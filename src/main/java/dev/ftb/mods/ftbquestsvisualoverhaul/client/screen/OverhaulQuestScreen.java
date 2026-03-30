@@ -1,5 +1,6 @@
 package dev.ftb.mods.ftbquestsvisualoverhaul.client.screen;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import dev.ftb.mods.ftbquests.client.ClientQuestFile;
 import dev.ftb.mods.ftbquests.client.FTBQuestsClient;
 import dev.ftb.mods.ftbquests.client.gui.quests.QuestScreen;
@@ -9,17 +10,16 @@ import dev.ftb.mods.ftbquests.quest.reward.Reward;
 import dev.ftb.mods.ftbquests.quest.task.Task;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestActionRouter;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestDataController;
-import dev.ftb.mods.ftbquestsvisualoverhaul.client.config.ModClientConfig;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.QuestDataSnapshot;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.RewardInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.TaskInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestOpenContext;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestViewState;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
@@ -30,33 +30,56 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Quest screen that replicates the vanilla Minecraft advancements screen
+ * as closely as possible for the quest tree area.
+ *
+ * References vanilla classes: AdvancementsScreen, AdvancementTab, AdvancementWidget
+ */
 public class OverhaulQuestScreen extends Screen {
+    // --- Custom background texture ---
     private static final ResourceLocation QUESTS_BACKGROUND_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quests_background.png");
-    private static final ResourceLocation OAK_PLANKS_TEXTURE = new ResourceLocation("minecraft", "textures/block/oak_planks.png");
-    private static final ResourceLocation ADVANCEMENT_WINDOW_TEXTURE = new ResourceLocation("minecraft", "textures/gui/advancements/window.png");
-    private static final ResourceLocation ADVANCEMENT_WIDGETS_TEXTURE = new ResourceLocation("minecraft", "textures/gui/advancements/widgets.png");
     private static final int BACKGROUND_WIDTH = 294;
     private static final int BACKGROUND_HEIGHT = 163;
     private static final int BACKGROUND_TEXTURE_WIDTH = 512;
     private static final int BACKGROUND_TEXTURE_HEIGHT = 256;
+
+    // --- Tree panel area within the background texture ---
     private static final int TREE_X = 89;
     private static final int TREE_Y = 19;
     private static final int TREE_WIDTH = 186;
     private static final int TREE_HEIGHT = 125;
 
-    private static final int OUTER_MARGIN = 18;
-    private static final int HEADER_HEIGHT = 58;
-    private static final int CHAPTER_WIDTH = 152;
-    private static final int SECTION_GAP = 12;
-    private static final int CHAPTER_ROW_HEIGHT = 42;
+    // --- Vanilla advancement textures ---
+    private static final ResourceLocation WINDOW_LOCATION = new ResourceLocation("textures/gui/advancements/window.png");
+    private static final ResourceLocation TABS_LOCATION = new ResourceLocation("textures/gui/advancements/tabs.png");
+    private static final ResourceLocation WIDGETS_LOCATION = new ResourceLocation("textures/gui/advancements/widgets.png");
+    private static final ResourceLocation OAK_PLANKS_TEXTURE = new ResourceLocation("minecraft", "textures/block/oak_planks.png");
+
+    // --- Node spacing (vanilla values from AdvancementWidget) ---
+    // Vanilla uses displayX * 28 and displayY * 27, where displayX/Y are 0,1,2,...
+    // FTB quest coordinates use a different scale, so we normalize to vanilla units
+    // first (via xStepSize/yStepSize) before multiplying by these constants.
     private static final int NODE_SPACING_X = 28;
     private static final int NODE_SPACING_Y = 27;
-    private static final int NODE_BASE_WIDTH = 26;
-    private static final int NODE_BASE_HEIGHT = 26;
-    private static final int ADVANCEMENT_WIDGET_SIZE = 26;
-    private static final int ADVANCEMENT_WIDGET_U = 0;
-    private static final int ADVANCEMENT_WIDGET_OBTAINED_V = 128;
-    private static final int ADVANCEMENT_WIDGET_UNOBTAINED_V = 154;
+    private static final int WIDGET_WIDTH = 26;
+    private static final int WIDGET_HEIGHT = 26;
+    private static final int WIDGET_ICON_X = 8;
+    private static final int WIDGET_ICON_Y = 5;
+
+    // --- Vanilla advancement tab dimensions (from AdvancementTabType.ABOVE) ---
+    private static final int TAB_WIDTH = 28;
+    private static final int TAB_HEIGHT = 32;
+
+    // --- Vanilla tooltip constants (from AdvancementWidget) ---
+    private static final int TITLE_PADDING_LEFT = 3;
+    private static final int TITLE_PADDING_RIGHT = 5;
+    private static final int TITLE_X = 32;
+    private static final int TITLE_Y = 9;
+    private static final int TITLE_MAX_WIDTH = 163;
+    private static final int[] TEST_SPLIT_OFFSETS = new int[]{0, 10, -10, 25, -25};
+
+    // --- Detail modal constants ---
     private static final int MODAL_MIN_WIDTH = 280;
     private static final int MODAL_MAX_WIDTH = 440;
     private static final int MODAL_HEADER_HEIGHT = 50;
@@ -67,23 +90,28 @@ public class OverhaulQuestScreen extends Screen {
     private final QuestViewState viewState;
     private final List<ClickTarget> clickTargets = new ArrayList<>();
 
-    private EditBox searchBox;
-    private Button claimAllButton;
-    private Button focusButton;
-    private Button vanillaButton;
-    private Button pinButton;
-
     private final Map<Long, NodeLayout> visibleQuestNodes = new HashMap<>();
     private QuestDataSnapshot.QuestSnapshot hoveredQuest;
-    private boolean draggingTree;
-    private double dragOriginMouseX;
-    private double dragOriginMouseY;
-    private double dragOriginPanX;
-    private double dragOriginPanY;
+    private boolean isScrolling;
     private long focusedChapterId = Long.MIN_VALUE;
+    private float fade;
+    private boolean centered;
+    private int tabPage;
+    private int maxPages;
+
+    // Scroll bounds tracking (from AdvancementTab)
+    private int minNodeX = Integer.MAX_VALUE;
+    private int minNodeY = Integer.MAX_VALUE;
+    private int maxNodeX = Integer.MIN_VALUE;
+    private int maxNodeY = Integer.MIN_VALUE;
+
+    // Normalized step sizes: minimum non-zero gap between quest positions,
+    // so we scale FTB coords to vanilla's 0,1,2,... units before multiplying by 28/27.
+    private double xStepSize = 1.0;
+    private double yStepSize = 1.0;
 
     public OverhaulQuestScreen(QuestOpenContext openContext) {
-        super(Component.literal("Quest Log"));
+        super(Component.literal("Quests"));
         this.openContext = openContext;
         this.viewState = openContext.previousState().copy();
 
@@ -98,6 +126,8 @@ public class OverhaulQuestScreen extends Screen {
     @Override
     protected void init() {
         clearWidgets();
+        centered = false;
+        updateTabPages();
     }
 
     @Override
@@ -116,6 +146,8 @@ public class OverhaulQuestScreen extends Screen {
         QuestDataController.saveViewState(viewState);
         super.onClose();
     }
+
+    // ---- Input handling (matching vanilla AdvancementsScreen) ----
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
@@ -138,49 +170,77 @@ public class OverhaulQuestScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
         QuestDataSnapshot.QuestSnapshot selectedQuest = getSelectedQuestSnapshot(snapshot);
+
+        // If a detail modal is open, handle clicks for it first
         if (selectedQuest != null) {
             if (button == 0 && handleClickTargets(mouseX, mouseY)) {
                 return true;
             }
-
-            Rect modalRect = buildDetailLayout(selectedQuest).rect();
-            if (!modalRect.contains(mouseX, mouseY)) {
+            DetailLayout layout = buildDetailLayout(selectedQuest);
+            if (!layout.rect().contains(mouseX, mouseY)) {
                 closeViewedQuest();
             }
             return true;
         }
 
+        // Check tab clicks (matching vanilla AdvancementsScreen.mouseClicked)
+        if (button == 0) {
+            Rect frame = frameRect();
+            int treeLeft = frame.x() + TREE_X;
+            int treeTop = frame.y() + TREE_Y;
+            List<QuestDataSnapshot.ChapterSnapshot> chapters = snapshot.chapters();
+            for (int i = 0; i < chapters.size(); i++) {
+                if (getTabPage(i) == tabPage && isTabMouseOver(treeLeft, treeTop, i, mouseX, mouseY)) {
+                    viewState.setSelectedChapterId(chapters.get(i).id());
+                    centered = false;
+                    closeViewedQuest();
+                    return true;
+                }
+            }
+        }
+
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
+
         if (button == 0 && handleClickTargets(mouseX, mouseY)) {
             return true;
         }
-        if (button == 0 && treeCanvasRect(treeRect(frameRect())).contains(mouseX, mouseY)) {
-            draggingTree = true;
-            dragOriginMouseX = mouseX;
-            dragOriginMouseY = mouseY;
-            dragOriginPanX = viewState.getTreePanX();
-            dragOriginPanY = viewState.getTreePanY();
-            return true;
-        }
+
         return false;
     }
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        draggingTree = false;
+        if (button == 0) {
+            isScrolling = false;
+        }
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
+    /**
+     * Matches vanilla AdvancementsScreen.mouseDragged exactly:
+     * - Only button 0 (left click)
+     * - First drag frame sets isScrolling=true but doesn't scroll
+     * - Subsequent frames apply delta-based scrolling
+     */
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (draggingTree && button == 0) {
-            viewState.setTreePanX(dragOriginPanX + mouseX - dragOriginMouseX);
-            viewState.setTreePanY(dragOriginPanY + mouseY - dragOriginMouseY);
-            return true;
+        if (button != 0) {
+            isScrolling = false;
+            return false;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+
+        if (viewState.getViewedQuestId() != 0L) {
+            return false;
+        }
+
+        if (!isScrolling) {
+            isScrolling = true;
+        } else {
+            scroll(dragX, dragY);
+        }
+        return true;
     }
 
     @Override
@@ -195,226 +255,621 @@ public class OverhaulQuestScreen extends Screen {
             }
             return true;
         }
-
-        Rect frame = frameRect();
-        Rect chapterRail = chapterRailRect(frame);
-        Rect treeCanvas = treeCanvasRect(treeRect(frame));
-
-        if (chapterRail.contains(mouseX, mouseY)) {
-            int contentHeight = QuestDataController.getSnapshot().chapters().size() * (CHAPTER_ROW_HEIGHT + 8);
-            viewState.setChapterScroll(clampScroll(viewState.getChapterScroll() - deltaY * 20D, contentHeight, chapterRail.height() - 20));
-            return true;
-        }
         return super.mouseScrolled(mouseX, mouseY, deltaY);
     }
+
+    // ---- Scroll/Pan (matching vanilla AdvancementTab.scroll) ----
+
+    private void scroll(double deltaX, double deltaY) {
+        if (maxNodeX - minNodeX > TREE_WIDTH) {
+            viewState.setTreePanX(Mth.clamp(viewState.getTreePanX() + deltaX, -(maxNodeX - TREE_WIDTH), 0.0D));
+        }
+        if (maxNodeY - minNodeY > TREE_HEIGHT) {
+            viewState.setTreePanY(Mth.clamp(viewState.getTreePanY() + deltaY, -(maxNodeY - TREE_HEIGHT), 0.0D));
+        }
+    }
+
+    // ---- Rendering ----
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
-        refreshState();
+        refreshState(snapshot);
         hoveredQuest = null;
         visibleQuestNodes.clear();
         clickTargets.clear();
-        renderBackdrop(graphics);
-        renderTreePanel(graphics, snapshot, treeRect(frameRect()), mouseX, mouseY);
-        super.render(graphics, mouseX, mouseY, partialTick);
 
-        if (viewState.getViewedQuestId() == 0L && hoveredQuest != null) {
-            renderHoverSummary(graphics, hoveredQuest, mouseX, mouseY);
+        Rect frame = frameRect();
+        int treeLeft = frame.x() + TREE_X;
+        int treeTop = frame.y() + TREE_Y;
+
+        // Dark backdrop + custom background texture
+        this.renderBackground(graphics);
+        graphics.fill(0, 0, width, height, 0xC0100B08);
+        graphics.blit(QUESTS_BACKGROUND_TEXTURE, frame.x(), frame.y(), 0, 0,
+                BACKGROUND_WIDTH, BACKGROUND_HEIGHT, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+
+        // Tab page indicator (from vanilla Forge extension)
+        if (maxPages != 0) {
+            Component page = Component.literal(String.format("%d / %d", tabPage + 1, maxPages + 1));
+            int pageWidth = this.font.width(page);
+            graphics.drawString(this.font, page.getVisualOrderText(),
+                    treeLeft + (TREE_WIDTH / 2) - (pageWidth / 2), treeTop - 44, -1);
         }
 
+        // Render tree content inside the tree panel area (vanilla advancement style)
+        renderInside(graphics, snapshot, mouseX, mouseY, treeLeft, treeTop);
+
+        // Chapter tabs along the top of the tree panel (vanilla tab style)
+        renderTabs(graphics, snapshot, treeLeft, treeTop, mouseX, mouseY);
+
+        super.render(graphics, mouseX, mouseY, partialTick);
+
+        // Tooltips (rendered after everything else so they appear on top)
+        renderTooltips(graphics, snapshot, mouseX, mouseY, treeLeft, treeTop);
+
+        // Detail modal overlay (quest-specific, not in vanilla advancements)
         QuestDataSnapshot.QuestSnapshot selectedQuest = getSelectedQuestSnapshot(snapshot);
         if (selectedQuest != null) {
             renderQuestDetailModal(graphics, selectedQuest, mouseX, mouseY);
         }
     }
 
-    private void renderBackdrop(GuiGraphics graphics) {
-        graphics.fill(0, 0, width, height, 0xC0100B08);
-        Rect frame = frameRect();
-        graphics.blit(QUESTS_BACKGROUND_TEXTURE, frame.x(), frame.y(), 0, 0, BACKGROUND_WIDTH, BACKGROUND_HEIGHT, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
-    }
-
-    private void renderFrame(GuiGraphics graphics, Rect frame, Rect header) {
-        drawPanel(graphics, frame, 0xFF201610, 0xFF362219, 0xFFB28752);
-        drawPanel(graphics, header, 0xFF3A261A, 0xFF291B13, 0xFFD5A86A);
-
-        graphics.blit(ADVANCEMENT_WINDOW_TEXTURE, header.x() + 8, header.y() + 6, 0, 0, 252, 140, 256, 256);
-        graphics.fill(header.x() + 6, header.y() + 6, header.maxX() - 6, header.maxY() - 6, 0xCC24160F);
-
-        graphics.drawString(font, title, frame.x() + 18, frame.y() + 10, 0xFFF8EACC, false);
-        graphics.drawString(font, Component.literal("Adventure log with a chapter rail, tree map, and quest dossier"), frame.x() + 18, frame.y() + 24, 0xFFD7B990, false);
-    }
-
-    private void renderChapterRail(GuiGraphics graphics, QuestDataSnapshot snapshot, Rect rect, int mouseX, int mouseY) {
-        drawPanel(graphics, rect, 0xFF231913, 0xFF18110D, 0xFF85603D);
-        graphics.drawString(font, Component.literal("Chapters"), rect.x() + 12, rect.y() + 10, 0xFFF5E4C0, false);
-
-        int rowY = rect.y() + 32 - (int) viewState.getChapterScroll();
-        graphics.enableScissor(rect.x() + 4, rect.y() + 28, rect.maxX() - 4, rect.maxY() - 6);
-        for (QuestDataSnapshot.ChapterSnapshot chapter : snapshot.chapters()) {
-            int x = rect.x() + 8;
-            int y = rowY;
-            boolean selected = chapter.id() == viewState.getSelectedChapterId();
-            boolean hovered = new Rect(x, y, rect.width() - 16, CHAPTER_ROW_HEIGHT).contains(mouseX, mouseY);
-            int fill = selected ? 0xFF7E552F : hovered ? 0xFF553826 : 0xFF2E211A;
-
-            graphics.fill(x, y, rect.maxX() - 8, y + CHAPTER_ROW_HEIGHT, fill);
-            graphics.fill(x, y, rect.maxX() - 8, y + 4, selected ? 0xFFD5A86A : 0xFF5C3E29);
-            chapter.icon().draw(graphics, x + 8, y + 12, 18, 18);
-            graphics.drawString(font, trim(chapter.title(), rect.width() - 54), x + 32, y + 9, 0xFFF7EBD2, false);
-            drawProgressBar(graphics, x + 32, y + 24, rect.width() - 56, 6, chapter.progress(), 0xFF4D3829, 0xFFE2B66F);
-            graphics.drawString(font, Component.literal(chapter.progress() + "%"), rect.maxX() - 34, y + 8, 0xFFE4CAA1, false);
-
-            clickTargets.add(new ClickTarget(new Rect(x, y, rect.width() - 16, CHAPTER_ROW_HEIGHT), () -> {
-                viewState.setSelectedChapterId(chapter.id());
-                closeViewedQuest();
-                focusCurrentChapter(true);
-            }));
-
-            rowY += CHAPTER_ROW_HEIGHT + 8;
-        }
-        graphics.disableScissor();
-    }
-
-    private void renderTreePanel(GuiGraphics graphics, QuestDataSnapshot snapshot, Rect rect, int mouseX, int mouseY) {
+    /**
+     * Renders the tree content area using vanilla AdvancementTab.drawContents approach:
+     * Scissor clips to tree panel, tiles background, draws connections + widgets.
+     */
+    private void renderInside(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, int treeLeft, int treeTop) {
         QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(viewState.getSelectedChapterId());
-        Rect canvas = treeCanvasRect(rect);
-        graphics.enableScissor(canvas.x(), canvas.y(), canvas.maxX(), canvas.maxY());
-        tileOakPlanksBackground(graphics, canvas);
+        if (chapter == null) {
+            // Match vanilla: black fill + empty label
+            graphics.fill(treeLeft, treeTop, treeLeft + TREE_WIDTH, treeTop + TREE_HEIGHT, -16777216);
+            graphics.drawCenteredString(this.font, Component.translatable("advancements.empty"),
+                    treeLeft + TREE_WIDTH / 2, treeTop + TREE_HEIGHT / 2 - 4, -1);
+            return;
+        }
 
-        List<QuestDataSnapshot.QuestSnapshot> quests = chapter == null ? List.of() : chapter.quests();
-        Map<Long, NodeLayout> nodes = buildNodeLayouts(quests, canvas);
-        renderQuestConnections(graphics, quests, nodes);
-        renderQuestNodes(graphics, quests, nodes, mouseX, mouseY);
+        List<QuestDataSnapshot.QuestSnapshot> quests = chapter.quests();
 
+        // Compute node bounds and auto-center (matching AdvancementTab logic)
+        computeNodeBounds(quests);
+        if (!centered && !quests.isEmpty()) {
+            // Matching AdvancementTab: center = halfWidth - (max+min)/2
+            viewState.setTreePanX((TREE_WIDTH / 2.0) - (maxNodeX + minNodeX) / 2.0);
+            viewState.setTreePanY((TREE_HEIGHT / 2.0) - (maxNodeY + minNodeY) / 2.0);
+            centered = true;
+        }
+
+        // Scissor to tree panel area (matching AdvancementTab.drawContents)
+        graphics.enableScissor(treeLeft, treeTop, treeLeft + TREE_WIDTH, treeTop + TREE_HEIGHT);
+        graphics.pose().pushPose();
+        graphics.pose().translate((float) treeLeft, (float) treeTop, 0.0F);
+
+        // Tile background (matching AdvancementTab: 16x16 tiles with scroll offset)
+        int scrollXInt = Mth.floor(viewState.getTreePanX());
+        int scrollYInt = Mth.floor(viewState.getTreePanY());
+        int tileOffsetX = scrollXInt % 16;
+        int tileOffsetY = scrollYInt % 16;
+
+        int tilesX = (TREE_WIDTH / 16) + 2;
+        int tilesY = (TREE_HEIGHT / 16) + 2;
+        for (int tx = -1; tx <= tilesX; ++tx) {
+            for (int ty = -1; ty <= tilesY; ++ty) {
+                graphics.blit(OAK_PLANKS_TEXTURE, tileOffsetX + 16 * tx, tileOffsetY + 16 * ty, 0.0F, 0.0F, 16, 16, 16, 16);
+            }
+        }
+
+        // Draw connections (matching AdvancementWidget.drawConnectivity)
+        // First pass: black outline, second pass: white center
+        drawAllConnections(graphics, quests, scrollXInt, scrollYInt, true);
+        drawAllConnections(graphics, quests, scrollXInt, scrollYInt, false);
+
+        // Draw widgets (matching AdvancementWidget.draw)
+        drawAllWidgets(graphics, quests, scrollXInt, scrollYInt, mouseX - treeLeft, mouseY - treeTop);
+
+        graphics.pose().popPose();
         graphics.disableScissor();
-        drawInsetBorder(graphics, canvas, 0x88876646, 0xCC110C09);
     }
 
-    private void tileOakPlanksBackground(GuiGraphics graphics, Rect rect) {
-        int offsetX = Mth.floor(viewState.getTreePanX()) % 16;
-        int offsetY = Mth.floor(viewState.getTreePanY()) % 16;
-        if (offsetX > 0) {
-            offsetX -= 16;
-        }
-        if (offsetY > 0) {
-            offsetY -= 16;
-        }
+    /**
+     * Renders chapter tabs along the top of the tree panel area,
+     * using the vanilla advancement tab style (tabs.png texture).
+     */
+    private void renderTabs(GuiGraphics graphics, QuestDataSnapshot snapshot, int treeLeft, int treeTop, int mouseX, int mouseY) {
+        List<QuestDataSnapshot.ChapterSnapshot> chapters = snapshot.chapters();
+        if (chapters.size() <= 1) return;
 
-        for (int y = rect.y() + offsetY; y < rect.maxY(); y += 16) {
-            for (int x = rect.x() + offsetX; x < rect.maxX(); x += 16) {
-                graphics.blit(OAK_PLANKS_TEXTURE, x, y, 0, 0, 16, 16, 16, 16);
+        RenderSystem.enableBlend();
+
+        // Draw tab backgrounds
+        for (int i = 0; i < chapters.size(); i++) {
+            if (getTabPage(i) == tabPage) {
+                boolean selected = chapters.get(i).id() == viewState.getSelectedChapterId();
+                drawTab(graphics, treeLeft, treeTop, i, selected);
             }
         }
-        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0x55140F0B);
+
+        // Draw tab icons
+        for (int i = 0; i < chapters.size(); i++) {
+            if (getTabPage(i) == tabPage) {
+                drawTabIcon(graphics, treeLeft, treeTop, i, chapters.get(i));
+            }
+        }
     }
 
-    private void renderQuestConnections(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests, Map<Long, NodeLayout> nodes) {
-        String query = normalizedQuery();
-        for (QuestDataSnapshot.QuestSnapshot quest : quests) {
-            NodeLayout node = nodes.get(quest.id());
-            if (node == null) {
-                continue;
-            }
+    /**
+     * Renders tooltips for hovered widgets and tabs.
+     * Matches vanilla AdvancementTab.drawTooltips approach with fade overlay.
+     */
+    private void renderTooltips(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, int treeLeft, int treeTop) {
+        if (viewState.getViewedQuestId() != 0L) {
+            return;
+        }
 
-            boolean questMatch = query.isEmpty() || questMatchesQuery(quest, query);
-            for (Long dependencyId : quest.dependencyQuestIds()) {
-                NodeLayout dependencyNode = nodes.get(dependencyId);
-                if (dependencyNode == null) {
-                    continue;
+        QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(viewState.getSelectedChapterId());
+        if (chapter != null) {
+            // Matching AdvancementsScreen.renderTooltips: translate to content origin at z=400
+            graphics.pose().pushPose();
+            graphics.pose().translate((float) treeLeft, (float) treeTop, 400.0F);
+            RenderSystem.enableDepthTest();
+
+            int relMouseX = mouseX - treeLeft;
+            int relMouseY = mouseY - treeTop;
+
+            // Fade overlay (matching AdvancementTab.drawTooltips)
+            graphics.pose().pushPose();
+            graphics.pose().translate(0.0F, 0.0F, -200.0F);
+            graphics.fill(0, 0, TREE_WIDTH, TREE_HEIGHT, Mth.floor(this.fade * 255.0F) << 24);
+            boolean foundHovered = false;
+
+            if (relMouseX > 0 && relMouseX < TREE_WIDTH && relMouseY > 0 && relMouseY < TREE_HEIGHT) {
+                int scrollXInt = Mth.floor(viewState.getTreePanX());
+                int scrollYInt = Mth.floor(viewState.getTreePanY());
+
+                for (QuestDataSnapshot.QuestSnapshot quest : chapter.quests()) {
+                    int nodeX = getNodeX(quest);
+                    int nodeY = getNodeY(quest);
+                    int widgetX = scrollXInt + nodeX;
+                    int widgetY = scrollYInt + nodeY;
+
+                    if (relMouseX >= widgetX && relMouseX <= widgetX + WIDGET_WIDTH
+                            && relMouseY >= widgetY && relMouseY <= widgetY + WIDGET_HEIGHT) {
+                        foundHovered = true;
+                        drawWidgetHover(graphics, quest, scrollXInt, scrollYInt, this.fade, treeLeft, treeTop);
+                        break;
+                    }
                 }
+            }
 
-                boolean dependencyMatch = query.isEmpty() || questMatchesQuery(dependencyNode.quest(), query);
-                int color = quest.completed() ? 0xFF79B06A : quest.canStart() ? 0xFFD6A25A : 0xFF5C4734;
-                if (!query.isEmpty() && !questMatch && !dependencyMatch) {
-                    color = 0x88443226;
+            graphics.pose().popPose();
+
+            // Matching vanilla fade behavior
+            if (foundHovered) {
+                this.fade = Mth.clamp(this.fade + 0.02F, 0.0F, 0.3F);
+            } else {
+                this.fade = Mth.clamp(this.fade - 0.04F, 0.0F, 1.0F);
+            }
+
+            RenderSystem.disableDepthTest();
+            graphics.pose().popPose();
+        }
+
+        // Tab tooltips (matching vanilla)
+        List<QuestDataSnapshot.ChapterSnapshot> chapters = snapshot.chapters();
+        if (chapters.size() > 1) {
+            for (int i = 0; i < chapters.size(); i++) {
+                if (getTabPage(i) == tabPage && isTabMouseOver(treeLeft, treeTop, i, mouseX, mouseY)) {
+                    graphics.renderTooltip(this.font, chapters.get(i).title(), mouseX, mouseY);
                 }
-
-                int sx = dependencyNode.centerX();
-                int sy = dependencyNode.centerY();
-                int ex = node.centerX();
-                int ey = node.centerY();
-                int midX = sx + (ex - sx) / 2;
-
-                drawHorizontalLine(graphics, sx, midX, sy, color);
-                drawVerticalLine(graphics, midX, sy, ey, color);
-                drawHorizontalLine(graphics, midX, ex, ey, color);
             }
         }
     }
 
-    private void renderQuestNodes(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests, Map<Long, NodeLayout> nodes, int mouseX, int mouseY) {
+    // ---- Node position calculations (matching AdvancementWidget) ----
+
+    /**
+     * Converts a quest's raw FTB x coordinate to a pixel position.
+     * Normalizes by xStepSize so the minimum inter-node gap matches vanilla's
+     * 0→1→2 integer unit scale, then multiplies by NODE_SPACING_X (28, vanilla value).
+     */
+    private int getNodeX(QuestDataSnapshot.QuestSnapshot quest) {
+        return Mth.floor((quest.x() / xStepSize) * NODE_SPACING_X);
+    }
+
+    private int getNodeY(QuestDataSnapshot.QuestSnapshot quest) {
+        return Mth.floor((quest.y() / yStepSize) * NODE_SPACING_Y);
+    }
+
+    /**
+     * Compute min/max node bounds (matching AdvancementTab.addWidget bounds tracking)
+     * and derive xStepSize/yStepSize by finding the minimum non-zero gap between
+     * quest coordinates. This normalizes FTB's coordinate scale to vanilla units.
+     */
+    private void computeNodeBounds(List<QuestDataSnapshot.QuestSnapshot> quests) {
+        minNodeX = Integer.MAX_VALUE;
+        minNodeY = Integer.MAX_VALUE;
+        maxNodeX = Integer.MIN_VALUE;
+        maxNodeY = Integer.MIN_VALUE;
+
+        // Derive step sizes from the data before computing pixel positions
+        xStepSize = computeStepSize(quests.stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::x).sorted().distinct().toArray());
+        yStepSize = computeStepSize(quests.stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::y).sorted().distinct().toArray());
+
         for (QuestDataSnapshot.QuestSnapshot quest : quests) {
-            NodeLayout node = nodes.get(quest.id());
-            if (node == null) {
-                continue;
+            int x = getNodeX(quest);
+            int y = getNodeY(quest);
+            minNodeX = Math.min(minNodeX, x);
+            maxNodeX = Math.max(maxNodeX, x + NODE_SPACING_X);
+            minNodeY = Math.min(minNodeY, y);
+            maxNodeY = Math.max(maxNodeY, y + NODE_SPACING_Y);
+        }
+    }
+
+    /**
+     * Finds the minimum non-zero absolute difference between consecutive values
+     * in a sorted array. Returns 1.0 if there are fewer than 2 distinct values.
+     */
+    private static double computeStepSize(double[] sortedValues) {
+        if (sortedValues.length < 2) return 1.0;
+        double minStep = Double.MAX_VALUE;
+        for (int i = 1; i < sortedValues.length; i++) {
+            double gap = sortedValues[i] - sortedValues[i - 1];
+            if (gap > 1e-6) {
+                minStep = Math.min(minStep, gap);
             }
+        }
+        return minStep == Double.MAX_VALUE ? 1.0 : minStep;
+    }
 
-            Rect rect = node.rect();
-            boolean hovered = rect.contains(mouseX, mouseY);
-            renderAdvancementWidget(graphics, rect, quest.completed() || quest.hasUnclaimedRewards());
+    // ---- Connection line drawing (matching AdvancementWidget.drawConnectivity exactly) ----
 
-            int iconSize = Math.min(16, rect.height() - 10);
-            int iconX = rect.x() + (rect.width() - iconSize) / 2;
-            int iconY = rect.y() + (rect.height() - iconSize) / 2;
-            quest.icon().draw(graphics, iconX, iconY, iconSize, iconSize);
+    /**
+     * Draws connection lines between quest nodes.
+     * Matches vanilla AdvancementWidget.drawConnectivity:
+     * - When outline=true: draws 3px-wide black lines (-16777216)
+     * - When outline=false: draws 1px-wide white lines (-1)
+     * - Line path: horizontal from parent center to parent right edge+4,
+     *              then vertical to child Y, then horizontal to child center.
+     */
+    private void drawAllConnections(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests, int scrollX, int scrollY, boolean outline) {
+        Map<Long, QuestDataSnapshot.QuestSnapshot> questMap = new HashMap<>();
+        for (QuestDataSnapshot.QuestSnapshot q : quests) {
+            questMap.put(q.id(), q);
+        }
 
-            clickTargets.add(new ClickTarget(rect, () -> {
+        for (QuestDataSnapshot.QuestSnapshot quest : quests) {
+            for (Long depId : quest.dependencyQuestIds()) {
+                QuestDataSnapshot.QuestSnapshot parent = questMap.get(depId);
+                if (parent == null) continue;
+
+                // Matching vanilla variable names from AdvancementWidget.drawConnectivity:
+                // i = scrollX + parent.x + 13 (parent center X)
+                // j = scrollX + parent.x + 26 + 4 (parent right edge + gap)
+                // k = scrollY + parent.y + 13 (parent center Y)
+                // l = scrollX + this.x + 13 (child center X)
+                // i1 = scrollY + this.y + 13 (child center Y)
+                int parentX = getNodeX(parent);
+                int parentY = getNodeY(parent);
+                int childX = getNodeX(quest);
+                int childY = getNodeY(quest);
+
+                int i = scrollX + parentX + 13;
+                int j = scrollX + parentX + 26 + 4;
+                int k = scrollY + parentY + 13;
+                int l = scrollX + childX + 13;
+                int i1 = scrollY + childY + 13;
+                int lineColor = outline ? -16777216 : -1;
+
+                if (outline) {
+                    // Black outline: 3px wide lines
+                    graphics.hLine(j, i, k - 1, lineColor);
+                    graphics.hLine(j + 1, i, k, lineColor);
+                    graphics.hLine(j, i, k + 1, lineColor);
+                    graphics.hLine(l, j - 1, i1 - 1, lineColor);
+                    graphics.hLine(l, j - 1, i1, lineColor);
+                    graphics.hLine(l, j - 1, i1 + 1, lineColor);
+                    graphics.vLine(j - 1, i1, k, lineColor);
+                    graphics.vLine(j + 1, i1, k, lineColor);
+                } else {
+                    // White center: 1px wide lines
+                    graphics.hLine(j, i, k, lineColor);
+                    graphics.hLine(l, j, i1, lineColor);
+                    graphics.vLine(j, i1, k, lineColor);
+                }
+            }
+        }
+    }
+
+    // ---- Widget drawing (matching AdvancementWidget.draw) ----
+
+    /**
+     * Draws all quest widgets.
+     * Matches AdvancementWidget.draw:
+     * - blit from widgets.png at (scrollX + x + 3, scrollY + y)
+     * - U = frame texture offset (we use 0 = TASK frame for all quests)
+     * - V = 128 + widgetType * 26 (128=obtained, 154=unobtained)
+     * - Then render item icon at (scrollX + x + 8, scrollY + y + 5)
+     */
+    private void drawAllWidgets(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests, int scrollX, int scrollY, int relMouseX, int relMouseY) {
+        for (QuestDataSnapshot.QuestSnapshot quest : quests) {
+            int nodeX = getNodeX(quest);
+            int nodeY = getNodeY(quest);
+
+            boolean obtained = quest.completed() || quest.hasUnclaimedRewards();
+            int widgetTypeIndex = obtained ? 0 : 1; // OBTAINED=0, UNOBTAINED=1
+
+            // Frame texture U: 0=TASK, 26=CHALLENGE, 52=GOAL
+            // We use TASK (0) as the default frame for all quests
+            int frameU = 0;
+
+            // Matching vanilla: blit at (scrollX + x + 3, scrollY + y)
+            graphics.blit(WIDGETS_LOCATION,
+                    scrollX + nodeX + 3, scrollY + nodeY,
+                    frameU, 128 + widgetTypeIndex * 26,
+                    WIDGET_WIDTH, WIDGET_HEIGHT);
+
+            // Matching vanilla: render icon at (scrollX + x + 8, scrollY + y + 5)
+            quest.icon().draw(graphics,
+                    scrollX + nodeX + WIDGET_ICON_X,
+                    scrollY + nodeY + WIDGET_ICON_Y,
+                    16, 16);
+
+            // Hit detection for click targets (in screen coordinates)
+            Rect frame = frameRect();
+            int screenX = scrollX + nodeX + frame.x() + TREE_X;
+            int screenY = scrollY + nodeY + frame.y() + TREE_Y;
+            clickTargets.add(new ClickTarget(new Rect(screenX, screenY, WIDGET_WIDTH, WIDGET_HEIGHT), () -> {
                 viewState.setViewedQuestId(quest.id());
                 viewState.setDetailScroll(0D);
             }));
 
-            visibleQuestNodes.put(quest.id(), node);
-            if (hovered) {
+            visibleQuestNodes.put(quest.id(), new NodeLayout(quest, new Rect(screenX, screenY, WIDGET_WIDTH, WIDGET_HEIGHT)));
+
+            // Check hover (in content-relative coordinates)
+            int widgetScreenX = scrollX + nodeX;
+            int widgetScreenY = scrollY + nodeY;
+            if (relMouseX >= widgetScreenX && relMouseX <= widgetScreenX + WIDGET_WIDTH
+                    && relMouseY >= widgetScreenY && relMouseY <= widgetScreenY + WIDGET_HEIGHT) {
                 hoveredQuest = quest;
             }
         }
     }
 
-    private void renderAdvancementWidget(GuiGraphics graphics, Rect rect, boolean obtained) {
-        int v = obtained ? ADVANCEMENT_WIDGET_OBTAINED_V : ADVANCEMENT_WIDGET_UNOBTAINED_V;
-        graphics.blit(
-                ADVANCEMENT_WIDGETS_TEXTURE,
-                rect.x(),
-                rect.y(),
-                rect.width(),
-                rect.height(),
-                ADVANCEMENT_WIDGET_U,
-                v,
-                ADVANCEMENT_WIDGET_SIZE,
-                ADVANCEMENT_WIDGET_SIZE,
-                256,
-                256
-        );
+    // ---- Hover tooltip (matching AdvancementWidget.drawHover) ----
+
+    /**
+     * Draws the hover tooltip for a quest widget.
+     * Closely matches AdvancementWidget.drawHover:
+     * - Determines tooltip width from title + description
+     * - Flips left if tooltip would go off-screen right
+     * - Flips up if tooltip would go off-screen bottom
+     * - Draws nine-sliced description background
+     * - Draws title bar with progress-based split (obtained/unobtained halves)
+     * - Draws frame icon overlay
+     * - Draws title text and description text
+     */
+    private void drawWidgetHover(GuiGraphics graphics, QuestDataSnapshot.QuestSnapshot quest, int scrollX, int scrollY, float currentFade, int treeLeft, int treeTop) {
+        int nodeX = getNodeX(quest);
+        int nodeY = getNodeY(quest);
+        boolean obtained = quest.completed() || quest.hasUnclaimedRewards();
+
+        // Build tooltip text (matching AdvancementWidget constructor logic)
+        FormattedCharSequence titleSeq = Language.getInstance().getVisualOrder(font.substrByWidth(quest.title(), TITLE_MAX_WIDTH));
+        int titleWidth = font.width(titleSeq);
+
+        // Progress text: only shown when partially complete (not 0% or 100%)
+        int progress = quest.progress();
+        boolean showProgress = progress > 0 && progress < 100;
+        String progressText = progress + "%";
+        int progressTextWidth = showProgress ? font.width(progressText) : 0;
+        int spaceWidth = showProgress ? font.width(" ") : 0;
+
+        int tooltipWidth = 29 + titleWidth + progressTextWidth + spaceWidth;
+
+        // Build description lines (matching AdvancementWidget.findOptimalLines)
+        Component descComponent;
+        if (!quest.subtitle().getString().isEmpty()) {
+            descComponent = quest.subtitle().copy().withStyle(Style.EMPTY.withColor(obtained ? 0x55FF55 : 0xFFFF55));
+        } else if (!quest.description().isEmpty()) {
+            descComponent = quest.description().get(0).copy().withStyle(Style.EMPTY.withColor(obtained ? 0x55FF55 : 0xFFFF55));
+        } else {
+            descComponent = Component.literal(quest.tasks().size() + " requirements").withStyle(Style.EMPTY.withColor(0xAAAAAA));
+        }
+
+        List<FormattedCharSequence> description = findOptimalLines(descComponent, tooltipWidth);
+        for (FormattedCharSequence line : description) {
+            tooltipWidth = Math.max(tooltipWidth, font.width(line));
+        }
+        tooltipWidth += TITLE_PADDING_LEFT + TITLE_PADDING_RIGHT;
+
+        // Determine tooltip position (matching vanilla drawHover logic)
+        // flag = tooltip goes off right edge (vanilla uses: windowX + scrollX + x + width + 26 >= screen.width)
+        boolean flipLeft = treeLeft + scrollX + nodeX + tooltipWidth + 26 >= this.width;
+        // flag1 = tooltip goes off bottom edge (vanilla uses: contentHeight - scrollY - y - 26 <= 6 + desc.size * 9)
+        boolean flipUp = TREE_HEIGHT - scrollY - nodeY - 26 <= 6 + description.size() * 9;
+
+        // Progress-based title bar split (matching vanilla exactly)
+        float percent = quest.progress() / 100.0F;
+        int splitJ = Mth.floor(percent * (float) tooltipWidth);
+
+        int obtainedIdx; // left half type
+        int unobtainedIdx; // right half type
+        int frameIdx; // frame overlay type
+
+        if (percent >= 1.0F) {
+            splitJ = tooltipWidth / 2;
+            obtainedIdx = 0; // OBTAINED
+            unobtainedIdx = 0; // OBTAINED
+            frameIdx = 0; // OBTAINED
+        } else if (splitJ < 2) {
+            splitJ = tooltipWidth / 2;
+            obtainedIdx = 1; // UNOBTAINED
+            unobtainedIdx = 1; // UNOBTAINED
+            frameIdx = 1; // UNOBTAINED
+        } else if (splitJ > tooltipWidth - 2) {
+            splitJ = tooltipWidth / 2;
+            obtainedIdx = 0; // OBTAINED
+            unobtainedIdx = 0; // OBTAINED
+            frameIdx = 1; // UNOBTAINED
+        } else {
+            obtainedIdx = 0; // OBTAINED
+            unobtainedIdx = 1; // UNOBTAINED
+            frameIdx = 1; // UNOBTAINED
+        }
+
+        int splitK = tooltipWidth - splitJ;
+
+        RenderSystem.enableBlend();
+        int drawY = scrollY + nodeY;
+        int drawX;
+        if (flipLeft) {
+            drawX = scrollX + nodeX - tooltipWidth + 26 + 6;
+        } else {
+            drawX = scrollX + nodeX;
+        }
+
+        // Description background - nine-sliced (matching vanilla)
+        int descHeight = 32 + description.size() * 9;
+        if (!description.isEmpty()) {
+            if (flipUp) {
+                graphics.blitNineSliced(WIDGETS_LOCATION, drawX, drawY + 26 - descHeight, tooltipWidth, descHeight, 10, 200, 26, 0, 52);
+            } else {
+                graphics.blitNineSliced(WIDGETS_LOCATION, drawX, drawY, tooltipWidth, descHeight, 10, 200, 26, 0, 52);
+            }
+        }
+
+        // Title bar - left half (obtained portion)
+        graphics.blit(WIDGETS_LOCATION, drawX, drawY, 0, obtainedIdx * 26, splitJ, 26);
+        // Title bar - right half (unobtained portion)
+        graphics.blit(WIDGETS_LOCATION, drawX + splitJ, drawY, 200 - splitK, unobtainedIdx * 26, splitK, 26);
+
+        // Frame icon overlay (matching vanilla: at x+3, y with frame texture)
+        graphics.blit(WIDGETS_LOCATION, scrollX + nodeX + 3, scrollY + nodeY, 0, 128 + frameIdx * 26, WIDGET_WIDTH, WIDGET_HEIGHT);
+
+        // Title text with space before progress (progress omitted at 0% and 100%)
+        if (flipLeft) {
+            graphics.drawString(this.font, titleSeq, drawX + 5, scrollY + nodeY + TITLE_Y, -1);
+            if (showProgress) {
+                graphics.drawString(this.font, " " + progressText, scrollX + nodeX - progressTextWidth - font.width(" "), scrollY + nodeY + TITLE_Y, -1);
+            }
+        } else {
+            graphics.drawString(this.font, titleSeq, scrollX + nodeX + TITLE_X, scrollY + nodeY + TITLE_Y, -1);
+            if (showProgress) {
+                graphics.drawString(this.font, " " + progressText, scrollX + nodeX + tooltipWidth - progressTextWidth - font.width(" ") - 5, scrollY + nodeY + TITLE_Y, -1);
+            }
+        }
+
+        // Description lines (matching vanilla text color: -5592406 = 0xFFAAAAAA)
+        if (flipUp) {
+            for (int idx = 0; idx < description.size(); idx++) {
+                graphics.drawString(this.font, description.get(idx), drawX + 5, drawY + 26 - descHeight + 7 + idx * 9, -5592406, false);
+            }
+        } else {
+            for (int idx = 0; idx < description.size(); idx++) {
+                graphics.drawString(this.font, description.get(idx), drawX + 5, scrollY + nodeY + 9 + 17 + idx * 9, -5592406, false);
+            }
+        }
+
+        // Re-render icon on top of tooltip (matching vanilla)
+        quest.icon().draw(graphics,
+                scrollX + nodeX + WIDGET_ICON_X,
+                scrollY + nodeY + WIDGET_ICON_Y,
+                16, 16);
     }
 
-    private void renderHoverSummary(GuiGraphics graphics, QuestDataSnapshot.QuestSnapshot quest, int mouseX, int mouseY) {
-        int width = Math.min(180, this.width - 24);
-        List<FormattedCharSequence> summary = summarizeQuest(quest, width - 18, 4);
-        int height = 22 + summary.size() * 10;
-        int x = mouseX + 12;
-        int y = mouseY - 8;
-        if (x + width > this.width - 8) {
-            x = mouseX - width - 12;
-        }
-        if (y + height > this.height - 8) {
-            y = this.height - height - 8;
-        }
-        if (y < 8) {
-            y = 8;
-        }
-        Rect rect = new Rect(x, y, width, height);
+    /**
+     * Matches AdvancementWidget.findOptimalLines:
+     * Tries different split widths to find the best text wrapping.
+     */
+    private List<FormattedCharSequence> findOptimalLines(Component text, int maxWidth) {
+        var splitter = this.font.getSplitter();
+        List<FormattedCharSequence> best = null;
+        float bestDiff = Float.MAX_VALUE;
 
-        drawPanel(graphics, rect, 0xF02C2116, 0xF018120C, 0xFFE2B66F);
-        graphics.drawString(font, trim(quest.title(), width - 14), x + 7, y + 6, 0xFFF8EFD9, false);
-
-        int lineY = y + 18;
-        for (FormattedCharSequence line : summary) {
-            graphics.drawString(font, line, x + 7, lineY, 0xFFEADAC0);
-            lineY += 10;
+        for (int offset : TEST_SPLIT_OFFSETS) {
+            var lines = splitter.splitLines(text, maxWidth - offset, Style.EMPTY);
+            float maxLineWidth = (float) lines.stream().mapToDouble(splitter::stringWidth).max().orElse(0.0D);
+            float diff = Math.abs(maxLineWidth - (float) maxWidth);
+            if (diff <= 10.0F) {
+                return lines.stream()
+                        .map(ft -> Language.getInstance().getVisualOrder(ft))
+                        .toList();
+            }
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = lines.stream()
+                        .map(ft -> Language.getInstance().getVisualOrder(ft))
+                        .toList();
+            }
         }
+        return best != null ? best : List.of();
     }
+
+    // ---- Tab rendering (matching AdvancementTabType.ABOVE) ----
+
+    /**
+     * Draws a chapter tab along the top of the window.
+     * Matches AdvancementTabType.ABOVE.draw:
+     * - textureX=0 (first tab), +28 (middle tabs), +56 (last tab)
+     * - textureY=0 (unselected), +32 (selected)
+     * - Position: (tabWidth+4)*index, y=-tabHeight+4
+     */
+    private void drawTab(GuiGraphics graphics, int windowX, int windowY, int tabIndex, boolean selected) {
+        int localIndex = tabIndex % AdvancementTabTypeAbove.MAX_TABS;
+
+        int textureX = 0;
+        if (localIndex > 0) textureX += TAB_WIDTH;
+        if (localIndex == AdvancementTabTypeAbove.MAX_TABS - 1) textureX += TAB_WIDTH;
+
+        int textureY = selected ? TAB_HEIGHT : 0;
+
+        int tabX = windowX + (TAB_WIDTH + 4) * localIndex;
+        int tabY = windowY + (-TAB_HEIGHT + 4);
+
+        graphics.blit(TABS_LOCATION, tabX, tabY, textureX, textureY, TAB_WIDTH, TAB_HEIGHT);
+    }
+
+    /**
+     * Draws the chapter icon on its tab.
+     * Matches AdvancementTabType.ABOVE.drawIcon:
+     * - Icon offset: x+6, y+9
+     */
+    private void drawTabIcon(GuiGraphics graphics, int windowX, int windowY, int tabIndex, QuestDataSnapshot.ChapterSnapshot chapter) {
+        int localIndex = tabIndex % AdvancementTabTypeAbove.MAX_TABS;
+        int tabX = windowX + (TAB_WIDTH + 4) * localIndex + 6;
+        int tabY = windowY + (-TAB_HEIGHT + 4) + 9;
+        chapter.icon().draw(graphics, tabX, tabY, 16, 16);
+    }
+
+    private boolean isTabMouseOver(int windowX, int windowY, int tabIndex, double mouseX, double mouseY) {
+        int localIndex = tabIndex % AdvancementTabTypeAbove.MAX_TABS;
+        int tabX = windowX + (TAB_WIDTH + 4) * localIndex;
+        int tabY = windowY + (-TAB_HEIGHT + 4);
+        return mouseX > tabX && mouseX < tabX + TAB_WIDTH && mouseY > tabY && mouseY < tabY + TAB_HEIGHT;
+    }
+
+    private int getTabPage(int tabIndex) {
+        return tabIndex / AdvancementTabTypeAbove.MAX_TABS;
+    }
+
+    private void updateTabPages() {
+        QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
+        int tabCount = snapshot.chapters().size();
+        if (tabCount > AdvancementTabTypeAbove.MAX_TABS) {
+            maxPages = (tabCount - 1) / AdvancementTabTypeAbove.MAX_TABS;
+        } else {
+            maxPages = 0;
+        }
+        tabPage = Mth.clamp(tabPage, 0, maxPages);
+    }
+
+    // Tab type constants - max tabs per page is limited by tree panel width
+    // Tree panel is 186px wide, each tab is 32px (28+4), so ~5 tabs fit
+    private static final class AdvancementTabTypeAbove {
+        static final int MAX_TABS = 5;
+    }
+
+    // ---- Quest Detail Modal (preserved from existing implementation) ----
 
     private void renderQuestDetailModal(GuiGraphics graphics, QuestDataSnapshot.QuestSnapshot quest, int mouseX, int mouseY) {
         graphics.fill(0, 0, width, height, 0xA0140E0A);
@@ -424,7 +879,7 @@ public class OverhaulQuestScreen extends Screen {
         Rect body = layout.bodyRect();
 
         drawPanel(graphics, rect, 0xFF2B1D14, 0xFF18110D, 0xFFE0B46A);
-        graphics.blit(ADVANCEMENT_WINDOW_TEXTURE, rect.x() + 4, rect.y() + 4, 0, 0, 252, 140, 256, 256);
+        graphics.blit(WINDOW_LOCATION, rect.x() + 4, rect.y() + 4, 0, 0, Math.min(252, rect.width() - 8), Math.min(140, rect.height() - 8), 256, 256);
         graphics.fill(rect.x() + 4, rect.y() + 4, rect.maxX() - 4, rect.maxY() - 4, 0xDD1D140E);
 
         quest.icon().draw(graphics, rect.x() + 12, rect.y() + 14, 22, 22);
@@ -586,6 +1041,8 @@ public class OverhaulQuestScreen extends Screen {
         return y + 36;
     }
 
+    // ---- Utility rendering methods ----
+
     private void renderHeaderChip(GuiGraphics graphics, int x, int y, int width, int height, String label, int fill) {
         graphics.fill(x, y, x + width, y + height, fill);
         graphics.drawCenteredString(font, Component.literal(label), x + width / 2, y + 4, 0xFFF8ECD6);
@@ -597,33 +1054,7 @@ public class OverhaulQuestScreen extends Screen {
         graphics.drawCenteredString(font, Component.literal(up ? "^" : "v"), x + 6, y + 2, active ? 0xFFF7EAD2 : 0xFF9D7C57);
     }
 
-    private Map<Long, NodeLayout> buildNodeLayouts(List<QuestDataSnapshot.QuestSnapshot> quests, Rect canvas) {
-        Map<Long, NodeLayout> nodes = new HashMap<>();
-        if (quests.isEmpty()) {
-            return nodes;
-        }
-
-        double spacingX = NODE_SPACING_X;
-        double spacingY = NODE_SPACING_Y;
-        int nodeWidth = NODE_BASE_WIDTH;
-        int nodeHeight = NODE_BASE_HEIGHT;
-
-        double minX = quests.stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::x).min().orElse(0D);
-        double maxX = quests.stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::x).max().orElse(0D);
-        double minY = quests.stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::y).min().orElse(0D);
-        double maxY = quests.stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::y).max().orElse(0D);
-
-        double centerX = (minX + maxX) / 2D;
-        double centerY = (minY + maxY) / 2D;
-
-        for (QuestDataSnapshot.QuestSnapshot quest : quests) {
-            int x = Mth.floor(canvas.centerX() + (quest.x() - centerX) * spacingX + viewState.getTreePanX() - nodeWidth / 2D);
-            int y = Mth.floor(canvas.centerY() + (quest.y() - centerY) * spacingY + viewState.getTreePanY() - nodeHeight / 2D);
-            nodes.put(quest.id(), new NodeLayout(quest, new Rect(x, y, nodeWidth, nodeHeight)));
-        }
-
-        return nodes;
-    }
+    // ---- Layout and state helpers ----
 
     private DetailLayout buildDetailLayout(QuestDataSnapshot.QuestSnapshot quest) {
         int desiredWidth = Math.max(
@@ -658,20 +1089,6 @@ public class OverhaulQuestScreen extends Screen {
         return new DetailLayout(rect, bodyRect, subtitleLines, descriptionLines, contentHeight);
     }
 
-    private List<FormattedCharSequence> summarizeQuest(QuestDataSnapshot.QuestSnapshot quest, int width, int maxLines) {
-        List<FormattedCharSequence> lines = new ArrayList<>();
-        if (!quest.subtitle().getString().isEmpty()) {
-            lines.addAll(font.split(quest.subtitle(), width));
-        } else if (!quest.description().isEmpty()) {
-            lines.addAll(font.split(quest.description().get(0), width));
-        }
-
-        if (lines.isEmpty()) {
-            lines.addAll(font.split(Component.literal(quest.tasks().size() + " requirements, " + quest.rewards().size() + " rewards"), width));
-        }
-        return lines.subList(0, Math.min(maxLines, lines.size()));
-    }
-
     private List<FormattedCharSequence> flattenDescription(List<Component> description, int maxWidth) {
         List<FormattedCharSequence> lines = new ArrayList<>();
         for (Component component : description) {
@@ -683,36 +1100,7 @@ public class OverhaulQuestScreen extends Screen {
         return lines;
     }
 
-    private boolean questMatchesQuery(QuestDataSnapshot.QuestSnapshot quest, String query) {
-        String normalizedTitle = quest.title().getString().toLowerCase(Locale.ROOT);
-        String normalizedSubtitle = quest.subtitle().getString().toLowerCase(Locale.ROOT);
-        return normalizedTitle.contains(query) || normalizedSubtitle.contains(query);
-    }
-
-    private String normalizedQuery() {
-        return viewState.getSearchText().trim().toLowerCase(Locale.ROOT);
-    }
-
-    private void focusCurrentChapter(boolean force) {
-        QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
-        QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(viewState.getSelectedChapterId());
-        Rect canvas = treeCanvasRect(treeRect(frameRect()));
-
-        if (!force && chapter != null && chapter.id() == focusedChapterId) {
-            return;
-        }
-        focusedChapterId = chapter == null ? Long.MIN_VALUE : chapter.id();
-        if (chapter == null || chapter.quests().isEmpty()) {
-            viewState.setTreePanX(0D);
-            viewState.setTreePanY(0D);
-            return;
-        }
-        viewState.setTreePanX(0D);
-        viewState.setTreePanY(0D);
-    }
-
-    private void refreshState() {
-        QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
+    private void refreshState(QuestDataSnapshot snapshot) {
         if (snapshot.chapters().isEmpty()) {
             return;
         }
@@ -728,38 +1116,11 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         if (focusedChapterId != chapter.id()) {
-            focusCurrentChapter(true);
-        }
-    }
-
-    private void refreshButtons() {
-        QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
-        QuestDataSnapshot.QuestSnapshot selectedQuest = getSelectedQuestSnapshot(snapshot);
-        pinButton.active = selectedQuest != null;
-        pinButton.setMessage(Component.literal(selectedQuest != null && selectedQuest.pinned() ? "Unpin Quest" : "Pin Quest"));
-        vanillaButton.setMessage(Component.literal(ClientQuestFile.exists() && ClientQuestFile.INSTANCE.canEdit() ? "Vanilla Editor" : "Open Vanilla"));
-        claimAllButton.active = snapshot.chapters().stream()
-                .flatMap(chapter -> chapter.quests().stream())
-                .flatMap(quest -> quest.rewards().stream())
-                .anyMatch(QuestDataSnapshot.RewardSnapshot::canClaim);
-    }
-
-    private void syncWithVanillaRequest() {
-        if (!openContext.fromVanillaScreen() || !ClientQuestFile.exists()) {
-            return;
-        }
-        if (viewState.getViewedQuestId() != 0L) {
-            return;
+            focusedChapterId = chapter.id();
+            centered = false;
         }
 
-        ClientQuestFile.INSTANCE.getQuestScreen()
-                .map(QuestScreen::getViewedQuest)
-                .filter(quest -> quest != null)
-                .ifPresent(quest -> {
-                    viewState.setViewedQuestId(quest.getId());
-                    viewState.setSelectedChapterId(quest.getChapter().getId());
-                    viewState.setDetailScroll(0D);
-                });
+        updateTabPages();
     }
 
     private void openVanillaSelected() {
@@ -810,6 +1171,12 @@ public class OverhaulQuestScreen extends Screen {
         return false;
     }
 
+    private Rect frameRect() {
+        return new Rect((width - BACKGROUND_WIDTH) / 2, (height - BACKGROUND_HEIGHT) / 2, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
+    }
+
+    // ---- Drawing primitives ----
+
     private void drawPanel(GuiGraphics graphics, Rect rect, int topColor, int bodyColor, int borderColor) {
         graphics.fillGradient(rect.x(), rect.y(), rect.maxX(), rect.maxY(), topColor, bodyColor);
         graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.y() + 1, borderColor);
@@ -823,23 +1190,6 @@ public class OverhaulQuestScreen extends Screen {
         graphics.fill(rect.x(), rect.maxY() - 1, rect.maxX(), rect.maxY(), shadeColor);
         graphics.fill(rect.x(), rect.y(), rect.x() + 1, rect.maxY(), borderColor);
         graphics.fill(rect.maxX() - 1, rect.y(), rect.maxX(), rect.maxY(), shadeColor);
-    }
-
-    private void drawProgressBar(GuiGraphics graphics, int x, int y, int width, int height, int progress, int backgroundColor, int fillColor) {
-        graphics.fill(x, y, x + width, y + height, backgroundColor);
-        graphics.fill(x, y, x + Math.max(1, width * progress / 100), y + height, fillColor);
-    }
-
-    private void drawHorizontalLine(GuiGraphics graphics, int x1, int x2, int y, int color) {
-        int min = Math.min(x1, x2);
-        int max = Math.max(x1, x2);
-        graphics.fill(min, y - 1, max + 1, y + 1, color);
-    }
-
-    private void drawVerticalLine(GuiGraphics graphics, int x, int y1, int y2, int color) {
-        int min = Math.min(y1, y2);
-        int max = Math.max(y1, y2);
-        graphics.fill(x - 1, min, x + 1, max + 1, color);
     }
 
     private double clampScroll(double scroll, int contentHeight, int visibleHeight) {
@@ -860,25 +1210,7 @@ public class OverhaulQuestScreen extends Screen {
         return "Locked";
     }
 
-    private Rect frameRect() {
-        return new Rect((width - BACKGROUND_WIDTH) / 2, (height - BACKGROUND_HEIGHT) / 2, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
-    }
-
-    private Rect headerRect(Rect frame) {
-        return new Rect(frame.x() + 1, frame.y() + 1, frame.width() - 2, HEADER_HEIGHT);
-    }
-
-    private Rect chapterRailRect(Rect frame) {
-        return new Rect(frame.x() + 8, frame.y() + HEADER_HEIGHT + 10, CHAPTER_WIDTH, frame.height() - HEADER_HEIGHT - 18);
-    }
-
-    private Rect treeRect(Rect frame) {
-        return new Rect(frame.x() + TREE_X, frame.y() + TREE_Y, TREE_WIDTH, TREE_HEIGHT);
-    }
-
-    private Rect treeCanvasRect(Rect rect) {
-        return rect;
-    }
+    // ---- Records ----
 
     private record ClickTarget(Rect rect, Runnable action) {
         boolean contains(double mouseX, double mouseY) {
