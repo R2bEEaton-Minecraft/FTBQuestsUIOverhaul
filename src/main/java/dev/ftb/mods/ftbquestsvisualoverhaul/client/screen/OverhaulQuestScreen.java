@@ -31,8 +31,18 @@ import java.util.Locale;
 import java.util.Map;
 
 public class OverhaulQuestScreen extends Screen {
+    private static final ResourceLocation QUESTS_BACKGROUND_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quests_background.png");
+    private static final ResourceLocation OAK_PLANKS_TEXTURE = new ResourceLocation("minecraft", "textures/block/oak_planks.png");
     private static final ResourceLocation ADVANCEMENT_WINDOW_TEXTURE = new ResourceLocation("minecraft", "textures/gui/advancements/window.png");
     private static final ResourceLocation ADVANCEMENT_STONE_TEXTURE = new ResourceLocation("minecraft", "textures/gui/advancements/backgrounds/stone.png");
+    private static final int BACKGROUND_WIDTH = 294;
+    private static final int BACKGROUND_HEIGHT = 163;
+    private static final int BACKGROUND_TEXTURE_WIDTH = 512;
+    private static final int BACKGROUND_TEXTURE_HEIGHT = 256;
+    private static final int TREE_X = 89;
+    private static final int TREE_Y = 19;
+    private static final int TREE_WIDTH = 186;
+    private static final int TREE_HEIGHT = 125;
 
     private static final int OUTER_MARGIN = 18;
     private static final int HEADER_HEIGHT = 58;
@@ -83,41 +93,12 @@ public class OverhaulQuestScreen extends Screen {
 
     @Override
     protected void init() {
-        Rect frame = frameRect();
-        Rect header = headerRect(frame);
-        Rect chapterRail = chapterRailRect(frame);
-        Rect treeRect = treeRect(frame);
-
-        int searchX = chapterRail.maxX() + 16;
-        int searchWidth = Math.max(160, treeRect.width() - 378);
-        int controlY = header.y() + 28;
-
-        searchBox = new EditBox(font, searchX, controlY, searchWidth, 20, Component.literal("Search quests"));
-        searchBox.setMaxLength(80);
-        searchBox.setValue(viewState.getSearchText());
-        searchBox.setResponder(value -> viewState.setSearchText(value));
-        addRenderableWidget(searchBox);
-
-        claimAllButton = addRenderableWidget(Button.builder(Component.literal("Claim Rewards"), button -> actionRouter.claimAllRewards())
-                .bounds(treeRect.maxX() - 318, controlY, 102, 20)
-                .build());
-        focusButton = addRenderableWidget(Button.builder(Component.literal("Focus Tree"), button -> focusCurrentChapter(true))
-                .bounds(treeRect.maxX() - 208, controlY, 86, 20)
-                .build());
-        vanillaButton = addRenderableWidget(Button.builder(Component.literal("Open Vanilla"), button -> openVanillaSelected())
-                .bounds(treeRect.maxX() - 114, controlY, 106, 20)
-                .build());
-        pinButton = addRenderableWidget(Button.builder(Component.literal("Pin"), button -> toggleCurrentQuestPin())
-                .bounds(treeRect.maxX() - 114, controlY - 22, 106, 20)
-                .build());
+        clearWidgets();
     }
 
     @Override
     public void tick() {
         super.tick();
-        syncWithVanillaRequest();
-        refreshState();
-        refreshButtons();
     }
 
     @Override
@@ -241,19 +222,10 @@ public class OverhaulQuestScreen extends Screen {
         QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
         refreshState();
         hoveredQuest = null;
-        clickTargets.clear();
         visibleQuestNodes.clear();
-
-        Rect frame = frameRect();
-        Rect header = headerRect(frame);
-        Rect chapterRail = chapterRailRect(frame);
-        Rect tree = treeRect(frame);
-
+        clickTargets.clear();
         renderBackdrop(graphics);
-        renderFrame(graphics, frame, header);
-        renderChapterRail(graphics, snapshot, chapterRail, mouseX, mouseY);
-        renderTreePanel(graphics, snapshot, tree, mouseX, mouseY);
-
+        renderTreePanel(graphics, snapshot, treeRect(frameRect()), mouseX, mouseY);
         super.render(graphics, mouseX, mouseY, partialTick);
 
         if (viewState.getViewedQuestId() == 0L && hoveredQuest != null) {
@@ -267,9 +239,9 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderBackdrop(GuiGraphics graphics) {
-        graphics.fillGradient(0, 0, width, height, 0xFF120E0C, 0xFF24160F);
-        graphics.fillGradient(0, 0, width, 120, 0x554A2E19, 0x00120E0C);
-        graphics.fill(0, height - 28, width, height, 0x4423110A);
+        graphics.fill(0, 0, width, height, 0xC0100B08);
+        Rect frame = frameRect();
+        graphics.blit(QUESTS_BACKGROUND_TEXTURE, frame.x(), frame.y(), 0, 0, BACKGROUND_WIDTH, BACKGROUND_HEIGHT, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
     }
 
     private void renderFrame(GuiGraphics graphics, Rect frame, Rect header) {
@@ -315,26 +287,10 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderTreePanel(GuiGraphics graphics, QuestDataSnapshot snapshot, Rect rect, int mouseX, int mouseY) {
-        drawPanel(graphics, rect, 0xFF211710, 0xFF130E0A, 0xFF8B633F);
-
         QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(viewState.getSelectedChapterId());
-        Component heading = chapter == null ? Component.literal("Quest Tree") : chapter.title();
-        graphics.drawString(font, heading, rect.x() + 14, rect.y() + 10, 0xFFF8EACC, false);
-
-        String query = viewState.getSearchText().trim();
-        Component treeHint = query.isEmpty()
-                ? Component.literal("Drag to pan, scroll to zoom, hover for summary, click to open")
-                : Component.literal("Highlighting matches for \"" + query + "\"");
-        graphics.drawString(font, treeHint, rect.x() + 14, rect.y() + 24, 0xFFD0B08A, false);
-
-        if (snapshot.hasFallbackEntries() && ModClientConfig.SHOW_UNKNOWN_TYPE_WARNING.get()) {
-            graphics.fill(rect.maxX() - 186, rect.y() + 8, rect.maxX() - 10, rect.y() + 26, 0xAA7B3C23);
-            graphics.drawString(font, Component.literal("Some entries still use vanilla"), rect.maxX() - 180, rect.y() + 13, 0xFFF3DEC3, false);
-        }
-
         Rect canvas = treeCanvasRect(rect);
         graphics.enableScissor(canvas.x(), canvas.y(), canvas.maxX(), canvas.maxY());
-        tileAdvancementBackground(graphics, canvas);
+        tileOakPlanksBackground(graphics, canvas);
 
         List<QuestDataSnapshot.QuestSnapshot> quests = chapter == null ? List.of() : chapter.quests();
         Map<Long, NodeLayout> nodes = buildNodeLayouts(quests, canvas);
@@ -342,16 +298,16 @@ public class OverhaulQuestScreen extends Screen {
         renderQuestNodes(graphics, quests, nodes, mouseX, mouseY);
 
         graphics.disableScissor();
-        drawInsetBorder(graphics, canvas, 0x558A6847, 0xCC110C09);
+        drawInsetBorder(graphics, canvas, 0x88876646, 0xCC110C09);
     }
 
-    private void tileAdvancementBackground(GuiGraphics graphics, Rect rect) {
+    private void tileOakPlanksBackground(GuiGraphics graphics, Rect rect) {
         for (int y = rect.y(); y < rect.maxY(); y += 16) {
             for (int x = rect.x(); x < rect.maxX(); x += 16) {
-                graphics.blit(ADVANCEMENT_STONE_TEXTURE, x, y, 0, 0, 16, 16, 16, 16);
+                graphics.blit(OAK_PLANKS_TEXTURE, x, y, 0, 0, 16, 16, 16, 16);
             }
         }
-        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0x88221710);
+        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0x55140F0B);
     }
 
     private void renderQuestConnections(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests, Map<Long, NodeLayout> nodes) {
@@ -911,7 +867,7 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private Rect frameRect() {
-        return new Rect(OUTER_MARGIN, OUTER_MARGIN, width - OUTER_MARGIN * 2, height - OUTER_MARGIN * 2);
+        return new Rect((width - BACKGROUND_WIDTH) / 2, (height - BACKGROUND_HEIGHT) / 2, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
     }
 
     private Rect headerRect(Rect frame) {
@@ -923,12 +879,11 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private Rect treeRect(Rect frame) {
-        Rect chapter = chapterRailRect(frame);
-        return new Rect(chapter.maxX() + SECTION_GAP, chapter.y(), frame.maxX() - chapter.maxX() - SECTION_GAP - 8, chapter.height());
+        return new Rect(frame.x() + TREE_X, frame.y() + TREE_Y, TREE_WIDTH, TREE_HEIGHT);
     }
 
     private Rect treeCanvasRect(Rect rect) {
-        return new Rect(rect.x() + 12, rect.y() + 38, rect.width() - 24, rect.height() - 50);
+        return rect;
     }
 
     private record ClickTarget(Rect rect, Runnable action) {
