@@ -1,0 +1,157 @@
+package dev.ftb.mods.ftbquestsvisualoverhaul.client.data;
+
+import dev.ftb.mods.ftbquests.api.FTBQuestsAPI;
+import dev.ftb.mods.ftbquests.client.FTBQuestsClient;
+import dev.ftb.mods.ftbquests.quest.Chapter;
+import dev.ftb.mods.ftbquests.quest.Quest;
+import dev.ftb.mods.ftbquests.quest.QuestObject;
+import dev.ftb.mods.ftbquests.quest.TeamData;
+import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
+import dev.ftb.mods.ftbquests.quest.reward.Reward;
+import dev.ftb.mods.ftbquests.quest.reward.RewardClaimType;
+import dev.ftb.mods.ftbquests.quest.task.CheckmarkTask;
+import dev.ftb.mods.ftbquests.quest.task.ItemTask;
+import dev.ftb.mods.ftbquests.quest.task.Task;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+
+public class QuestDataSnapshotBuilder {
+    public QuestDataSnapshot build(TeamData teamData) {
+        List<QuestDataSnapshot.ChapterSnapshot> chapters = new ArrayList<>();
+        Player player = FTBQuestsClient.getClientPlayer();
+        UUID playerId = player == null ? null : player.getUUID();
+        boolean hasFallbackEntries = false;
+
+        for (Chapter chapter : teamData.getFile().getVisibleChapters(teamData)) {
+            List<QuestDataSnapshot.QuestSnapshot> quests = new ArrayList<>();
+
+            chapter.getQuests().stream()
+                    .filter(quest -> quest.isVisible(teamData))
+                    .sorted(Comparator.comparing(quest -> quest.getTitle().getString().toLowerCase(Locale.ROOT)))
+                    .forEach(quest -> {
+                        List<QuestDataSnapshot.TaskSnapshot> tasks = new ArrayList<>();
+                        List<QuestDataSnapshot.RewardSnapshot> rewards = new ArrayList<>();
+
+                        for (Task task : quest.getTasks()) {
+                            TaskInteractionMode interactionMode = resolveTaskMode(task);
+                            String fallbackReason = interactionMode == TaskInteractionMode.VANILLA_FALLBACK
+                                    ? "Custom or unsupported task interaction"
+                                    : "";
+
+                            tasks.add(new QuestDataSnapshot.TaskSnapshot(
+                                    task.getId(),
+                                    task.getTitle(),
+                                    Component.literal(task.formatProgress(teamData, teamData.getProgress(task)) + "/" + task.formatMaxProgress()),
+                                    task.getIcon(),
+                                    teamData.isCompleted(task),
+                                    task.isOptionalForProgression(teamData),
+                                    canTaskInteract(task, teamData),
+                                    task.consumesResources(),
+                                    interactionMode,
+                                    fallbackReason
+                            ));
+                        }
+
+                        for (Reward reward : quest.getRewards()) {
+                            RewardInteractionMode interactionMode = resolveRewardMode(reward);
+                            String fallbackReason = interactionMode == RewardInteractionMode.VANILLA_FALLBACK
+                                    ? "Custom or unsupported reward interaction"
+                                    : "";
+                            RewardClaimType claimType = playerId == null ? RewardClaimType.CANT_CLAIM : teamData.getClaimType(playerId, reward);
+                            rewards.add(new QuestDataSnapshot.RewardSnapshot(
+                                    reward.getId(),
+                                    reward.getTitle(),
+                                    Component.literal(claimType.name().replace('_', ' ').toLowerCase(Locale.ROOT)),
+                                    reward.getIcon(),
+                                    claimType == RewardClaimType.CLAIMED,
+                                    claimType == RewardClaimType.CAN_CLAIM,
+                                    interactionMode,
+                                    fallbackReason
+                            ));
+                        }
+
+                        quests.add(new QuestDataSnapshot.QuestSnapshot(
+                                quest.getId(),
+                                chapter.getId(),
+                                quest.getTitle(),
+                                quest.getSubtitle(),
+                                quest.getDescription(),
+                                quest.getIcon(),
+                                quest.getX(),
+                                quest.getY(),
+                                quest.getSize(),
+                                quest.getShape(),
+                                teamData.getRelativeProgress(quest),
+                                teamData.isCompleted(quest),
+                                teamData.isStarted(quest),
+                                player != null && teamData.isQuestPinned(player, quest.getId()),
+                                teamData.canStartTasks(quest),
+                                quest.hideDetailsUntilStartable() && !teamData.canStartTasks(quest) && !teamData.isCompleted(quest),
+                                playerId != null && teamData.hasUnclaimedRewards(playerId, quest),
+                                quest.streamDependencies()
+                                        .filter(Quest.class::isInstance)
+                                        .map(Quest.class::cast)
+                                        .map(QuestObject::getId)
+                                        .toList(),
+                                quest.getDependants().stream()
+                                        .filter(Quest.class::isInstance)
+                                        .map(Quest.class::cast)
+                                        .map(QuestObject::getId)
+                                        .toList(),
+                                List.copyOf(tasks),
+                                List.copyOf(rewards)
+                        ));
+                    });
+
+            hasFallbackEntries |= quests.stream().flatMap(q -> q.tasks().stream()).anyMatch(t -> t.interactionMode() == TaskInteractionMode.VANILLA_FALLBACK);
+            hasFallbackEntries |= quests.stream().flatMap(q -> q.rewards().stream()).anyMatch(r -> r.interactionMode() == RewardInteractionMode.VANILLA_FALLBACK);
+
+            chapters.add(new QuestDataSnapshot.ChapterSnapshot(
+                    chapter.getId(),
+                    chapter.getTitle(),
+                    Component.empty(),
+                    chapter.getIcon(),
+                    teamData.getRelativeProgress(chapter),
+                    List.copyOf(quests)
+            ));
+        }
+
+        return new QuestDataSnapshot(chapters, hasFallbackEntries);
+    }
+
+    private static boolean canTaskInteract(Task task, TeamData teamData) {
+        if (teamData.isCompleted(task) || !teamData.canStartTasks(task.getQuest())) {
+            return false;
+        }
+        return resolveTaskMode(task) == TaskInteractionMode.SUBMIT;
+    }
+
+    private static TaskInteractionMode resolveTaskMode(Task task) {
+        if (!FTBQuestsAPI.MOD_ID.equals(task.getType().getTypeId().getNamespace())) {
+            return TaskInteractionMode.VANILLA_FALLBACK;
+        }
+        if (task instanceof CheckmarkTask) {
+            return TaskInteractionMode.SUBMIT;
+        }
+        if (task instanceof ItemTask itemTask) {
+            return itemTask.consumesResources() ? TaskInteractionMode.SUBMIT : TaskInteractionMode.READ_ONLY;
+        }
+        return TaskInteractionMode.READ_ONLY;
+    }
+
+    private static RewardInteractionMode resolveRewardMode(Reward reward) {
+        if (reward instanceof ChoiceReward) {
+            return RewardInteractionMode.CHOICE;
+        }
+        if (!FTBQuestsAPI.MOD_ID.equals(reward.getType().getTypeId().getNamespace())) {
+            return RewardInteractionMode.VANILLA_FALLBACK;
+        }
+        return RewardInteractionMode.CLAIM;
+    }
+}

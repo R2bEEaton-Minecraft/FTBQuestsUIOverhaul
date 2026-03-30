@@ -1,0 +1,37 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# Java / IDE
+*.class
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.vscode/
+
+# OS / editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Forge runtime workspace
+run/*
+!run/config/
+run/config/*
+!run/config/ftbquests/
+run/config/ftbquests/*
+!run/config/ftbquests/quests/
+!run/config/ftbquests/quests/**
+
+# If you decide to version more run assets later, add exceptions above.
+
