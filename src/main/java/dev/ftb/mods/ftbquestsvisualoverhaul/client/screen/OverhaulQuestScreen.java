@@ -61,6 +61,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final ResourceLocation WINDOW_LOCATION = new ResourceLocation("textures/gui/advancements/window.png");
     private static final ResourceLocation TABS_LOCATION = new ResourceLocation("textures/gui/advancements/tabs.png");
     private static final ResourceLocation WIDGETS_LOCATION = new ResourceLocation("textures/gui/advancements/widgets.png");
+    private static final ResourceLocation BUTTONS_LOCATION = new ResourceLocation("textures/gui/widgets.png");
     private static final ResourceLocation OAK_PLANKS_TEXTURE = new ResourceLocation("minecraft", "textures/block/oak_planks.png");
 
     // --- Node spacing (vanilla values from AdvancementWidget) ---
@@ -325,6 +326,8 @@ public class OverhaulQuestScreen extends Screen {
         if (selectedQuest != null) {
             renderQuestDetailModal(graphics, selectedQuest, mouseX, mouseY);
         }
+
+        renderDefaultViewButton(graphics, mouseX, mouseY);
 
         updateCursor(snapshot, mouseX, mouseY, treeLeft, treeTop);
     }
@@ -969,28 +972,32 @@ public class OverhaulQuestScreen extends Screen {
         drawSectionDivider(graphics, body.x(), body.width(), contentY);
         contentY += 8;
 
-        contentY = renderSectionLabel(graphics, "Requirements", body.x(), contentY);
+        int columnGap = 8;
+        int columnWidth = (body.width() - columnGap) / 2;
+        int leftX = body.x();
+        int rightX = body.x() + columnWidth + columnGap;
+        int columnStartY = contentY;
+
+        int requirementsY = renderSectionLabel(graphics, "Requirements", leftX, columnStartY);
         if (quest.tasks().isEmpty()) {
-            drawScaledString(graphics, Component.literal("No explicit requirements"), body.x(), contentY, 0xFFC8B08C, MODAL_TEXT_SCALE);
-            contentY += 10;
+            drawScaledString(graphics, Component.literal("No explicit requirements"), leftX, requirementsY, 0xFFC8B08C, MODAL_TEXT_SCALE);
+            requirementsY += 10;
         } else {
             for (QuestDataSnapshot.TaskSnapshot task : quest.tasks()) {
-                contentY = renderTaskSummaryRow(graphics, body.x(), body.width(), task, contentY);
+                requirementsY = renderTaskSummaryRow(graphics, leftX, columnWidth, task, requirementsY);
             }
         }
-        contentY += 3;
-        drawSectionDivider(graphics, body.x(), body.width(), contentY);
-        contentY += 8;
 
-        contentY = renderSectionLabel(graphics, "Reward", body.x(), contentY);
+        int rewardsY = renderSectionLabel(graphics, "Reward", rightX, columnStartY);
         if (quest.rewards().isEmpty()) {
-            drawScaledString(graphics, Component.literal("No reward configured"), body.x(), contentY, 0xFFC8B08C, MODAL_TEXT_SCALE);
-            contentY += 10;
+            drawScaledString(graphics, Component.literal("No reward configured"), rightX, rewardsY, 0xFFC8B08C, MODAL_TEXT_SCALE);
+            rewardsY += 10;
         } else {
             for (QuestDataSnapshot.RewardSnapshot reward : quest.rewards()) {
-                contentY = renderRewardSummaryRow(graphics, body.x(), body.width(), reward, contentY);
+                rewardsY = renderRewardSummaryRow(graphics, rightX, columnWidth, reward, rewardsY);
             }
         }
+        contentY = Math.max(requirementsY, rewardsY);
         graphics.disableScissor();
 
         if (layout.contentHeight() > body.height()) {
@@ -1019,18 +1026,32 @@ public class OverhaulQuestScreen extends Screen {
 
         int buttonGap = 8;
         int buttonWidth = (footer.width() - buttonGap) / 2;
-        Rect pinButton = new Rect(footer.x(), footer.y(), buttonWidth, footer.height());
-        Rect claimButton = new Rect(footer.x() + buttonWidth + buttonGap, footer.y(), buttonWidth, footer.height());
+        Rect pinButton = footerButtonRect(footer.x(), footer.y(), buttonWidth, footer.height());
+        Rect claimButton = footerButtonRect(footer.x() + buttonWidth + buttonGap, footer.y(), buttonWidth, footer.height());
 
-        renderFooterButton(graphics, pinButton, quest.pinned() ? "Pinned" : "Pin", true, quest.pinned(), pinButton.contains(mouseX, mouseY));
+        renderFooterButton(graphics, pinButton, quest.pinned() ? "Pin" : "Unpin", true, pinButton.contains(mouseX, mouseY));
         boolean claimEnabled = canClaimAnyReward(quest);
-        renderFooterButton(graphics, claimButton, "Claim", claimEnabled, false, claimButton.contains(mouseX, mouseY));
+        renderFooterButton(graphics, claimButton, "Claim", claimEnabled, claimButton.contains(mouseX, mouseY));
 
         clickTargets.add(new ClickTarget(pinButton, this::toggleCurrentQuestPin));
         if (claimEnabled) {
             clickTargets.add(new ClickTarget(claimButton, this::claimCurrentQuestRewards));
         }
         graphics.pose().popPose();
+    }
+
+    private void renderDefaultViewButton(GuiGraphics graphics, int mouseX, int mouseY) {
+        Rect rect = new Rect(width - 86, height - 18, 78, 12);
+        boolean hovered = rect.contains(mouseX, mouseY);
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, 260.0F);
+        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), hovered ? 0xAA2A2118 : 0x88201812);
+        drawInsetBorder(graphics, rect, hovered ? 0xAA8C734E : 0x885B4630, 0xAA120D09);
+        drawCenteredScaledString(graphics, Component.literal("default view"), rect.centerX(), rect.y() + 3, 0xFFD9C6A4, MODAL_TEXT_SCALE);
+        graphics.pose().popPose();
+
+        clickTargets.add(new ClickTarget(rect, actionRouter::openVanillaRoot));
     }
 
     private int renderSectionLabel(GuiGraphics graphics, String label, int x, int y) {
@@ -1040,19 +1061,45 @@ public class OverhaulQuestScreen extends Screen {
 
     private int renderTaskSummaryRow(GuiGraphics graphics, int x, int width, QuestDataSnapshot.TaskSnapshot task, int y) {
         Rect rect = new Rect(x, y, width, 18);
+        Rect iconRect = new Rect(rect.x() + 2, rect.y() + 1, 14, 14);
+        boolean consumableTurnIn = task.consumesResources() && task.interactionMode() == TaskInteractionMode.SUBMIT;
+        Rect actionRect = consumableTurnIn ? new Rect(rect.maxX() - 37, rect.y() + 2, 33, 12) : null;
         graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0x5A3A2A1D);
         drawInsetBorder(graphics, rect, 0x885F452F, 0x55201510);
 
-        task.icon().draw(graphics, rect.x() + 3, rect.y() + 1, 14, 14);
-        drawScaledString(graphics, trim(task.title(), (int) ((rect.width() - 88) / MODAL_TEXT_SCALE)), rect.x() + 20, rect.y() + 4, 0xFFF4E6C9, MODAL_TEXT_SCALE);
-        drawScaledString(graphics, task.progressText(), rect.maxX() - 56, rect.y() + 4, task.completed() ? 0xFF75D65C : 0xFFD9BE96, MODAL_TEXT_SCALE);
+        task.icon().draw(graphics, iconRect.x(), iconRect.y(), 14, 14);
+        if (consumableTurnIn) {
+            renderRequirementMarker(graphics, iconRect, task.canInteract());
+            renderConsumableActionButton(graphics, actionRect, task.canInteract());
+        }
+        int infoX = rect.x() + 20;
+        int progressWidth = Math.round(font.width(task.progressText()) * MODAL_TEXT_SCALE);
+        int progressRightBound = consumableTurnIn ? actionRect.x() - 6 : rect.maxX() - 34;
+        int progressX = Math.min(infoX, progressRightBound - progressWidth);
+        if (progressX < infoX) {
+            progressX = infoX;
+        }
+        drawScaledString(graphics, task.progressText(), progressX, rect.y() + 4, task.completed() ? 0xFF75D65C : 0xFFD9BE96, MODAL_TEXT_SCALE);
 
         String state = switch (task.interactionMode()) {
-            case SUBMIT -> task.canInteract() ? "Ready" : task.completed() ? "Done" : "Locked";
+            case SUBMIT -> consumableTurnIn && task.canInteract() ? "Turn in" : task.canInteract() ? "Ready" : task.completed() ? "Done" : "Locked";
             case VANILLA_FALLBACK -> "Vanilla";
             case READ_ONLY -> task.completed() ? "Done" : "Track";
         };
-        drawScaledString(graphics, Component.literal(state), rect.maxX() - 25, rect.y() + 4, task.completed() ? 0xFF75D65C : 0xFFC8A97C, MODAL_TEXT_SCALE);
+        if (consumableTurnIn) {
+            if (task.canInteract()) {
+                clickTargets.add(new ClickTarget(actionRect, () -> {
+                    Task liveTask = resolveTask(task.id());
+                    if (liveTask != null) {
+                        actionRouter.submitTask(liveTask);
+                    }
+                }));
+            }
+        } else {
+            int stateWidth = Math.round(font.width(state) * MODAL_TEXT_SCALE);
+            int stateX = Math.max(infoX + progressWidth + 6, rect.maxX() - stateWidth - 4);
+            drawScaledString(graphics, Component.literal(state), stateX, rect.y() + 4, task.completed() ? 0xFF75D65C : 0xFFC8A97C, MODAL_TEXT_SCALE);
+        }
         return y + 20;
     }
 
@@ -1062,7 +1109,6 @@ public class OverhaulQuestScreen extends Screen {
         drawInsetBorder(graphics, rect, 0x88634731, 0x55201510);
 
         rewardSnapshot.icon().draw(graphics, rect.x() + 3, rect.y() + 1, 14, 14);
-        drawScaledString(graphics, trim(rewardSnapshot.title(), (int) ((rect.width() - 72) / MODAL_TEXT_SCALE)), rect.x() + 20, rect.y() + 4, 0xFFF4E6C9, MODAL_TEXT_SCALE);
 
         int statusColor = rewardSnapshot.canClaim() ? 0xFF7DE25E : rewardSnapshot.claimed() ? 0xFFB6B6B6 : 0xFFD5B58C;
         String state = switch (rewardSnapshot.interactionMode()) {
@@ -1070,7 +1116,9 @@ public class OverhaulQuestScreen extends Screen {
             case CHOICE -> rewardSnapshot.canClaim() ? "Choose" : rewardSnapshot.claimed() ? "Claimed" : "Locked";
             case VANILLA_FALLBACK -> rewardSnapshot.canClaim() ? "Vanilla" : "Locked";
         };
-        drawScaledString(graphics, Component.literal(state), rect.maxX() - 31, rect.y() + 4, statusColor, MODAL_TEXT_SCALE);
+        int stateWidth = Math.round(font.width(state) * MODAL_TEXT_SCALE);
+        int stateX = Math.max(rect.x() + 20, rect.maxX() - stateWidth - 4);
+        drawScaledString(graphics, Component.literal(state), stateX, rect.y() + 4, statusColor, MODAL_TEXT_SCALE);
         return y + 20;
     }
 
@@ -1080,16 +1128,33 @@ public class OverhaulQuestScreen extends Screen {
         graphics.drawCenteredString(font, Component.literal(up ? "^" : "v"), x + 6, y + 2, active ? 0xFFF7E9D3 : 0xFF8F7556);
     }
 
-    private void renderFooterButton(GuiGraphics graphics, Rect rect, String label, boolean enabled, boolean active, boolean hovered) {
-        if (enabled) {
-            drawNineSlice(graphics, HOVER_CARD_TEXTURE, rect, HOVER_CARD_TEXTURE_WIDTH, HOVER_CARD_TEXTURE_HEIGHT, HOVER_CARD_SLICE);
-            int fill = active ? 0xCC8F6E2A : hovered ? 0xCC9A7327 : 0xB07A5920;
-            graphics.fill(rect.x() + 3, rect.y() + 3, rect.maxX() - 3, rect.maxY() - 3, fill);
-        } else {
-            graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0x99403127);
-            drawInsetBorder(graphics, rect, 0xAA6F5840, 0xAA1B140F);
-        }
-        drawCenteredScaledString(graphics, Component.literal(label), rect.centerX(), rect.y() + 8, enabled ? 0xFFF6EAD6 : 0xFF98806A, MODAL_TEXT_SCALE);
+    private void renderRequirementMarker(GuiGraphics graphics, Rect iconRect, boolean active) {
+        Rect badge = new Rect(iconRect.maxX() - 5, iconRect.y() - 1, 6, 6);
+        graphics.fill(badge.x(), badge.y(), badge.maxX(), badge.maxY(), active ? 0xFFD2A63B : 0xAA705C3D);
+        drawInsetBorder(graphics, badge, active ? 0xFFFFE1A3 : 0xCC9B8764, 0xAA24180F);
+        drawCenteredScaledString(graphics, Component.literal("!"), badge.centerX(), badge.y(), active ? 0xFF2B1706 : 0xFF24180F, 0.55F);
+    }
+
+    private void renderConsumableActionButton(GuiGraphics graphics, Rect rect, boolean active) {
+        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), active ? 0xCC926B21 : 0x99433528);
+        drawInsetBorder(graphics, rect, active ? 0xFFE1BC72 : 0xAA78624B, 0xAA1C140F);
+        drawScaledString(graphics, Component.literal("Turn in"), rect.x() + 2, rect.y() + 4, active ? 0xFFF7EAD1 : 0xFF9A8470, MODAL_TEXT_SCALE);
+    }
+
+    private void drawVanillaButton(GuiGraphics graphics, Rect rect, boolean enabled, boolean hovered) {
+        int textureY = !enabled ? 46 : hovered ? 86 : 66;
+        int halfWidth = rect.width() / 2;
+        graphics.blit(BUTTONS_LOCATION, rect.x(), rect.y(), 0, textureY, halfWidth, 20, 256, 256);
+        graphics.blit(BUTTONS_LOCATION, rect.x() + halfWidth, rect.y(), 200 - (rect.width() - halfWidth), textureY, rect.width() - halfWidth, 20, 256, 256);
+    }
+
+    private void renderFooterButton(GuiGraphics graphics, Rect rect, String label, boolean enabled, boolean hovered) {
+        drawVanillaButton(graphics, rect, enabled, hovered);
+        drawCenteredScaledString(graphics, Component.literal(label), rect.centerX(), rect.y() + 8, enabled ? 0xFFE0E0E0 : 0xFFA0A0A0, MODAL_TEXT_SCALE);
+    }
+
+    private Rect footerButtonRect(int x, int y, int width, int containerHeight) {
+        return new Rect(x, y + Math.max(0, (containerHeight - 20) / 2), width, 20);
     }
 
     // ---- Layout and state helpers ----
@@ -1106,8 +1171,9 @@ public class OverhaulQuestScreen extends Screen {
 
         int contentHeight = 10 + objectiveLines.size() * 8 + 12;
         contentHeight += 10 + descriptionLines.size() * 8 + 12;
-        contentHeight += 10 + Math.max(1, quest.tasks().size()) * 20 + 10;
-        contentHeight += 10 + Math.max(1, quest.rewards().size()) * 20 + 6;
+        int requirementsHeight = 10 + Math.max(1, quest.tasks().size()) * 20;
+        int rewardsHeight = 10 + Math.max(1, quest.rewards().size()) * 20;
+        contentHeight += Math.max(requirementsHeight, rewardsHeight) + 6;
 
         int maxHeight = height - MODAL_MARGIN;
         int chromeHeight = 14 + MODAL_HEADER_HEIGHT + MODAL_FOOTER_HEIGHT + 18;
@@ -1230,6 +1296,7 @@ public class OverhaulQuestScreen extends Screen {
         Quest quest = resolveQuest(viewState.getViewedQuestId());
         if (quest != null) {
             actionRouter.togglePin(quest);
+            QuestDataController.markDirty();
         }
     }
 
