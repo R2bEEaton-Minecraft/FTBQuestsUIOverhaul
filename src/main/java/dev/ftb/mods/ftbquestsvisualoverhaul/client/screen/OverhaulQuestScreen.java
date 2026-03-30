@@ -34,7 +34,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final ResourceLocation QUESTS_BACKGROUND_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quests_background.png");
     private static final ResourceLocation OAK_PLANKS_TEXTURE = new ResourceLocation("minecraft", "textures/block/oak_planks.png");
     private static final ResourceLocation ADVANCEMENT_WINDOW_TEXTURE = new ResourceLocation("minecraft", "textures/gui/advancements/window.png");
-    private static final ResourceLocation ADVANCEMENT_STONE_TEXTURE = new ResourceLocation("minecraft", "textures/gui/advancements/backgrounds/stone.png");
+    private static final ResourceLocation ADVANCEMENT_WIDGETS_TEXTURE = new ResourceLocation("minecraft", "textures/gui/advancements/widgets.png");
     private static final int BACKGROUND_WIDTH = 294;
     private static final int BACKGROUND_HEIGHT = 163;
     private static final int BACKGROUND_TEXTURE_WIDTH = 512;
@@ -49,10 +49,14 @@ public class OverhaulQuestScreen extends Screen {
     private static final int CHAPTER_WIDTH = 152;
     private static final int SECTION_GAP = 12;
     private static final int CHAPTER_ROW_HEIGHT = 42;
-    private static final int NODE_SPACING_X = 128;
-    private static final int NODE_SPACING_Y = 72;
-    private static final int NODE_BASE_WIDTH = 98;
-    private static final int NODE_BASE_HEIGHT = 44;
+    private static final int NODE_SPACING_X = 28;
+    private static final int NODE_SPACING_Y = 27;
+    private static final int NODE_BASE_WIDTH = 26;
+    private static final int NODE_BASE_HEIGHT = 26;
+    private static final int ADVANCEMENT_WIDGET_SIZE = 26;
+    private static final int ADVANCEMENT_WIDGET_U = 0;
+    private static final int ADVANCEMENT_WIDGET_OBTAINED_V = 128;
+    private static final int ADVANCEMENT_WIDGET_UNOBTAINED_V = 154;
     private static final int MODAL_MIN_WIDTH = 280;
     private static final int MODAL_MAX_WIDTH = 440;
     private static final int MODAL_HEADER_HEIGHT = 50;
@@ -201,19 +205,6 @@ public class OverhaulQuestScreen extends Screen {
             viewState.setChapterScroll(clampScroll(viewState.getChapterScroll() - deltaY * 20D, contentHeight, chapterRail.height() - 20));
             return true;
         }
-        if (treeCanvas.contains(mouseX, mouseY)) {
-            double oldZoom = viewState.getTreeZoom();
-            double newZoom = Mth.clamp(oldZoom + deltaY * 0.08D, 0.58D, 1.7D);
-            if (newZoom != oldZoom) {
-                double centerX = treeCanvas.centerX();
-                double centerY = treeCanvas.centerY();
-                double scale = newZoom / oldZoom;
-                viewState.setTreePanX(centerX - (centerX - viewState.getTreePanX() - mouseX) * scale - mouseX);
-                viewState.setTreePanY(centerY - (centerY - viewState.getTreePanY() - mouseY) * scale - mouseY);
-                viewState.setTreeZoom(newZoom);
-            }
-            return true;
-        }
         return super.mouseScrolled(mouseX, mouseY, deltaY);
     }
 
@@ -302,8 +293,17 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void tileOakPlanksBackground(GuiGraphics graphics, Rect rect) {
-        for (int y = rect.y(); y < rect.maxY(); y += 16) {
-            for (int x = rect.x(); x < rect.maxX(); x += 16) {
+        int offsetX = Mth.floor(viewState.getTreePanX()) % 16;
+        int offsetY = Mth.floor(viewState.getTreePanY()) % 16;
+        if (offsetX > 0) {
+            offsetX -= 16;
+        }
+        if (offsetY > 0) {
+            offsetY -= 16;
+        }
+
+        for (int y = rect.y() + offsetY; y < rect.maxY(); y += 16) {
+            for (int x = rect.x() + offsetX; x < rect.maxX(); x += 16) {
                 graphics.blit(OAK_PLANKS_TEXTURE, x, y, 0, 0, 16, 16, 16, 16);
             }
         }
@@ -345,7 +345,6 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderQuestNodes(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests, Map<Long, NodeLayout> nodes, int mouseX, int mouseY) {
-        String query = normalizedQuery();
         for (QuestDataSnapshot.QuestSnapshot quest : quests) {
             NodeLayout node = nodes.get(quest.id());
             if (node == null) {
@@ -354,27 +353,12 @@ public class OverhaulQuestScreen extends Screen {
 
             Rect rect = node.rect();
             boolean hovered = rect.contains(mouseX, mouseY);
-            boolean selected = quest.id() == viewState.getViewedQuestId();
-            boolean matches = query.isEmpty() || questMatchesQuery(quest, query);
+            renderAdvancementWidget(graphics, rect, quest.completed() || quest.hasUnclaimedRewards());
 
-            int fill = quest.completed() ? 0xFF2F5A39 : quest.hasUnclaimedRewards() ? 0xFF734726 : quest.canStart() ? 0xFF5A3C28 : 0xFF3A2A1E;
-            int header = quest.completed() ? 0xFF87C076 : quest.hasUnclaimedRewards() ? 0xFFD99A4F : quest.canStart() ? 0xFFD5A86A : 0xFF8A5C35;
-            int border = selected ? 0xFFF6E1B8 : hovered ? 0xFFF2C98A : 0xFF694B32;
-            if (!matches) {
-                fill = 0xAA2B2018;
-                header = 0xAA594231;
-                border = 0x884E3827;
-            }
-
-            graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), fill);
-            graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.y() + 6, header);
-            drawInsetBorder(graphics, rect, border, 0xCC140F0B);
-
-            int iconSize = Math.min(20, rect.height() - 14);
-            quest.icon().draw(graphics, rect.x() + 6, rect.y() + 11, iconSize, iconSize);
-            graphics.drawString(font, trim(quest.title(), rect.width() - 40), rect.x() + 30, rect.y() + 10, 0xFFF9EED9, false);
-            drawProgressBar(graphics, rect.x() + 30, rect.y() + rect.height() - 11, rect.width() - 36, 5, quest.progress(), 0xAA1D1611, 0xFFE0B46A);
-            graphics.drawString(font, Component.literal(quest.progress() + "%"), rect.maxX() - 24, rect.y() + 23, 0xFFE6D0AB, false);
+            int iconSize = Math.min(16, rect.height() - 10);
+            int iconX = rect.x() + (rect.width() - iconSize) / 2;
+            int iconY = rect.y() + (rect.height() - iconSize) / 2;
+            quest.icon().draw(graphics, iconX, iconY, iconSize, iconSize);
 
             clickTargets.add(new ClickTarget(rect, () -> {
                 viewState.setViewedQuestId(quest.id());
@@ -388,23 +372,46 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
+    private void renderAdvancementWidget(GuiGraphics graphics, Rect rect, boolean obtained) {
+        int v = obtained ? ADVANCEMENT_WIDGET_OBTAINED_V : ADVANCEMENT_WIDGET_UNOBTAINED_V;
+        graphics.blit(
+                ADVANCEMENT_WIDGETS_TEXTURE,
+                rect.x(),
+                rect.y(),
+                rect.width(),
+                rect.height(),
+                ADVANCEMENT_WIDGET_U,
+                v,
+                ADVANCEMENT_WIDGET_SIZE,
+                ADVANCEMENT_WIDGET_SIZE,
+                256,
+                256
+        );
+    }
+
     private void renderHoverSummary(GuiGraphics graphics, QuestDataSnapshot.QuestSnapshot quest, int mouseX, int mouseY) {
-        int width = Math.min(226, this.width - 24);
-        List<FormattedCharSequence> summary = summarizeQuest(quest, width - 26, 3);
-        int height = 46 + summary.size() * 10;
-        int x = Math.min(mouseX + 16, this.width - width - 10);
-        int y = Math.min(mouseY + 16, this.height - height - 10);
+        int width = Math.min(180, this.width - 24);
+        List<FormattedCharSequence> summary = summarizeQuest(quest, width - 18, 4);
+        int height = 22 + summary.size() * 10;
+        int x = mouseX + 12;
+        int y = mouseY - 8;
+        if (x + width > this.width - 8) {
+            x = mouseX - width - 12;
+        }
+        if (y + height > this.height - 8) {
+            y = this.height - height - 8;
+        }
+        if (y < 8) {
+            y = 8;
+        }
         Rect rect = new Rect(x, y, width, height);
 
-        drawPanel(graphics, rect, 0xF0302219, 0xF01E150F, 0xFFE2B66F);
-        quest.icon().draw(graphics, x + 8, y + 10, 18, 18);
-        graphics.drawString(font, trim(quest.title(), width - 42), x + 32, y + 10, 0xFFF8EFD9, false);
-        graphics.drawString(font, Component.literal(statusLabel(quest)), x + 32, y + 22, 0xFFD8BB95, false);
-        drawProgressBar(graphics, x + 8, y + 34, width - 16, 5, quest.progress(), 0xAA20170F, 0xFFE0B46A);
+        drawPanel(graphics, rect, 0xF02C2116, 0xF018120C, 0xFFE2B66F);
+        graphics.drawString(font, trim(quest.title(), width - 14), x + 7, y + 6, 0xFFF8EFD9, false);
 
-        int lineY = y + 43;
+        int lineY = y + 18;
         for (FormattedCharSequence line : summary) {
-            graphics.drawString(font, line, x + 8, lineY, 0xFFEADAC0);
+            graphics.drawString(font, line, x + 7, lineY, 0xFFEADAC0);
             lineY += 10;
         }
     }
@@ -596,11 +603,10 @@ public class OverhaulQuestScreen extends Screen {
             return nodes;
         }
 
-        double zoom = viewState.getTreeZoom();
-        double spacingX = NODE_SPACING_X * zoom;
-        double spacingY = NODE_SPACING_Y * zoom;
-        int nodeWidth = Math.max(72, Mth.floor(NODE_BASE_WIDTH * zoom));
-        int nodeHeight = Math.max(34, Mth.floor(NODE_BASE_HEIGHT * zoom));
+        double spacingX = NODE_SPACING_X;
+        double spacingY = NODE_SPACING_Y;
+        int nodeWidth = NODE_BASE_WIDTH;
+        int nodeHeight = NODE_BASE_HEIGHT;
 
         double minX = quests.stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::x).min().orElse(0D);
         double maxX = quests.stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::x).max().orElse(0D);
@@ -699,20 +705,8 @@ public class OverhaulQuestScreen extends Screen {
         if (chapter == null || chapter.quests().isEmpty()) {
             viewState.setTreePanX(0D);
             viewState.setTreePanY(0D);
-            viewState.setTreeZoom(1D);
             return;
         }
-
-        double minX = chapter.quests().stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::x).min().orElse(0D);
-        double maxX = chapter.quests().stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::x).max().orElse(0D);
-        double minY = chapter.quests().stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::y).min().orElse(0D);
-        double maxY = chapter.quests().stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::y).max().orElse(0D);
-
-        double spanX = Math.max(1.5D, maxX - minX + 1.8D);
-        double spanY = Math.max(1.5D, maxY - minY + 1.8D);
-        double fitZoom = Math.min((canvas.width() - 80D) / (spanX * NODE_SPACING_X), (canvas.height() - 60D) / (spanY * NODE_SPACING_Y));
-
-        viewState.setTreeZoom(Mth.clamp(fitZoom, 0.62D, 1.28D));
         viewState.setTreePanX(0D);
         viewState.setTreePanY(0D);
     }

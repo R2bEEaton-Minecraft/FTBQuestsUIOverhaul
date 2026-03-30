@@ -6,7 +6,6 @@ Files:
 - header_panel.png: top title/header strip base
 - hover_card.png: hover summary tooltip card base
 - quest_modal.png: quest detail modal base
-- quest_node.png: quest node/card base
 - quest_tree_tile.png: repeating background tile for the tree canvas
 - notification_marker_bg.png: small red backing for the inventory notification marker
 
