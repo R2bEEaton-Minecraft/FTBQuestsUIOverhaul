@@ -58,15 +58,21 @@ public class OverhaulQuestScreen extends Screen {
     private static final int TREE_HEIGHT = 125;
     private static final int CHAPTER_SELECTOR_X = 16;
     private static final int CHAPTER_SELECTOR_Y = 14;
+    private static final int CHAPTER_SELECTOR_BOTTOM_PADDING = 10;
     private static final int CHAPTER_BUTTON_ACTIVE_WIDTH = 67;
     private static final int CHAPTER_BUTTON_REGULAR_WIDTH = 53;
     private static final int CHAPTER_BUTTON_HEIGHT = 14;
     private static final int CHAPTER_BUTTON_TEXTURE_Y_OFFSET = 6;
     private static final int CHAPTER_SELECTOR_ENTRY_SPACING = 1;
+    private static final int CHAPTER_SELECTOR_SCROLL_STEP = CHAPTER_BUTTON_HEIGHT + CHAPTER_SELECTOR_ENTRY_SPACING;
     private static final int CHAPTER_SELECTOR_ICON_SIZE = 10;
     private static final int CHAPTER_SELECTOR_ICON_X_OFFSET = 4;
     private static final int CHAPTER_SELECTOR_TEXT_X_OFFSET = 16;
     private static final int CHAPTER_SELECTOR_TEXT_RIGHT_PADDING = 4;
+    private static final int CHAPTER_SCROLLBAR_WIDTH = 1;
+    private static final int CHAPTER_SCROLLBAR_GAP = 2;
+    private static final int CHAPTER_SCROLLBAR_HITBOX_WIDTH = 5;
+    private static final int CHAPTER_SCROLLBAR_MIN_THUMB_HEIGHT = 8;
     private static final float CHAPTER_SELECTOR_TEXT_SCALE = 0.6F;
 
     // --- Vanilla advancement textures ---
@@ -116,11 +122,13 @@ public class OverhaulQuestScreen extends Screen {
     private final Map<Long, NodeLayout> visibleQuestNodes = new HashMap<>();
     private QuestDataSnapshot.QuestSnapshot hoveredQuest;
     private boolean isScrolling;
+    private boolean chapterScrollbarDragging;
     private long focusedChapterId = Long.MIN_VALUE;
     private float fade;
     private boolean centered;
     private int tabPage;
     private int maxPages;
+    private double chapterScroll;
 
     // Scroll bounds tracking (from AdvancementTab)
     private int minNodeX = Integer.MAX_VALUE;
@@ -215,6 +223,10 @@ public class OverhaulQuestScreen extends Screen {
             return true;
         }
 
+        if (button == 0 && handleChapterScrollbarClick(snapshot, mouseX, mouseY)) {
+            return true;
+        }
+
         if (button == 0 && handleClickTargets(mouseX, mouseY)) {
             return true;
         }
@@ -226,6 +238,7 @@ public class OverhaulQuestScreen extends Screen {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (button == 0) {
             isScrolling = false;
+            chapterScrollbarDragging = false;
         }
         return super.mouseReleased(mouseX, mouseY, button);
     }
@@ -240,11 +253,17 @@ public class OverhaulQuestScreen extends Screen {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (button != 0) {
             isScrolling = false;
+            chapterScrollbarDragging = false;
             return false;
         }
 
         if (viewState.getViewedQuestId() != 0L) {
             return false;
+        }
+
+        if (chapterScrollbarDragging) {
+            updateChapterScrollFromMouse(mouseY, QuestDataController.getSnapshot().chapters().size());
+            return true;
         }
 
         if (!isScrolling) {
@@ -265,6 +284,12 @@ public class OverhaulQuestScreen extends Screen {
             if (bodyRect.contains(mouseX, mouseY)) {
                 viewState.setDetailScroll(clampScroll(viewState.getDetailScroll() - deltaY * 24D, layout.contentHeight(), bodyRect.height()));
             }
+            return true;
+        }
+        Rect selectorViewport = chapterSelectorViewportRect();
+        Rect scrollbarHitbox = chapterScrollbarHitbox(snapshot.chapters().size());
+        if (selectorViewport.contains(mouseX, mouseY) || scrollbarHitbox != null && scrollbarHitbox.contains(mouseX, mouseY)) {
+            scrollChapterSelector(-deltaY * CHAPTER_SELECTOR_SCROLL_STEP, snapshot.chapters().size());
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, deltaY);
@@ -393,40 +418,52 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderChapterSelector(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, boolean interactive) {
-        Rect frame = frameRect();
-        int selectorX = frame.x() + CHAPTER_SELECTOR_X;
-        int selectorY = frame.y() + CHAPTER_SELECTOR_Y;
-        int y = selectorY;
+        Rect viewportRect = chapterSelectorViewportRect();
+        clampChapterScroll(snapshot.chapters().size());
+        int y = viewportRect.y() - Mth.floor(chapterScroll);
+
+        graphics.enableScissor(viewportRect.x(), viewportRect.y(), viewportRect.maxX(), viewportRect.maxY());
 
         for (QuestDataSnapshot.ChapterSnapshot chapter : snapshot.chapters()) {
             boolean selected = chapter.id() == viewState.getSelectedChapterId();
             int buttonWidth = selected ? CHAPTER_BUTTON_ACTIVE_WIDTH : CHAPTER_BUTTON_REGULAR_WIDTH;
-            Rect buttonRect = new Rect(selectorX, y, buttonWidth, CHAPTER_BUTTON_HEIGHT);
-            boolean hovered = buttonRect.contains(mouseX, mouseY);
+            Rect buttonRect = new Rect(viewportRect.x(), y, buttonWidth, CHAPTER_BUTTON_HEIGHT);
+            Rect textureRect = new Rect(viewportRect.x(), y - CHAPTER_BUTTON_TEXTURE_Y_OFFSET, CHAPTER_BUTTON_TEXTURE_WIDTH, CHAPTER_BUTTON_TEXTURE_HEIGHT);
+            boolean visible = textureRect.intersects(viewportRect);
+            boolean hovered = visible && buttonRect.contains(mouseX, mouseY);
             ResourceLocation texture = selected ? CHAPTER_BUTTON_ACTIVE_TEXTURE : hovered ? CHAPTER_BUTTON_HOVER_TEXTURE : CHAPTER_BUTTON_INACTIVE_TEXTURE;
-            Rect textureRect = new Rect(selectorX, y - CHAPTER_BUTTON_TEXTURE_Y_OFFSET, CHAPTER_BUTTON_TEXTURE_WIDTH, CHAPTER_BUTTON_TEXTURE_HEIGHT);
 
-            RenderSystem.enableBlend();
-            graphics.blit(texture, textureRect.x(), textureRect.y(), 0, 0, textureRect.width(), textureRect.height(), CHAPTER_BUTTON_TEXTURE_WIDTH, CHAPTER_BUTTON_TEXTURE_HEIGHT);
-            RenderSystem.disableBlend();
+            if (visible) {
+                RenderSystem.enableBlend();
+                graphics.blit(texture, textureRect.x(), textureRect.y(), 0, 0, textureRect.width(), textureRect.height(), CHAPTER_BUTTON_TEXTURE_WIDTH, CHAPTER_BUTTON_TEXTURE_HEIGHT);
+                RenderSystem.disableBlend();
 
-            int iconX = buttonRect.x() + CHAPTER_SELECTOR_ICON_X_OFFSET;
-            int iconY = buttonRect.y() + Math.max(0, (buttonRect.height() - CHAPTER_SELECTOR_ICON_SIZE) / 2);
-            chapter.icon().draw(graphics, iconX, iconY, CHAPTER_SELECTOR_ICON_SIZE, CHAPTER_SELECTOR_ICON_SIZE);
+                int iconX = buttonRect.x() + CHAPTER_SELECTOR_ICON_X_OFFSET;
+                int iconY = buttonRect.y() + Math.max(0, (buttonRect.height() - CHAPTER_SELECTOR_ICON_SIZE) / 2);
+                chapter.icon().draw(graphics, iconX, iconY, CHAPTER_SELECTOR_ICON_SIZE, CHAPTER_SELECTOR_ICON_SIZE);
 
-            float scaledTextHeight = font.lineHeight * CHAPTER_SELECTOR_TEXT_SCALE;
-            int textLeft = buttonRect.x() + CHAPTER_SELECTOR_TEXT_X_OFFSET;
-            int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + 1;
-            int availableWidth = buttonRect.maxX() - textLeft - CHAPTER_SELECTOR_TEXT_RIGHT_PADDING;
-            int textColor = selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
-            renderScrollingChapterLabel(graphics, chapter.title(), buttonRect, textLeft, textY, availableWidth, textColor, hovered || selected);
-
-            if (interactive) {
-                clickTargets.add(new ClickTarget(buttonRect, () -> selectChapter(chapter.id())));
+                float scaledTextHeight = font.lineHeight * CHAPTER_SELECTOR_TEXT_SCALE;
+                int textLeft = buttonRect.x() + CHAPTER_SELECTOR_TEXT_X_OFFSET;
+                int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + 1;
+                int availableWidth = buttonRect.maxX() - textLeft - CHAPTER_SELECTOR_TEXT_RIGHT_PADDING;
+                int textColor = selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
+                renderScrollingChapterLabel(graphics, chapter.title(), buttonRect, textLeft, textY, availableWidth, textColor, hovered || selected);
             }
 
-            y += CHAPTER_BUTTON_HEIGHT + CHAPTER_SELECTOR_ENTRY_SPACING;
+            if (interactive && buttonRect.intersects(viewportRect)) {
+                int clippedY = Math.max(buttonRect.y(), viewportRect.y());
+                int clippedHeight = Math.min(buttonRect.maxY(), viewportRect.maxY()) - clippedY;
+                if (clippedHeight > 0) {
+                    clickTargets.add(new ClickTarget(new Rect(buttonRect.x(), clippedY, buttonRect.width(), clippedHeight),
+                            () -> selectChapter(chapter.id())));
+                }
+            }
+
+            y += CHAPTER_SELECTOR_SCROLL_STEP;
         }
+
+        graphics.disableScissor();
+        renderChapterScrollbar(graphics, snapshot.chapters().size());
     }
 
     /**
@@ -936,6 +973,11 @@ public class OverhaulQuestScreen extends Screen {
             return false;
         }
 
+        Rect scrollbarHitbox = chapterScrollbarHitbox(snapshot.chapters().size());
+        if (scrollbarHitbox != null && scrollbarHitbox.contains(mouseX, mouseY)) {
+            return true;
+        }
+
         return false;
     }
 
@@ -1310,8 +1352,10 @@ public class OverhaulQuestScreen extends Screen {
         if (focusedChapterId != chapter.id()) {
             focusedChapterId = chapter.id();
             centered = false;
+            ensureSelectedChapterVisible(snapshot.chapters(), chapter.id());
         }
 
+        clampChapterScroll(snapshot.chapters().size());
         updateTabPages();
     }
 
@@ -1370,6 +1414,135 @@ public class OverhaulQuestScreen extends Screen {
             }
         }
         return false;
+    }
+
+    private boolean handleChapterScrollbarClick(QuestDataSnapshot snapshot, double mouseX, double mouseY) {
+        Rect scrollbarHitbox = chapterScrollbarHitbox(snapshot.chapters().size());
+        if (scrollbarHitbox == null || !scrollbarHitbox.contains(mouseX, mouseY)) {
+            return false;
+        }
+
+        chapterScrollbarDragging = true;
+        updateChapterScrollFromMouse(mouseY, snapshot.chapters().size());
+        return true;
+    }
+
+    private void scrollChapterSelector(double delta, int chapterCount) {
+        if (chapterCount <= 0) {
+            chapterScroll = 0D;
+            return;
+        }
+
+        chapterScroll = Mth.clamp(chapterScroll + delta, 0D, maxChapterScroll(chapterCount));
+    }
+
+    private void clampChapterScroll(int chapterCount) {
+        chapterScroll = Mth.clamp(chapterScroll, 0D, maxChapterScroll(chapterCount));
+    }
+
+    private void ensureSelectedChapterVisible(List<QuestDataSnapshot.ChapterSnapshot> chapters, long selectedChapterId) {
+        int selectedIndex = -1;
+        for (int i = 0; i < chapters.size(); i++) {
+            if (chapters.get(i).id() == selectedChapterId) {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        if (selectedIndex < 0) {
+            return;
+        }
+
+        int viewportHeight = chapterSelectorViewportHeight();
+        int entryTop = selectedIndex * CHAPTER_SELECTOR_SCROLL_STEP;
+        int entryBottom = entryTop + CHAPTER_BUTTON_HEIGHT;
+        if (entryTop < chapterScroll) {
+            chapterScroll = entryTop;
+        } else if (entryBottom > chapterScroll + viewportHeight) {
+            chapterScroll = entryBottom - viewportHeight;
+        }
+
+        clampChapterScroll(chapters.size());
+    }
+
+    private void updateChapterScrollFromMouse(double mouseY, int chapterCount) {
+        Rect trackRect = chapterScrollbarTrackRect();
+        Rect thumbRect = chapterScrollbarThumbRect(chapterCount);
+        if (trackRect == null || thumbRect == null) {
+            chapterScroll = 0D;
+            return;
+        }
+
+        int maxThumbTravel = Math.max(0, trackRect.height() - thumbRect.height());
+        if (maxThumbTravel == 0) {
+            chapterScroll = 0D;
+            return;
+        }
+
+        double thumbOffset = Mth.clamp(mouseY - trackRect.y() - thumbRect.height() / 2D, 0D, maxThumbTravel);
+        chapterScroll = thumbOffset / maxThumbTravel * maxChapterScroll(chapterCount);
+    }
+
+    private void renderChapterScrollbar(GuiGraphics graphics, int chapterCount) {
+        Rect trackRect = chapterScrollbarTrackRect();
+        Rect thumbRect = chapterScrollbarThumbRect(chapterCount);
+        if (trackRect == null || thumbRect == null) {
+            return;
+        }
+
+        graphics.fill(trackRect.x(), trackRect.y(), trackRect.maxX(), trackRect.maxY(), 0x44271410);
+        graphics.fill(thumbRect.x(), thumbRect.y(), thumbRect.maxX(), thumbRect.maxY(),
+                chapterScrollbarDragging ? 0xFFF0E2C5 : 0xCCBFA68A);
+    }
+
+    private Rect chapterSelectorViewportRect() {
+        Rect frame = frameRect();
+        return new Rect(frame.x() + CHAPTER_SELECTOR_X, frame.y() + CHAPTER_SELECTOR_Y,
+                CHAPTER_BUTTON_ACTIVE_WIDTH, chapterSelectorViewportHeight());
+    }
+
+    private int chapterSelectorViewportHeight() {
+        return BACKGROUND_HEIGHT - CHAPTER_SELECTOR_Y - CHAPTER_SELECTOR_BOTTOM_PADDING;
+    }
+
+    private Rect chapterScrollbarTrackRect() {
+        Rect viewportRect = chapterSelectorViewportRect();
+        return new Rect(viewportRect.x() - CHAPTER_SCROLLBAR_GAP - CHAPTER_SCROLLBAR_WIDTH, viewportRect.y(),
+                CHAPTER_SCROLLBAR_WIDTH, viewportRect.height());
+    }
+
+    private Rect chapterScrollbarThumbRect(int chapterCount) {
+        Rect trackRect = chapterScrollbarTrackRect();
+        int contentHeight = chapterContentHeight(chapterCount);
+        if (contentHeight <= trackRect.height()) {
+            return null;
+        }
+
+        int thumbHeight = Mth.clamp(Math.round((float) trackRect.height() * trackRect.height() / (float) contentHeight),
+                CHAPTER_SCROLLBAR_MIN_THUMB_HEIGHT, trackRect.height());
+        int maxThumbTravel = Math.max(0, trackRect.height() - thumbHeight);
+        double maxScroll = maxChapterScroll(chapterCount);
+        int thumbY = trackRect.y() + (maxScroll <= 0D || maxThumbTravel == 0 ? 0
+                : Mth.floor(chapterScroll / maxScroll * maxThumbTravel));
+        return new Rect(trackRect.x(), thumbY, trackRect.width(), thumbHeight);
+    }
+
+    private Rect chapterScrollbarHitbox(int chapterCount) {
+        Rect trackRect = chapterScrollbarTrackRect();
+        if (chapterScrollbarThumbRect(chapterCount) == null) {
+            return null;
+        }
+
+        return new Rect(trackRect.x() - (CHAPTER_SCROLLBAR_HITBOX_WIDTH - trackRect.width()) / 2, trackRect.y(),
+                CHAPTER_SCROLLBAR_HITBOX_WIDTH, trackRect.height());
+    }
+
+    private int chapterContentHeight(int chapterCount) {
+        return chapterCount <= 0 ? 0 : chapterCount * CHAPTER_SELECTOR_SCROLL_STEP - CHAPTER_SELECTOR_ENTRY_SPACING;
+    }
+
+    private double maxChapterScroll(int chapterCount) {
+        return Math.max(0D, chapterContentHeight(chapterCount) - chapterSelectorViewportHeight());
     }
 
     private Rect frameRect() {
@@ -1532,6 +1705,10 @@ public class OverhaulQuestScreen extends Screen {
 
         boolean contains(double mouseX, double mouseY) {
             return mouseX >= x && mouseX <= maxX() && mouseY >= y && mouseY <= maxY();
+        }
+
+        boolean intersects(Rect other) {
+            return maxX() > other.x() && x < other.maxX() && maxY() > other.y() && y < other.maxY();
         }
     }
 }
