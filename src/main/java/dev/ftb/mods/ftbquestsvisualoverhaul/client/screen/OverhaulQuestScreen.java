@@ -19,6 +19,7 @@ import dev.ftb.mods.ftblibrary.ui.CursorType;
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.world.level.GameType;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
@@ -73,7 +74,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final int CHAPTER_SCROLLBAR_GAP = 2;
     private static final int CHAPTER_SCROLLBAR_HITBOX_WIDTH = 5;
     private static final int CHAPTER_SCROLLBAR_MIN_THUMB_HEIGHT = 8;
-    private static final float CHAPTER_SELECTOR_TEXT_SCALE = 0.6F;
+    private static final float CHAPTER_SELECTOR_TEXT_SCALE = 0.45F;
 
     // --- Vanilla advancement textures ---
     private static final ResourceLocation WINDOW_LOCATION = new ResourceLocation("textures/gui/advancements/window.png");
@@ -352,7 +353,7 @@ public class OverhaulQuestScreen extends Screen {
             renderQuestDetailModal(graphics, selectedQuest, mouseX, mouseY);
         }
 
-        if (renderDefaultButton) {
+        if (renderDefaultButton && shouldShowDefaultViewButton()) {
             renderDefaultViewButton(graphics, mouseX, mouseY);
         }
 
@@ -444,7 +445,7 @@ public class OverhaulQuestScreen extends Screen {
 
                 float scaledTextHeight = font.lineHeight * CHAPTER_SELECTOR_TEXT_SCALE;
                 int textLeft = buttonRect.x() + CHAPTER_SELECTOR_TEXT_X_OFFSET;
-                int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + 1;
+                int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + 2;
                 int availableWidth = buttonRect.maxX() - textLeft - CHAPTER_SELECTOR_TEXT_RIGHT_PADDING;
                 int textColor = selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
                 renderScrollingChapterLabel(graphics, chapter.title(), buttonRect, textLeft, textY, availableWidth, textColor, hovered || selected);
@@ -1117,6 +1118,10 @@ public class OverhaulQuestScreen extends Screen {
         graphics.pose().popPose();
 
         clickTargets.add(new ClickTarget(rect, actionRouter::openVanillaRoot));
+    }
+
+    private boolean shouldShowDefaultViewButton() {
+        return minecraft == null || minecraft.gameMode == null || minecraft.gameMode.getPlayerMode() != GameType.SURVIVAL;
     }
 
     private int renderSectionLabel(GuiGraphics graphics, String label, int x, int y) {
