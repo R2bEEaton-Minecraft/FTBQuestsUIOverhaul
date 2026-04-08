@@ -145,6 +145,10 @@ public class OverhaulQuestScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
+        // FTB Quests pushes client progress updates into TeamData, but it only refreshes
+        // the vanilla QuestScreen widgets. Rebuild our cached snapshot while this screen
+        // is open so inventory-detected task completion and reward claimability stay in sync.
+        QuestDataController.markDirty();
     }
 
     @Override
