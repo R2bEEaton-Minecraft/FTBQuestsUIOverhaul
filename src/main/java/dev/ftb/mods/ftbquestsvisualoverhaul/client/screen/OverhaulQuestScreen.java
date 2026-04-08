@@ -16,6 +16,7 @@ import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.TaskInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestOpenContext;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestViewState;
 import dev.ftb.mods.ftblibrary.ui.CursorType;
+import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.locale.Language;
@@ -40,22 +41,33 @@ import java.util.Map;
 public class OverhaulQuestScreen extends Screen {
     // --- Custom background texture ---
     private static final ResourceLocation QUESTS_BACKGROUND_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quests_background.png");
-    private static final ResourceLocation HOVER_CARD_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/hover_card.png");
-    private static final ResourceLocation QUEST_MODAL_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quest_modal.png");
+    private static final ResourceLocation CHAPTER_BUTTON_INACTIVE_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quest_line_button_inactive.png");
+    private static final ResourceLocation CHAPTER_BUTTON_HOVER_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quest_line_button_hover.png");
+    private static final ResourceLocation CHAPTER_BUTTON_ACTIVE_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quest_line_button_active.png");
     private static final int BACKGROUND_WIDTH = 294;
     private static final int BACKGROUND_HEIGHT = 163;
     private static final int BACKGROUND_TEXTURE_WIDTH = 512;
     private static final int BACKGROUND_TEXTURE_HEIGHT = 256;
-    private static final int HOVER_CARD_TEXTURE_WIDTH = 96;
-    private static final int HOVER_CARD_TEXTURE_HEIGHT = 64;
-    private static final int QUEST_MODAL_TEXTURE_WIDTH = 128;
-    private static final int QUEST_MODAL_TEXTURE_HEIGHT = 96;
+    private static final int CHAPTER_BUTTON_TEXTURE_WIDTH = 67;
+    private static final int CHAPTER_BUTTON_TEXTURE_HEIGHT = 30;
 
     // --- Tree panel area within the background texture ---
     private static final int TREE_X = 89;
     private static final int TREE_Y = 19;
     private static final int TREE_WIDTH = 186;
     private static final int TREE_HEIGHT = 125;
+    private static final int CHAPTER_SELECTOR_X = 16;
+    private static final int CHAPTER_SELECTOR_Y = 14;
+    private static final int CHAPTER_BUTTON_ACTIVE_WIDTH = 67;
+    private static final int CHAPTER_BUTTON_REGULAR_WIDTH = 53;
+    private static final int CHAPTER_BUTTON_HEIGHT = 14;
+    private static final int CHAPTER_BUTTON_TEXTURE_Y_OFFSET = 6;
+    private static final int CHAPTER_SELECTOR_ENTRY_SPACING = 1;
+    private static final int CHAPTER_SELECTOR_ICON_SIZE = 10;
+    private static final int CHAPTER_SELECTOR_ICON_X_OFFSET = 4;
+    private static final int CHAPTER_SELECTOR_TEXT_X_OFFSET = 16;
+    private static final int CHAPTER_SELECTOR_TEXT_RIGHT_PADDING = 4;
+    private static final float CHAPTER_SELECTOR_TEXT_SCALE = 0.6F;
 
     // --- Vanilla advancement textures ---
     private static final ResourceLocation WINDOW_LOCATION = new ResourceLocation("textures/gui/advancements/window.png");
@@ -93,8 +105,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final int MODAL_HEADER_HEIGHT = 34;
     private static final int MODAL_FOOTER_HEIGHT = 24;
     private static final int MODAL_MARGIN = 28;
-    private static final int MODAL_FRAME_SLICE = 12;
-    private static final int HOVER_CARD_SLICE = 10;
+    private static final int FOOTER_BUTTON_HEIGHT = 15;
     private static final float MODAL_TEXT_SCALE = 0.8F;
 
     private final QuestOpenContext openContext;
@@ -200,22 +211,6 @@ public class OverhaulQuestScreen extends Screen {
             return true;
         }
 
-        // Check tab clicks (matching vanilla AdvancementsScreen.mouseClicked)
-        if (button == 0) {
-            Rect frame = frameRect();
-            int treeLeft = frame.x() + TREE_X;
-            int treeTop = frame.y() + TREE_Y;
-            List<QuestDataSnapshot.ChapterSnapshot> chapters = snapshot.chapters();
-            for (int i = 0; i < chapters.size(); i++) {
-                if (getTabPage(i) == tabPage && isTabMouseOver(treeLeft, treeTop, i, mouseX, mouseY)) {
-                    viewState.setSelectedChapterId(chapters.get(i).id());
-                    centered = false;
-                    closeViewedQuest();
-                    return true;
-                }
-            }
-        }
-
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
@@ -290,6 +285,15 @@ public class OverhaulQuestScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        renderScreen(graphics, mouseX, mouseY, partialTick, true, true, true);
+    }
+
+    public void renderChoiceBackdrop(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        renderScreen(graphics, mouseX, mouseY, partialTick, false, false, false);
+    }
+
+    private void renderScreen(GuiGraphics graphics, int mouseX, int mouseY, float partialTick,
+                              boolean renderDetailModal, boolean renderDefaultButton, boolean updateCursor) {
         QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
         refreshState(snapshot);
         hoveredQuest = null;
@@ -306,19 +310,12 @@ public class OverhaulQuestScreen extends Screen {
         graphics.blit(QUESTS_BACKGROUND_TEXTURE, frame.x(), frame.y(), 0, 0,
                 BACKGROUND_WIDTH, BACKGROUND_HEIGHT, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
 
-        // Tab page indicator (from vanilla Forge extension)
-        if (maxPages != 0) {
-            Component page = Component.literal(String.format("%d / %d", tabPage + 1, maxPages + 1));
-            int pageWidth = this.font.width(page);
-            graphics.drawString(this.font, page.getVisualOrderText(),
-                    treeLeft + (TREE_WIDTH / 2) - (pageWidth / 2), treeTop - 44, -1);
-        }
+        QuestDataSnapshot.QuestSnapshot selectedQuest = getSelectedQuestSnapshot(snapshot);
+
+        renderChapterSelector(graphics, snapshot, mouseX, mouseY, selectedQuest == null && updateCursor);
 
         // Render tree content inside the tree panel area (vanilla advancement style)
         renderInside(graphics, snapshot, mouseX, mouseY, treeLeft, treeTop);
-
-        // Chapter tabs along the top of the tree panel (vanilla tab style)
-        renderTabs(graphics, snapshot, treeLeft, treeTop, mouseX, mouseY);
 
         super.render(graphics, mouseX, mouseY, partialTick);
 
@@ -326,14 +323,17 @@ public class OverhaulQuestScreen extends Screen {
         renderTooltips(graphics, snapshot, mouseX, mouseY, treeLeft, treeTop);
 
         // Detail modal overlay (quest-specific, not in vanilla advancements)
-        QuestDataSnapshot.QuestSnapshot selectedQuest = getSelectedQuestSnapshot(snapshot);
-        if (selectedQuest != null) {
+        if (renderDetailModal && selectedQuest != null) {
             renderQuestDetailModal(graphics, selectedQuest, mouseX, mouseY);
         }
 
-        renderDefaultViewButton(graphics, mouseX, mouseY);
+        if (renderDefaultButton) {
+            renderDefaultViewButton(graphics, mouseX, mouseY);
+        }
 
-        updateCursor(snapshot, mouseX, mouseY, treeLeft, treeTop);
+        if (updateCursor) {
+            updateCursor(snapshot, mouseX, mouseY, treeLeft, treeTop);
+        }
     }
 
     /**
@@ -390,6 +390,43 @@ public class OverhaulQuestScreen extends Screen {
 
         graphics.pose().popPose();
         graphics.disableScissor();
+    }
+
+    private void renderChapterSelector(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, boolean interactive) {
+        Rect frame = frameRect();
+        int selectorX = frame.x() + CHAPTER_SELECTOR_X;
+        int selectorY = frame.y() + CHAPTER_SELECTOR_Y;
+        int y = selectorY;
+
+        for (QuestDataSnapshot.ChapterSnapshot chapter : snapshot.chapters()) {
+            boolean selected = chapter.id() == viewState.getSelectedChapterId();
+            int buttonWidth = selected ? CHAPTER_BUTTON_ACTIVE_WIDTH : CHAPTER_BUTTON_REGULAR_WIDTH;
+            Rect buttonRect = new Rect(selectorX, y, buttonWidth, CHAPTER_BUTTON_HEIGHT);
+            boolean hovered = buttonRect.contains(mouseX, mouseY);
+            ResourceLocation texture = selected ? CHAPTER_BUTTON_ACTIVE_TEXTURE : hovered ? CHAPTER_BUTTON_HOVER_TEXTURE : CHAPTER_BUTTON_INACTIVE_TEXTURE;
+            Rect textureRect = new Rect(selectorX, y - CHAPTER_BUTTON_TEXTURE_Y_OFFSET, CHAPTER_BUTTON_TEXTURE_WIDTH, CHAPTER_BUTTON_TEXTURE_HEIGHT);
+
+            RenderSystem.enableBlend();
+            graphics.blit(texture, textureRect.x(), textureRect.y(), 0, 0, textureRect.width(), textureRect.height(), CHAPTER_BUTTON_TEXTURE_WIDTH, CHAPTER_BUTTON_TEXTURE_HEIGHT);
+            RenderSystem.disableBlend();
+
+            int iconX = buttonRect.x() + CHAPTER_SELECTOR_ICON_X_OFFSET;
+            int iconY = buttonRect.y() + Math.max(0, (buttonRect.height() - CHAPTER_SELECTOR_ICON_SIZE) / 2);
+            chapter.icon().draw(graphics, iconX, iconY, CHAPTER_SELECTOR_ICON_SIZE, CHAPTER_SELECTOR_ICON_SIZE);
+
+            float scaledTextHeight = font.lineHeight * CHAPTER_SELECTOR_TEXT_SCALE;
+            int textLeft = buttonRect.x() + CHAPTER_SELECTOR_TEXT_X_OFFSET;
+            int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + 1;
+            int availableWidth = buttonRect.maxX() - textLeft - CHAPTER_SELECTOR_TEXT_RIGHT_PADDING;
+            int textColor = selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
+            renderScrollingChapterLabel(graphics, chapter.title(), buttonRect, textLeft, textY, availableWidth, textColor, hovered || selected);
+
+            if (interactive) {
+                clickTargets.add(new ClickTarget(buttonRect, () -> selectChapter(chapter.id())));
+            }
+
+            y += CHAPTER_BUTTON_HEIGHT + CHAPTER_SELECTOR_ENTRY_SPACING;
+        }
     }
 
     /**
@@ -475,15 +512,6 @@ public class OverhaulQuestScreen extends Screen {
             graphics.pose().popPose();
         }
 
-        // Tab tooltips (matching vanilla)
-        List<QuestDataSnapshot.ChapterSnapshot> chapters = snapshot.chapters();
-        if (chapters.size() > 1) {
-            for (int i = 0; i < chapters.size(); i++) {
-                if (getTabPage(i) == tabPage && isTabMouseOver(treeLeft, treeTop, i, mouseX, mouseY)) {
-                    graphics.renderTooltip(this.font, chapters.get(i).title(), mouseX, mouseY);
-                }
-            }
-        }
     }
 
     // ---- Node position calculations (matching AdvancementWidget) ----
@@ -908,17 +936,6 @@ public class OverhaulQuestScreen extends Screen {
             return false;
         }
 
-        List<QuestDataSnapshot.ChapterSnapshot> chapters = snapshot.chapters();
-        if (chapters.size() <= 1) {
-            return false;
-        }
-
-        for (int i = 0; i < chapters.size(); i++) {
-            if (getTabPage(i) == tabPage && isTabMouseOver(treeLeft, treeTop, i, mouseX, mouseY)) {
-                return true;
-            }
-        }
-
         return false;
     }
 
@@ -941,11 +958,12 @@ public class OverhaulQuestScreen extends Screen {
         Rect body = layout.bodyRect();
         Rect footer = layout.footerRect();
 
-        drawNineSlice(graphics, QUEST_MODAL_TEXTURE, rect, QUEST_MODAL_TEXTURE_WIDTH, QUEST_MODAL_TEXTURE_HEIGHT, MODAL_FRAME_SLICE);
-        graphics.fill(rect.x() + 8, rect.y() + 8, rect.maxX() - 8, rect.maxY() - 8, 0xD4211711);
+        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0xD4211711);
+        drawInsetBorder(graphics, rect, 0xFF8F6938, 0xCC160F0B);
+        graphics.fill(rect.x() + 6, rect.y() + 6, rect.maxX() - 6, rect.maxY() - 6, 0x96241711);
 
-        drawNineSlice(graphics, HOVER_CARD_TEXTURE, header, HOVER_CARD_TEXTURE_WIDTH, HOVER_CARD_TEXTURE_HEIGHT, HOVER_CARD_SLICE);
-        graphics.fill(header.x() + 3, header.y() + 3, header.maxX() - 3, header.maxY() - 3, 0xA08F6A1D);
+        graphics.fill(header.x(), header.y(), header.maxX(), header.maxY(), 0xCC8F6A1D);
+        drawInsetBorder(graphics, header, 0xFFD6A85C, 0xAA3E2B13);
 
         quest.icon().draw(graphics, header.x() + 7, header.y() + 6, 16, 16);
         drawCenteredScaledString(graphics, trim(quest.title(), (int) ((header.width() - 58) / MODAL_TEXT_SCALE)), header.centerX(), header.y() + 6, 0xFFF6EDDB, MODAL_TEXT_SCALE);
@@ -1029,11 +1047,12 @@ public class OverhaulQuestScreen extends Screen {
         drawInsetBorder(graphics, footer, 0xFF805C32, 0xCC1C1410);
 
         int buttonGap = 8;
-        int buttonWidth = (footer.width() - buttonGap) / 2;
-        Rect pinButton = footerButtonRect(footer.x(), footer.y(), buttonWidth, footer.height());
-        Rect claimButton = footerButtonRect(footer.x() + buttonWidth + buttonGap, footer.y(), buttonWidth, footer.height());
+        int buttonSlotWidth = (footer.width() - buttonGap) / 2;
+        int buttonWidth = Math.round(buttonSlotWidth * 0.75F);
+        Rect pinButton = footerButtonRect(footer.x() + Math.max(0, (buttonSlotWidth - buttonWidth) / 2), footer.y(), buttonWidth, footer.height());
+        Rect claimButton = footerButtonRect(footer.x() + buttonSlotWidth + buttonGap + Math.max(0, (buttonSlotWidth - buttonWidth) / 2), footer.y(), buttonWidth, footer.height());
 
-        renderFooterButton(graphics, pinButton, quest.pinned() ? "Pin" : "Unpin", true, pinButton.contains(mouseX, mouseY));
+        renderFooterButton(graphics, pinButton, quest.pinned() ? "Unpin" : "Pin", true, pinButton.contains(mouseX, mouseY));
         boolean claimEnabled = canClaimAnyReward(quest);
         renderFooterButton(graphics, claimButton, "Claim", claimEnabled, claimButton.contains(mouseX, mouseY));
 
@@ -1073,7 +1092,9 @@ public class OverhaulQuestScreen extends Screen {
 
         task.icon().draw(graphics, iconRect.x(), iconRect.y(), 14, 14);
         if (consumableTurnIn) {
-            renderRequirementMarker(graphics, iconRect, task.canInteract());
+            if (task.canInteract()) {
+                renderRequirementMarker(graphics, iconRect, true);
+            }
             renderConsumableActionButton(graphics, actionRect, task.canInteract());
         }
         int infoX = rect.x() + 20;
@@ -1133,7 +1154,7 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderRequirementMarker(GuiGraphics graphics, Rect iconRect, boolean active) {
-        Rect badge = new Rect(iconRect.maxX() - 5, iconRect.y() - 1, 6, 6);
+        Rect badge = new Rect(iconRect.centerX() - 3, iconRect.y() - 4, 6, 6);
         graphics.fill(badge.x(), badge.y(), badge.maxX(), badge.maxY(), active ? 0xFFD2A63B : 0xAA705C3D);
         drawInsetBorder(graphics, badge, active ? 0xFFFFE1A3 : 0xCC9B8764, 0xAA24180F);
         drawCenteredScaledString(graphics, Component.literal("!"), badge.centerX(), badge.y(), active ? 0xFF2B1706 : 0xFF24180F, 0.55F);
@@ -1148,17 +1169,24 @@ public class OverhaulQuestScreen extends Screen {
     private void drawVanillaButton(GuiGraphics graphics, Rect rect, boolean enabled, boolean hovered) {
         int textureY = !enabled ? 46 : hovered ? 86 : 66;
         int halfWidth = rect.width() / 2;
-        graphics.blit(BUTTONS_LOCATION, rect.x(), rect.y(), 0, textureY, halfWidth, 20, 256, 256);
-        graphics.blit(BUTTONS_LOCATION, rect.x() + halfWidth, rect.y(), 200 - (rect.width() - halfWidth), textureY, rect.width() - halfWidth, 20, 256, 256);
+        float yScale = rect.height() / 20F;
+        graphics.pose().pushPose();
+        graphics.pose().translate(rect.x(), rect.y(), 0F);
+        graphics.pose().scale(1F, yScale, 1F);
+        graphics.blit(BUTTONS_LOCATION, 0, 0, 0, textureY, halfWidth, 20, 256, 256);
+        graphics.blit(BUTTONS_LOCATION, halfWidth, 0, 200 - (rect.width() - halfWidth), textureY, rect.width() - halfWidth, 20, 256, 256);
+        graphics.pose().popPose();
     }
 
     private void renderFooterButton(GuiGraphics graphics, Rect rect, String label, boolean enabled, boolean hovered) {
         drawVanillaButton(graphics, rect, enabled, hovered);
-        drawCenteredScaledString(graphics, Component.literal(label), rect.centerX(), rect.y() + 8, enabled ? 0xFFE0E0E0 : 0xFFA0A0A0, MODAL_TEXT_SCALE);
+        int textHeight = Math.round(font.lineHeight * MODAL_TEXT_SCALE);
+        int textY = rect.y() + Math.max(0, (rect.height() - textHeight) / 2);
+        drawCenteredScaledString(graphics, Component.literal(label), rect.centerX(), textY, enabled ? 0xFFE0E0E0 : 0xFFA0A0A0, MODAL_TEXT_SCALE);
     }
 
     private Rect footerButtonRect(int x, int y, int width, int containerHeight) {
-        return new Rect(x, y + Math.max(0, (containerHeight - 20) / 2), width, 20);
+        return new Rect(x, y + Math.max(0, (containerHeight - FOOTER_BUTTON_HEIGHT) / 2), width, FOOTER_BUTTON_HEIGHT);
     }
 
     // ---- Layout and state helpers ----
@@ -1304,6 +1332,14 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
+    private void selectChapter(long chapterId) {
+        if (viewState.getSelectedChapterId() != chapterId) {
+            viewState.setSelectedChapterId(chapterId);
+            centered = false;
+        }
+        closeViewedQuest();
+    }
+
     private void closeViewedQuest() {
         viewState.setViewedQuestId(0L);
         viewState.setDetailScroll(0D);
@@ -1350,30 +1386,6 @@ public class OverhaulQuestScreen extends Screen {
         graphics.fill(rect.maxX() - 1, rect.y(), rect.maxX(), rect.maxY(), borderColor);
     }
 
-    private void drawNineSlice(GuiGraphics graphics, ResourceLocation texture, Rect rect, int textureWidth, int textureHeight, int slice) {
-        int centerWidth = Math.max(0, rect.width() - slice * 2);
-        int centerHeight = Math.max(0, rect.height() - slice * 2);
-        int texCenterWidth = textureWidth - slice * 2;
-        int texCenterHeight = textureHeight - slice * 2;
-
-        graphics.blit(texture, rect.x(), rect.y(), 0, 0, slice, slice, textureWidth, textureHeight);
-        graphics.blit(texture, rect.maxX() - slice, rect.y(), textureWidth - slice, 0, slice, slice, textureWidth, textureHeight);
-        graphics.blit(texture, rect.x(), rect.maxY() - slice, 0, textureHeight - slice, slice, slice, textureWidth, textureHeight);
-        graphics.blit(texture, rect.maxX() - slice, rect.maxY() - slice, textureWidth - slice, textureHeight - slice, slice, slice, textureWidth, textureHeight);
-
-        if (centerWidth > 0) {
-            graphics.blit(texture, rect.x() + slice, rect.y(), slice, 0, centerWidth, slice, texCenterWidth, slice, textureWidth, textureHeight);
-            graphics.blit(texture, rect.x() + slice, rect.maxY() - slice, slice, textureHeight - slice, centerWidth, slice, texCenterWidth, slice, textureWidth, textureHeight);
-        }
-        if (centerHeight > 0) {
-            graphics.blit(texture, rect.x(), rect.y() + slice, 0, slice, slice, centerHeight, slice, texCenterHeight, textureWidth, textureHeight);
-            graphics.blit(texture, rect.maxX() - slice, rect.y() + slice, textureWidth - slice, slice, slice, centerHeight, slice, texCenterHeight, textureWidth, textureHeight);
-        }
-        if (centerWidth > 0 && centerHeight > 0) {
-            graphics.blit(texture, rect.x() + slice, rect.y() + slice, slice, slice, centerWidth, centerHeight, texCenterWidth, texCenterHeight, textureWidth, textureHeight);
-        }
-    }
-
     private void drawInsetBorder(GuiGraphics graphics, Rect rect, int borderColor, int shadeColor) {
         graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.y() + 1, borderColor);
         graphics.fill(rect.x(), rect.maxY() - 1, rect.maxX(), rect.maxY(), shadeColor);
@@ -1413,6 +1425,53 @@ public class OverhaulQuestScreen extends Screen {
 
     private Component trim(Component component, int width) {
         return Component.literal(font.plainSubstrByWidth(component.getString(), Math.max(8, width)));
+    }
+
+    private Component trim(Component component, int width, float scale) {
+        return Component.literal(font.plainSubstrByWidth(component.getString(), Math.max(8, Math.round(width / Math.max(0.1F, scale)))));
+    }
+
+    private void renderScrollingChapterLabel(GuiGraphics graphics, Component component, Rect buttonRect, int textLeft, int textY,
+                                             int availableWidth, int color, boolean animate) {
+        int textWidth = Math.round(font.width(component) * CHAPTER_SELECTOR_TEXT_SCALE);
+        if (textWidth <= availableWidth) {
+            drawScaledString(graphics, component, textLeft, textY, color, CHAPTER_SELECTOR_TEXT_SCALE);
+            return;
+        }
+
+        int overflow = textWidth - availableWidth;
+        int offset = animate ? Mth.floor(getMarqueeOffset(overflow)) : 0;
+        graphics.enableScissor(textLeft, buttonRect.y(), textLeft + availableWidth, buttonRect.maxY());
+        drawScaledString(graphics, component, textLeft - offset, textY, color, CHAPTER_SELECTOR_TEXT_SCALE);
+        graphics.disableScissor();
+    }
+
+    private double getMarqueeOffset(int overflow) {
+        if (overflow <= 0) {
+            return 0D;
+        }
+
+        double holdDuration = 700D;
+        double travelDuration = Math.max(1200D, overflow * 60D);
+        double cycleDuration = holdDuration + travelDuration + holdDuration + travelDuration;
+        double cyclePos = Util.getMillis() % cycleDuration;
+
+        if (cyclePos < holdDuration) {
+            return 0D;
+        }
+        cyclePos -= holdDuration;
+
+        if (cyclePos < travelDuration) {
+            return overflow * (cyclePos / travelDuration);
+        }
+        cyclePos -= travelDuration;
+
+        if (cyclePos < holdDuration) {
+            return overflow;
+        }
+        cyclePos -= holdDuration;
+
+        return overflow * (1D - (cyclePos / travelDuration));
     }
 
     private String statusLabel(QuestDataSnapshot.QuestSnapshot quest) {
