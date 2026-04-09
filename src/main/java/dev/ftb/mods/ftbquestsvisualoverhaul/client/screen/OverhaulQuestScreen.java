@@ -238,6 +238,11 @@ public class OverhaulQuestScreen extends Screen {
             return true;
         }
 
+        if (!frameRect().contains(mouseX, mouseY)) {
+            onClose();
+            return true;
+        }
+
         return false;
     }
 
