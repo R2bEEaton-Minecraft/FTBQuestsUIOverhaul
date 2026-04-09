@@ -80,7 +80,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final int ACTIVE_CHAPTER_TITLE_SIDE_PADDING = 4;
     private static final int ACTIVE_CHAPTER_TITLE_ICON_SIZE = 8;
     private static final int ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING = 3;
-    private static final int ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET = 1;
+    private static final float ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET = 1.5F;
 
     // --- Vanilla advancement textures ---
     private static final ResourceLocation WINDOW_LOCATION = new ResourceLocation("textures/gui/advancements/window.png");
@@ -502,7 +502,7 @@ public class OverhaulQuestScreen extends Screen {
         int rowTextOffset = Mth.floor((CHAPTER_BUTTON_HEIGHT - scaledTextHeight) * 0.5F) + 2;
         int rowY = frame.y() + ACTIVE_CHAPTER_TITLE_TOP_PADDING - rowTextOffset;
         int textY = rowY + rowTextOffset;
-        int iconY = rowY + Math.max(0, (CHAPTER_BUTTON_HEIGHT - ACTIVE_CHAPTER_TITLE_ICON_SIZE) / 2) + ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET;
+        float iconY = rowY + Math.max(0, (CHAPTER_BUTTON_HEIGHT - ACTIVE_CHAPTER_TITLE_ICON_SIZE) / 2) + ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET;
         int separatorWidth = Math.round(font.width(separator) * CHAPTER_SELECTOR_TEXT_SCALE);
         int titleWidth = Math.round(font.width(title) * CHAPTER_SELECTOR_TEXT_SCALE);
         int totalWidth = ACTIVE_CHAPTER_TITLE_ICON_SIZE
@@ -523,7 +523,10 @@ public class OverhaulQuestScreen extends Screen {
         }
         graphics.enableScissor(titleBandRect.x(), titleBandRect.y(), titleBandRect.maxX(), titleBandRect.maxY());
         int cursorX = drawX;
-        chapter.icon().draw(graphics, cursorX, iconY, ACTIVE_CHAPTER_TITLE_ICON_SIZE, ACTIVE_CHAPTER_TITLE_ICON_SIZE);
+        graphics.pose().pushPose();
+        graphics.pose().translate(cursorX, iconY, 0F);
+        chapter.icon().draw(graphics, 0, 0, ACTIVE_CHAPTER_TITLE_ICON_SIZE, ACTIVE_CHAPTER_TITLE_ICON_SIZE);
+        graphics.pose().popPose();
         cursorX += ACTIVE_CHAPTER_TITLE_ICON_SIZE + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING;
         drawScaledString(graphics, separator, cursorX, textY, color, CHAPTER_SELECTOR_TEXT_SCALE);
         cursorX += separatorWidth + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING;
@@ -531,7 +534,10 @@ public class OverhaulQuestScreen extends Screen {
         cursorX += titleWidth + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING;
         drawScaledString(graphics, separator, cursorX, textY, color, CHAPTER_SELECTOR_TEXT_SCALE);
         cursorX += separatorWidth + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING;
-        chapter.icon().draw(graphics, cursorX, iconY, ACTIVE_CHAPTER_TITLE_ICON_SIZE, ACTIVE_CHAPTER_TITLE_ICON_SIZE);
+        graphics.pose().pushPose();
+        graphics.pose().translate(cursorX, iconY, 0F);
+        chapter.icon().draw(graphics, 0, 0, ACTIVE_CHAPTER_TITLE_ICON_SIZE, ACTIVE_CHAPTER_TITLE_ICON_SIZE);
+        graphics.pose().popPose();
         graphics.disableScissor();
     }
 
