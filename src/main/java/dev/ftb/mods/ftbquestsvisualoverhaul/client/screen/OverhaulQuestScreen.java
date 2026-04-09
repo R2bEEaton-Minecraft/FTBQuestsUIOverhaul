@@ -80,7 +80,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final int ACTIVE_CHAPTER_TITLE_SIDE_PADDING = 4;
     private static final int ACTIVE_CHAPTER_TITLE_ICON_SIZE = 8;
     private static final int ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING = 3;
-    private static final int ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET = 2;
+    private static final int ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET = 1;
 
     // --- Vanilla advancement textures ---
     private static final ResourceLocation WINDOW_LOCATION = new ResourceLocation("textures/gui/advancements/window.png");

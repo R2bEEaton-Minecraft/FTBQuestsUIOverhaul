@@ -1,0 +1,42 @@
+{
+  id: "2000000000000009",
+  filename: "scroll_test_09",
+  title: "Scroll Test 09",
+  icon: "minecraft:amethyst_shard",
+  subtitle: [
+    "Extra chapter for chapter selector scrolling tests"
+  ],
+  group: "",
+  order_index: 18,
+  default_quest_shape: "",
+  default_hide_dependency_lines: false,
+  quests: [
+    {
+      id: "2000000000000109",
+      title: "Tap to Complete 09",
+      subtitle: "Quick smoke test",
+      icon: "minecraft:amethyst_shard",
+      x: 0.0d,
+      y: 0.0d,
+      description: [
+        "A disposable test quest for sidebar scrolling.",
+        "This chapter exists so the selector has more entries."
+      ],
+      tasks: [
+        {
+          id: "2000000000000209",
+          type: "checkmark"
+        }
+      ],
+      rewards: [
+        {
+          id: "2000000000000309",
+          type: "item",
+          item: "minecraft:bread",
+          count: 1
+        }
+      ]
+    }
+  ],
+  quest_links: []
+}
