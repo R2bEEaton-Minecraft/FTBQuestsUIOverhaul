@@ -1,0 +1,267 @@
+{
+  id: "3000000000000001",
+  filename: "connector_stress_demo",
+  title: "Connector Stress Demo",
+  icon: "minecraft:redstone",
+  subtitle: [
+    "A dense dependency layout for testing midpoint pipe bends"
+  ],
+  group: "",
+  order_index: 25,
+  default_quest_shape: "",
+  default_hide_dependency_lines: false,
+  quests: [
+    {
+      id: "3000000000000101",
+      title: "Left Upper",
+      subtitle: "First parent",
+      icon: "minecraft:iron_pickaxe",
+      x: 0.0d,
+      y: 1.0d,
+      description: [
+        "Complete this quest to test the upper input line into the center join."
+      ],
+      tasks: [
+        {
+          id: "3000000000000201",
+          type: "checkmark"
+        }
+      ],
+      rewards: [
+        {
+          id: "3000000000000301",
+          type: "item",
+          item: "minecraft:stick",
+          count: 4
+        }
+      ]
+    },
+    {
+      id: "3000000000000102",
+      title: "Left Lower",
+      subtitle: "Second parent",
+      icon: "minecraft:stone_pickaxe",
+      x: 0.0d,
+      y: 4.0d,
+      description: [
+        "Complete this quest to test the lower input line into the center join."
+      ],
+      tasks: [
+        {
+          id: "3000000000000202",
+          type: "checkmark"
+        }
+      ],
+      rewards: [
+        {
+          id: "3000000000000302",
+          type: "item",
+          item: "minecraft:cobblestone",
+          count: 8
+        }
+      ]
+    },
+    {
+      id: "3000000000000103",
+      title: "Center Join",
+      subtitle: "Merged dependency",
+      icon: "minecraft:diamond",
+      x: 3.0d,
+      y: 2.5d,
+      dependencies: [
+        "3000000000000101",
+        "3000000000000102"
+      ],
+      description: [
+        "This quest merges the two left-side parents.",
+        "The connector direction change should happen halfway between each source icon and this icon."
+      ],
+      tasks: [
+        {
+          id: "3000000000000203",
+          type: "checkmark"
+        }
+      ],
+      rewards: [
+        {
+          id: "3000000000000303",
+          type: "item",
+          item: "minecraft:diamond",
+          count: 1
+        }
+      ]
+    },
+    {
+      id: "3000000000000104",
+      title: "Upper Branch",
+      subtitle: "Vertical branch",
+      icon: "minecraft:feather",
+      x: 6.0d,
+      y: 0.0d,
+      dependencies: [
+        "3000000000000103"
+      ],
+      description: [
+        "A high branch from the center quest for testing upward line bends."
+      ],
+      tasks: [
+        {
+          id: "3000000000000204",
+          type: "checkmark"
+        }
+      ],
+      rewards: [
+        {
+          id: "3000000000000304",
+          type: "item",
+          item: "minecraft:feather",
+          count: 3
+        }
+      ]
+    },
+    {
+      id: "3000000000000105",
+      title: "Middle Branch",
+      subtitle: "Straight branch",
+      icon: "minecraft:emerald",
+      x: 6.0d,
+      y: 2.5d,
+      dependencies: [
+        "3000000000000103"
+      ],
+      description: [
+        "A same-row branch from the center quest."
+      ],
+      tasks: [
+        {
+          id: "3000000000000205",
+          type: "checkmark"
+        }
+      ],
+      rewards: [
+        {
+          id: "3000000000000305",
+          type: "item",
+          item: "minecraft:emerald",
+          count: 1
+        }
+      ]
+    },
+    {
+      id: "3000000000000106",
+      title: "Lower Branch",
+      subtitle: "Vertical branch",
+      icon: "minecraft:redstone",
+      x: 6.0d,
+      y: 5.0d,
+      dependencies: [
+        "3000000000000103"
+      ],
+      description: [
+        "A low branch from the center quest for testing downward line bends."
+      ],
+      tasks: [
+        {
+          id: "3000000000000206",
+          type: "checkmark"
+        }
+      ],
+      rewards: [
+        {
+          id: "3000000000000306",
+          type: "item",
+          item: "minecraft:redstone",
+          count: 6
+        }
+      ]
+    },
+    {
+      id: "3000000000000107",
+      title: "Right Join",
+      subtitle: "Three-way merge",
+      icon: "minecraft:comparator",
+      x: 9.0d,
+      y: 2.5d,
+      dependencies: [
+        "3000000000000104",
+        "3000000000000105",
+        "3000000000000106"
+      ],
+      description: [
+        "This quest merges the three branches back together.",
+        "It should show several independent midpoint bends feeding one icon."
+      ],
+      tasks: [
+        {
+          id: "3000000000000207",
+          type: "checkmark"
+        }
+      ],
+      rewards: [
+        {
+          id: "3000000000000307",
+          type: "item",
+          item: "minecraft:comparator",
+          count: 1
+        }
+      ]
+    },
+    {
+      id: "3000000000000108",
+      title: "Far Upper",
+      subtitle: "Output branch",
+      icon: "minecraft:map",
+      x: 12.0d,
+      y: 1.0d,
+      dependencies: [
+        "3000000000000107"
+      ],
+      description: [
+        "One final output branch for testing line bends after the right join."
+      ],
+      tasks: [
+        {
+          id: "3000000000000208",
+          type: "checkmark"
+        }
+      ],
+      rewards: [
+        {
+          id: "3000000000000308",
+          type: "item",
+          item: "minecraft:filled_map",
+          count: 1
+        }
+      ]
+    },
+    {
+      id: "3000000000000109",
+      title: "Far Lower",
+      subtitle: "Output branch",
+      icon: "minecraft:paper",
+      x: 12.0d,
+      y: 4.0d,
+      dependencies: [
+        "3000000000000107"
+      ],
+      description: [
+        "A second final output branch for testing another bend after the right join."
+      ],
+      tasks: [
+        {
+          id: "3000000000000209",
+          type: "checkmark"
+        }
+      ],
+      rewards: [
+        {
+          id: "3000000000000309",
+          type: "item",
+          item: "minecraft:paper",
+          count: 12
+        }
+      ]
+    }
+  ],
+  quest_links: []
+}

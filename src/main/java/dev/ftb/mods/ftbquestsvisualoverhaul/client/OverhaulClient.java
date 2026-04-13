@@ -17,6 +17,7 @@ public class OverhaulClient {
 
         MinecraftForge.EVENT_BUS.register(QuestScreenInterceptor.class);
         MinecraftForge.EVENT_BUS.register(QuestLauncherButtonInjector.class);
+        MinecraftForge.EVENT_BUS.register(CleanUiModeOverlay.class);
         ClearFileCacheEvent.EVENT.register(file -> QuestDataController.markDirty());
     }
 }

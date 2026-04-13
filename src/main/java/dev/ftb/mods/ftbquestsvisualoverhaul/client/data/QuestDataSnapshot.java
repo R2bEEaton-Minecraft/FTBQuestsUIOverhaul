@@ -49,6 +49,9 @@ public class QuestDataSnapshot {
 
     public record ChapterSnapshot(
             long id,
+            long groupId,
+            Component groupTitle,
+            boolean firstInGroup,
             Component title,
             Component subtitle,
             Icon icon,
@@ -75,6 +78,7 @@ public class QuestDataSnapshot {
             boolean canStart,
             boolean hiddenDetails,
             boolean hasUnclaimedRewards,
+            boolean checkmarkOnly,
             List<Long> dependencyQuestIds,
             List<Long> dependantQuestIds,
             List<TaskSnapshot> tasks,

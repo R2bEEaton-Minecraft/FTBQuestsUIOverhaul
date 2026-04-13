@@ -1,6 +1,8 @@
 package dev.ftb.mods.ftbquestsvisualoverhaul.client.screen;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import dev.ftb.mods.ftblibrary.config.ImageResourceConfig;
+import dev.ftb.mods.ftblibrary.config.ui.SelectImageResourceScreen;
 import dev.ftb.mods.ftbquests.client.ClientQuestFile;
 import dev.ftb.mods.ftbquests.client.FTBQuestsClient;
 import dev.ftb.mods.ftbquests.client.gui.quests.QuestScreen;
@@ -45,42 +47,45 @@ public class OverhaulQuestScreen extends Screen {
     private static final ResourceLocation CHAPTER_BUTTON_INACTIVE_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quest_line_button_inactive.png");
     private static final ResourceLocation CHAPTER_BUTTON_HOVER_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quest_line_button_hover.png");
     private static final ResourceLocation CHAPTER_BUTTON_ACTIVE_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quest_line_button_active.png");
-    private static final int BACKGROUND_WIDTH = 294;
-    private static final int BACKGROUND_HEIGHT = 163;
+    private static final int BACKGROUND_WIDTH = 392;
+    private static final int BACKGROUND_HEIGHT = 217;
     private static final int BACKGROUND_TEXTURE_WIDTH = 512;
     private static final int BACKGROUND_TEXTURE_HEIGHT = 256;
-    private static final int CHAPTER_BUTTON_TEXTURE_WIDTH = 67;
-    private static final int CHAPTER_BUTTON_TEXTURE_HEIGHT = 30;
+    private static final int CHAPTER_BUTTON_TEXTURE_WIDTH = 98;
+    private static final int CHAPTER_BUTTON_TEXTURE_HEIGHT = 40;
 
     // --- Tree panel area within the background texture ---
-    private static final int TREE_X = 89;
+    private static final int TREE_X = 119;
     private static final int TREE_Y = 19;
-    private static final int TREE_WIDTH = 186;
-    private static final int TREE_HEIGHT = 125;
-    private static final int CHAPTER_SELECTOR_X = 16;
-    private static final int CHAPTER_SELECTOR_Y = 14;
-    private static final int CHAPTER_SELECTOR_BOTTOM_PADDING = 10;
-    private static final int CHAPTER_BUTTON_ACTIVE_WIDTH = 67;
-    private static final int CHAPTER_BUTTON_REGULAR_WIDTH = 53;
-    private static final int CHAPTER_BUTTON_HEIGHT = 14;
-    private static final int CHAPTER_BUTTON_TEXTURE_Y_OFFSET = 6;
-    private static final int CHAPTER_SELECTOR_ENTRY_SPACING = 1;
+    private static final int TREE_WIDTH = 248;
+    private static final int TREE_HEIGHT = 173;
+    private static final int CHAPTER_SELECTOR_X = 15;
+    private static final int CHAPTER_SELECTOR_Y = 13;
+    private static final int CHAPTER_SELECTOR_BOTTOM_PADDING = 18;
+    private static final int CHAPTER_BUTTON_ACTIVE_WIDTH = 98;
+    private static final int CHAPTER_BUTTON_REGULAR_WIDTH = 86;
+    private static final int CHAPTER_BUTTON_HEIGHT = 19;
+    private static final int CHAPTER_BUTTON_TEXTURE_Y_OFFSET = 8;
+    private static final int CHAPTER_SELECTOR_ENTRY_SPACING = 2;
     private static final int CHAPTER_SELECTOR_SCROLL_STEP = CHAPTER_BUTTON_HEIGHT + CHAPTER_SELECTOR_ENTRY_SPACING;
-    private static final int CHAPTER_SELECTOR_ICON_SIZE = 10;
-    private static final int CHAPTER_SELECTOR_ICON_X_OFFSET = 4;
-    private static final int CHAPTER_SELECTOR_TEXT_X_OFFSET = 16;
-    private static final int CHAPTER_SELECTOR_TEXT_RIGHT_PADDING = 4;
+    private static final int CHAPTER_SELECTOR_ICON_SIZE = 13;
+    private static final int CHAPTER_SELECTOR_ICON_X_OFFSET = 5;
+    private static final int CHAPTER_SELECTOR_TEXT_X_OFFSET = 21;
+    private static final int CHAPTER_SELECTOR_TEXT_RIGHT_PADDING = 5;
     private static final int CHAPTER_SCROLLBAR_WIDTH = 1;
     private static final int CHAPTER_SCROLLBAR_GAP = 2;
     private static final int CHAPTER_SCROLLBAR_HITBOX_WIDTH = 5;
-    private static final int CHAPTER_SCROLLBAR_MIN_THUMB_HEIGHT = 8;
-    private static final float CHAPTER_SELECTOR_TEXT_SCALE = 0.45F;
-    private static final int ACTIVE_CHAPTER_TITLE_TOP_PADDING = 13;
-    private static final int ACTIVE_CHAPTER_TITLE_BOTTOM_PADDING = 3;
-    private static final int ACTIVE_CHAPTER_TITLE_SIDE_PADDING = 4;
-    private static final int ACTIVE_CHAPTER_TITLE_ICON_SIZE = 8;
-    private static final int ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING = 3;
-    private static final float ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET = 1.5F;
+    private static final int CHAPTER_SCROLLBAR_MIN_THUMB_HEIGHT = 11;
+    private static final int CHAPTER_SELECTOR_BOTTOM_SHADOW_HEIGHT = 13;
+    private static final float CHAPTER_SELECTOR_TEXT_SCALE = 0.6F;
+    private static final float CHAPTER_GROUP_TEXT_SCALE = 0.65F;
+    private static final int CHAPTER_GROUP_HEADER_HEIGHT = 15;
+    private static final int ACTIVE_CHAPTER_TITLE_TOP_PADDING = 12;
+    private static final int ACTIVE_CHAPTER_TITLE_BOTTOM_PADDING = 4;
+    private static final int ACTIVE_CHAPTER_TITLE_SIDE_PADDING = 5;
+    private static final int ACTIVE_CHAPTER_TITLE_ICON_SIZE = 11;
+    private static final int ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING = 4;
+    private static final float ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET = 2.0F;
 
     // --- Vanilla advancement textures ---
     private static final ResourceLocation WINDOW_LOCATION = new ResourceLocation("textures/gui/advancements/window.png");
@@ -88,12 +93,13 @@ public class OverhaulQuestScreen extends Screen {
     private static final ResourceLocation WIDGETS_LOCATION = new ResourceLocation("textures/gui/advancements/widgets.png");
     private static final ResourceLocation BUTTONS_LOCATION = new ResourceLocation("textures/gui/widgets.png");
     private static final ResourceLocation OAK_PLANKS_TEXTURE = new ResourceLocation("minecraft", "textures/block/oak_planks.png");
+    private static final ResourceLocation FTB_QUEST_LOCKED_TEXTURE = new ResourceLocation("ftbquests", "textures/gui/quest_locked.png");
 
-    // --- Node spacing (vanilla values from AdvancementWidget) ---
+    // --- Node spacing (based on AdvancementWidget, with wider horizontal gaps) ---
     // Vanilla uses displayX * 28 and displayY * 27, where displayX/Y are 0,1,2,...
     // FTB quest coordinates use a different scale, so we normalize to vanilla units
     // first (via xStepSize/yStepSize) before multiplying by these constants.
-    private static final int NODE_SPACING_X = 28;
+    private static final int NODE_SPACING_X = 42;
     private static final int NODE_SPACING_Y = 27;
     private static final int WIDGET_WIDTH = 26;
     private static final int WIDGET_HEIGHT = 26;
@@ -274,7 +280,7 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         if (chapterScrollbarDragging) {
-            updateChapterScrollFromMouse(mouseY, QuestDataController.getSnapshot().chapters().size());
+            updateChapterScrollFromMouse(mouseY, QuestDataController.getSnapshot());
             return true;
         }
 
@@ -299,9 +305,9 @@ public class OverhaulQuestScreen extends Screen {
             return true;
         }
         Rect selectorViewport = chapterSelectorViewportRect();
-        Rect scrollbarHitbox = chapterScrollbarHitbox(snapshot.chapters().size());
+        Rect scrollbarHitbox = chapterScrollbarHitbox(snapshot);
         if (selectorViewport.contains(mouseX, mouseY) || scrollbarHitbox != null && scrollbarHitbox.contains(mouseX, mouseY)) {
-            scrollChapterSelector(-deltaY * CHAPTER_SELECTOR_SCROLL_STEP, snapshot.chapters().size());
+            scrollChapterSelector(-deltaY * CHAPTER_SELECTOR_SCROLL_STEP, snapshot);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, deltaY);
@@ -310,6 +316,11 @@ public class OverhaulQuestScreen extends Screen {
     // ---- Scroll/Pan (matching vanilla AdvancementTab.scroll) ----
 
     private void scroll(double deltaX, double deltaY) {
+        if (isCreativeControlsVisible() && viewState.isFreePan()) {
+            viewState.setTreePanX(viewState.getTreePanX() + deltaX);
+            viewState.setTreePanY(viewState.getTreePanY() + deltaY);
+            return;
+        }
         if (maxNodeX - minNodeX > TREE_WIDTH) {
             viewState.setTreePanX(Mth.clamp(viewState.getTreePanX() + deltaX, -(maxNodeX - TREE_WIDTH), 0.0D));
         }
@@ -354,6 +365,7 @@ public class OverhaulQuestScreen extends Screen {
         // Render tree content inside the tree panel area (vanilla advancement style)
         renderInside(graphics, snapshot, mouseX, mouseY, treeLeft, treeTop);
         renderActiveChapterTitle(graphics, snapshot, treeLeft, treeTop);
+        renderCreativeTreeControls(graphics, mouseX, mouseY);
 
         super.render(graphics, mouseX, mouseY, partialTick);
 
@@ -405,6 +417,10 @@ public class OverhaulQuestScreen extends Screen {
         graphics.pose().translate((float) treeLeft, (float) treeTop, 0.0F);
 
         // Tile background (matching AdvancementTab: 16x16 tiles with scroll offset)
+        ResourceLocation tileTexture = resolveTileTexture(viewState.getChapterTitleTexture(chapter.id()));
+        if (tileTexture == null) {
+            tileTexture = OAK_PLANKS_TEXTURE;
+        }
         int scrollXInt = Mth.floor(viewState.getTreePanX());
         int scrollYInt = Mth.floor(viewState.getTreePanY());
         int tileOffsetX = scrollXInt % 16;
@@ -414,7 +430,7 @@ public class OverhaulQuestScreen extends Screen {
         int tilesY = (TREE_HEIGHT / 16) + 2;
         for (int tx = -1; tx <= tilesX; ++tx) {
             for (int ty = -1; ty <= tilesY; ++ty) {
-                graphics.blit(OAK_PLANKS_TEXTURE, tileOffsetX + 16 * tx, tileOffsetY + 16 * ty, 0.0F, 0.0F, 16, 16, 16, 16);
+                graphics.blit(tileTexture, tileOffsetX + 16 * tx, tileOffsetY + 16 * ty, 0.0F, 0.0F, 16, 16, 16, 16);
             }
         }
 
@@ -432,23 +448,34 @@ public class OverhaulQuestScreen extends Screen {
 
     private void renderChapterSelector(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, boolean interactive) {
         Rect viewportRect = chapterSelectorViewportRect();
-        clampChapterScroll(snapshot.chapters().size());
+        clampChapterScroll(snapshot);
         int y = viewportRect.y() - Mth.floor(chapterScroll);
 
         graphics.enableScissor(viewportRect.x(), viewportRect.y(), viewportRect.maxX(), viewportRect.maxY());
 
         for (QuestDataSnapshot.ChapterSnapshot chapter : snapshot.chapters()) {
+            if (chapter.firstInGroup()) {
+                Rect headerRect = new Rect(viewportRect.x(), y, viewportRect.width(), CHAPTER_GROUP_HEADER_HEIGHT);
+                if (headerRect.intersects(viewportRect)) {
+                    graphics.fill(headerRect.x(), headerRect.y() + 1, headerRect.maxX() - 4, headerRect.maxY() - 1, 0x77140E0C);
+                    drawScaledString(graphics, trim(chapter.groupTitle(), headerRect.width() - 6, CHAPTER_GROUP_TEXT_SCALE),
+                            headerRect.x() + 4, headerRect.y() + 3, 0xFFF0E4CB, CHAPTER_GROUP_TEXT_SCALE);
+                }
+                y += CHAPTER_GROUP_HEADER_HEIGHT;
+            }
+
             boolean selected = chapter.id() == viewState.getSelectedChapterId();
             int buttonWidth = selected ? CHAPTER_BUTTON_ACTIVE_WIDTH : CHAPTER_BUTTON_REGULAR_WIDTH;
+            int textureWidth = CHAPTER_BUTTON_TEXTURE_WIDTH;
             Rect buttonRect = new Rect(viewportRect.x(), y, buttonWidth, CHAPTER_BUTTON_HEIGHT);
-            Rect textureRect = new Rect(viewportRect.x(), y - CHAPTER_BUTTON_TEXTURE_Y_OFFSET, CHAPTER_BUTTON_TEXTURE_WIDTH, CHAPTER_BUTTON_TEXTURE_HEIGHT);
+            Rect textureRect = new Rect(viewportRect.x(), y - CHAPTER_BUTTON_TEXTURE_Y_OFFSET, textureWidth, CHAPTER_BUTTON_TEXTURE_HEIGHT);
             boolean visible = textureRect.intersects(viewportRect);
             boolean hovered = visible && buttonRect.contains(mouseX, mouseY);
             ResourceLocation texture = selected ? CHAPTER_BUTTON_ACTIVE_TEXTURE : hovered ? CHAPTER_BUTTON_HOVER_TEXTURE : CHAPTER_BUTTON_INACTIVE_TEXTURE;
 
             if (visible) {
                 RenderSystem.enableBlend();
-                graphics.blit(texture, textureRect.x(), textureRect.y(), 0, 0, textureRect.width(), textureRect.height(), CHAPTER_BUTTON_TEXTURE_WIDTH, CHAPTER_BUTTON_TEXTURE_HEIGHT);
+                graphics.blit(texture, textureRect.x(), textureRect.y(), 0, 0, textureRect.width(), textureRect.height(), textureWidth, CHAPTER_BUTTON_TEXTURE_HEIGHT);
                 RenderSystem.disableBlend();
 
                 int iconX = buttonRect.x() + CHAPTER_SELECTOR_ICON_X_OFFSET;
@@ -475,8 +502,20 @@ public class OverhaulQuestScreen extends Screen {
             y += CHAPTER_SELECTOR_SCROLL_STEP;
         }
 
+        renderChapterSelectorBottomShadow(graphics, viewportRect, snapshot);
         graphics.disableScissor();
-        renderChapterScrollbar(graphics, snapshot.chapters().size());
+        renderChapterScrollbar(graphics, snapshot);
+    }
+
+    private void renderChapterSelectorBottomShadow(GuiGraphics graphics, Rect viewportRect, QuestDataSnapshot snapshot) {
+        if (chapterScroll >= maxChapterScroll(snapshot)) {
+            return;
+        }
+
+        int shadowTop = Math.max(viewportRect.y(), viewportRect.maxY() - CHAPTER_SELECTOR_BOTTOM_SHADOW_HEIGHT);
+        RenderSystem.enableBlend();
+        graphics.fillGradient(viewportRect.x(), shadowTop, viewportRect.maxX() - 10, viewportRect.maxY(), 0x00120D09, 0xD0120D09);
+        RenderSystem.disableBlend();
     }
 
     private void renderActiveChapterTitle(GuiGraphics graphics, QuestDataSnapshot snapshot, int treeLeft, int treeTop) {
@@ -539,6 +578,59 @@ public class OverhaulQuestScreen extends Screen {
         chapter.icon().draw(graphics, 0, 0, ACTIVE_CHAPTER_TITLE_ICON_SIZE, ACTIVE_CHAPTER_TITLE_ICON_SIZE);
         graphics.pose().popPose();
         graphics.disableScissor();
+    }
+
+    private void renderCreativeTreeControls(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (!isCreativeControlsVisible()) {
+            return;
+        }
+
+        Rect frame = frameRect();
+        Rect freePanButton = new Rect(frame.x() + TREE_X + 1, frame.y() + TREE_Y + 2, 72, 11);
+        Rect titleButton = new Rect(frame.x() + TREE_X + TREE_WIDTH - 72, frame.y() + TREE_Y + 2, 68, 11);
+        renderSmallOverlayButton(graphics, freePanButton, viewState.isFreePan() ? "Free Pan: On" : "Free Pan: Off",
+                freePanButton.contains(mouseX, mouseY), viewState.isFreePan() ? 0xFFE6D176 : 0xFFE68E7C);
+        renderSmallOverlayButton(graphics, titleButton, "Change Tile", titleButton.contains(mouseX, mouseY), 0xFFF2E8D6);
+
+        clickTargets.add(new ClickTarget(freePanButton, () -> viewState.setFreePan(!viewState.isFreePan())));
+        clickTargets.add(new ClickTarget(titleButton, this::openChapterTitleTextureSelector));
+    }
+
+    private void renderSmallOverlayButton(GuiGraphics graphics, Rect rect, String label, boolean hovered, int textColor) {
+        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), hovered ? 0xCC3A2B1C : 0x99201510);
+        drawInsetBorder(graphics, rect, hovered ? 0xE0C8A15C : 0xAA6F5535, 0xAA120D09);
+        drawCenteredScaledString(graphics, Component.literal(label), rect.centerX(), rect.y() + 3, textColor, 0.45F);
+    }
+
+    private void openChapterTitleTextureSelector() {
+        long chapterId = viewState.getSelectedChapterId();
+        ImageResourceConfig imageConfig = new ImageResourceConfig();
+        ResourceLocation currentTexture = viewState.getChapterTitleTexture(chapterId);
+        if (currentTexture != null) {
+            imageConfig.setValue(currentTexture);
+        }
+        new SelectImageResourceScreen(imageConfig, accepted -> {
+            if (accepted) {
+                viewState.setChapterTitleTexture(chapterId, imageConfig.isEmpty() ? null : imageConfig.getValue());
+                QuestDataController.saveViewState(viewState);
+            }
+            minecraft.setScreen(this);
+        }).openGui();
+    }
+
+    private ResourceLocation resolveTileTexture(ResourceLocation selectedTexture) {
+        if (selectedTexture == null) {
+            return null;
+        }
+
+        String path = selectedTexture.getPath();
+        if (path.startsWith("textures/") && path.endsWith(".png")) {
+            return selectedTexture;
+        }
+        if (!path.endsWith(".png")) {
+            return new ResourceLocation(selectedTexture.getNamespace(), "textures/" + path + ".png");
+        }
+        return new ResourceLocation(selectedTexture.getNamespace(), "textures/" + path);
     }
 
     /**
@@ -631,7 +723,7 @@ public class OverhaulQuestScreen extends Screen {
     /**
      * Converts a quest's raw FTB x coordinate to a pixel position.
      * Normalizes by xStepSize so the minimum inter-node gap matches vanilla's
-     * 0→1→2 integer unit scale, then multiplies by NODE_SPACING_X (28, vanilla value).
+     * 0→1→2 integer unit scale, then multiplies by NODE_SPACING_X.
      */
     private int getNodeX(QuestDataSnapshot.QuestSnapshot quest) {
         return Mth.floor((quest.x() / xStepSize) * NODE_SPACING_X);
@@ -682,15 +774,10 @@ public class OverhaulQuestScreen extends Screen {
         return minStep == Double.MAX_VALUE ? 1.0 : minStep;
     }
 
-    // ---- Connection line drawing (matching AdvancementWidget.drawConnectivity exactly) ----
+    // ---- Connection line drawing ----
 
     /**
-     * Draws connection lines between quest nodes.
-     * Matches vanilla AdvancementWidget.drawConnectivity:
-     * - When outline=true: draws 3px-wide black lines (-16777216)
-     * - When outline=false: draws 1px-wide white lines (-1)
-     * - Line path: horizontal from parent center to parent right edge+4,
-     *              then vertical to child Y, then horizontal to child center.
+     * Draws stable advancement-style elbow connections between quest nodes.
      */
     private void drawAllConnections(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests, int scrollX, int scrollY, boolean outline) {
         Map<Long, QuestDataSnapshot.QuestSnapshot> questMap = new HashMap<>();
@@ -703,40 +790,48 @@ public class OverhaulQuestScreen extends Screen {
                 QuestDataSnapshot.QuestSnapshot parent = questMap.get(depId);
                 if (parent == null) continue;
 
-                // Matching vanilla variable names from AdvancementWidget.drawConnectivity:
-                // i = scrollX + parent.x + 13 (parent center X)
-                // j = scrollX + parent.x + 26 + 4 (parent right edge + gap)
-                // k = scrollY + parent.y + 13 (parent center Y)
-                // l = scrollX + this.x + 13 (child center X)
-                // i1 = scrollY + this.y + 13 (child center Y)
                 int parentX = getNodeX(parent);
                 int parentY = getNodeY(parent);
                 int childX = getNodeX(quest);
                 int childY = getNodeY(quest);
 
-                int i = scrollX + parentX + 13;
-                int j = scrollX + parentX + 26 + 4;
-                int k = scrollY + parentY + 13;
-                int l = scrollX + childX + 13;
-                int i1 = scrollY + childY + 13;
-                int lineColor = outline ? -16777216 : -1;
+                int lineColor = outline ? 0xFF000000 : parent.completed() && isQuestAvailable(quest) ? 0xFF35E041 : 0xFFFFFFFF;
+
+                int startX = scrollX + parentX + WIDGET_WIDTH / 2;
+                int startY = scrollY + parentY + WIDGET_HEIGHT / 2;
+                int endX = scrollX + childX + WIDGET_WIDTH / 2;
+                int endY = scrollY + childY + WIDGET_HEIGHT / 2;
+                int bendX = (startX + endX) / 2;
 
                 if (outline) {
-                    // Black outline: 3px wide lines
-                    graphics.hLine(j, i, k - 1, lineColor);
-                    graphics.hLine(j + 1, i, k, lineColor);
-                    graphics.hLine(j, i, k + 1, lineColor);
-                    graphics.hLine(l, j - 1, i1 - 1, lineColor);
-                    graphics.hLine(l, j - 1, i1, lineColor);
-                    graphics.hLine(l, j - 1, i1 + 1, lineColor);
-                    graphics.vLine(j - 1, i1, k, lineColor);
-                    graphics.vLine(j + 1, i1, k, lineColor);
+                    drawElbowLine(graphics, startX, bendX, startY, endX, endY, 3, lineColor);
                 } else {
-                    // White center: 1px wide lines
-                    graphics.hLine(j, i, k, lineColor);
-                    graphics.hLine(l, j, i1, lineColor);
-                    graphics.vLine(j, i1, k, lineColor);
+                    drawElbowLine(graphics, startX, bendX, startY, endX, endY, 1, lineColor);
                 }
+            }
+        }
+    }
+
+    private void drawElbowLine(GuiGraphics graphics, int startX, int bendX, int startY, int endX, int endY, int thickness, int color) {
+        drawLineSegment(graphics, startX, startY, bendX, startY, thickness, color);
+        drawLineSegment(graphics, bendX, startY, bendX, endY, thickness, color);
+        drawLineSegment(graphics, bendX, endY, endX, endY, thickness, color);
+    }
+
+    private void drawLineSegment(GuiGraphics graphics, int x1, int y1, int x2, int y2, int thickness, int color) {
+        if (y1 == y2) {
+            int minX = Math.min(x1, x2);
+            int maxX = Math.max(x1, x2);
+            int half = thickness / 2;
+            for (int y = y1 - half; y <= y1 + half; y++) {
+                graphics.hLine(minX, maxX, y, color);
+            }
+        } else if (x1 == x2) {
+            int minY = Math.min(y1, y2);
+            int maxY = Math.max(y1, y2);
+            int half = thickness / 2;
+            for (int x = x1 - half; x <= x1 + half; x++) {
+                graphics.vLine(x, minY, maxY, color);
             }
         }
     }
@@ -775,6 +870,10 @@ public class OverhaulQuestScreen extends Screen {
                     scrollY + nodeY + WIDGET_ICON_Y,
                     16, 16);
 
+            if (!obtained && !isQuestAvailable(quest)) {
+                renderLockOverlay(graphics, scrollX + nodeX, scrollY + nodeY);
+            }
+
             // Hit detection for click targets (in screen coordinates)
             Rect frame = frameRect();
             int screenX = scrollX + nodeX + frame.x() + TREE_X;
@@ -796,6 +895,16 @@ public class OverhaulQuestScreen extends Screen {
                 hoveredQuest = quest;
             }
         }
+    }
+
+    private void renderLockOverlay(GuiGraphics graphics, int nodeX, int nodeY) {
+        int size = (int) (WIDGET_WIDTH / 8F * 3F);
+        float scale = size / 16F;
+        graphics.pose().pushPose();
+        graphics.pose().translate(nodeX + WIDGET_WIDTH - size, nodeY + WIDGET_HEIGHT - 1 - size, 0.0F);
+        graphics.pose().scale(scale, scale, 1.0F);
+        graphics.blit(FTB_QUEST_LOCKED_TEXTURE, 0, 0, 0.0F, 0.0F, 16, 16, 16, 16);
+        graphics.pose().popPose();
     }
 
     // ---- Hover tooltip (matching AdvancementWidget.drawHover) ----
@@ -1048,7 +1157,7 @@ public class OverhaulQuestScreen extends Screen {
             return false;
         }
 
-        Rect scrollbarHitbox = chapterScrollbarHitbox(snapshot.chapters().size());
+        Rect scrollbarHitbox = chapterScrollbarHitbox(snapshot);
         if (scrollbarHitbox != null && scrollbarHitbox.contains(mouseX, mouseY)) {
             return true;
         }
@@ -1117,12 +1226,13 @@ public class OverhaulQuestScreen extends Screen {
         int rightX = body.x() + columnWidth + columnGap;
         int columnStartY = contentY;
 
+        List<QuestDataSnapshot.TaskSnapshot> visibleTasks = visibleRequirementTasks(quest);
         int requirementsY = renderSectionLabel(graphics, "Requirements", leftX, columnStartY);
-        if (quest.tasks().isEmpty()) {
+        if (visibleTasks.isEmpty()) {
             drawScaledString(graphics, Component.literal("No explicit requirements"), leftX, requirementsY, 0xFFC8B08C, MODAL_TEXT_SCALE);
             requirementsY += 10;
         } else {
-            for (QuestDataSnapshot.TaskSnapshot task : quest.tasks()) {
+            for (QuestDataSnapshot.TaskSnapshot task : visibleTasks) {
                 requirementsY = renderTaskSummaryRow(graphics, leftX, columnWidth, task, requirementsY);
             }
         }
@@ -1166,32 +1276,35 @@ public class OverhaulQuestScreen extends Screen {
         int buttonGap = 8;
         int buttonSlotWidth = (footer.width() - buttonGap) / 2;
         int buttonWidth = Math.round(buttonSlotWidth * 0.75F);
-        Rect pinButton = footerButtonRect(footer.x() + Math.max(0, (buttonSlotWidth - buttonWidth) / 2), footer.y(), buttonWidth, footer.height());
-        Rect claimButton = footerButtonRect(footer.x() + buttonSlotWidth + buttonGap + Math.max(0, (buttonSlotWidth - buttonWidth) / 2), footer.y(), buttonWidth, footer.height());
+        Rect acceptButton = footerButtonRect(footer.x() + Math.max(0, (buttonSlotWidth - buttonWidth) / 2), footer.y(), buttonWidth, footer.height());
+        Rect completeButton = footerButtonRect(footer.x() + buttonSlotWidth + buttonGap + Math.max(0, (buttonSlotWidth - buttonWidth) / 2), footer.y(), buttonWidth, footer.height());
 
-        renderFooterButton(graphics, pinButton, quest.pinned() ? "Unpin" : "Pin", true, pinButton.contains(mouseX, mouseY));
+        renderFooterButton(graphics, acceptButton, quest.pinned() ? "Unaccept" : "Accept", true, acceptButton.contains(mouseX, mouseY), quest.pinned());
         boolean claimEnabled = canClaimAnyReward(quest);
-        renderFooterButton(graphics, claimButton, "Claim", claimEnabled, claimButton.contains(mouseX, mouseY));
+        renderFooterButton(graphics, completeButton, "Complete", claimEnabled, completeButton.contains(mouseX, mouseY), false);
+        if (quest.hasUnclaimedRewards() || claimEnabled) {
+            renderNotificationMarker(graphics, completeButton.maxX() - 4, completeButton.y() - 3, quest.completed() && !claimEnabled);
+        }
 
-        clickTargets.add(new ClickTarget(pinButton, this::toggleCurrentQuestPin));
+        clickTargets.add(new ClickTarget(acceptButton, () -> acceptOrUnacceptQuest(quest)));
         if (claimEnabled) {
-            clickTargets.add(new ClickTarget(claimButton, this::claimCurrentQuestRewards));
+            clickTargets.add(new ClickTarget(completeButton, this::claimCurrentQuestRewards));
         }
         graphics.pose().popPose();
     }
 
     private void renderDefaultViewButton(GuiGraphics graphics, int mouseX, int mouseY) {
-        Rect rect = new Rect(width - 86, height - 18, 78, 12);
+        Rect rect = new Rect(width - 92, height - 18, 84, 12);
         boolean hovered = rect.contains(mouseX, mouseY);
 
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, 260.0F);
         graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), hovered ? 0xAA2A2118 : 0x88201812);
         drawInsetBorder(graphics, rect, hovered ? 0xAA8C734E : 0x885B4630, 0xAA120D09);
-        drawCenteredScaledString(graphics, Component.literal("default view"), rect.centerX(), rect.y() + 3, 0xFFD9C6A4, MODAL_TEXT_SCALE);
+        drawCenteredScaledString(graphics, Component.literal("Editing Mode"), rect.centerX(), rect.y() + 3, 0xFFD9C6A4, MODAL_TEXT_SCALE);
         graphics.pose().popPose();
 
-        clickTargets.add(new ClickTarget(rect, actionRouter::openVanillaRoot));
+        clickTargets.add(new ClickTarget(rect, this::openEditingMode));
     }
 
     private boolean shouldShowDefaultViewButton() {
@@ -1212,6 +1325,9 @@ public class OverhaulQuestScreen extends Screen {
         drawInsetBorder(graphics, rect, 0x885F452F, 0x55201510);
 
         task.icon().draw(graphics, iconRect.x(), iconRect.y(), 14, 14);
+        if (task.completed()) {
+            renderSmallCheck(graphics, iconRect.maxX() - 4, iconRect.y() - 2);
+        }
         if (consumableTurnIn) {
             if (task.canInteract()) {
                 renderRequirementMarker(graphics, iconRect, true);
@@ -1255,6 +1371,9 @@ public class OverhaulQuestScreen extends Screen {
         drawInsetBorder(graphics, rect, 0x88634731, 0x55201510);
 
         rewardSnapshot.icon().draw(graphics, rect.x() + 3, rect.y() + 1, 14, 14);
+        if (rewardSnapshot.claimed()) {
+            renderSmallCheck(graphics, rect.x() + 13, rect.y() - 1);
+        }
 
         int statusColor = rewardSnapshot.canClaim() ? 0xFF7DE25E : rewardSnapshot.claimed() ? 0xFFB6B6B6 : 0xFFD5B58C;
         String state = switch (rewardSnapshot.interactionMode()) {
@@ -1266,6 +1385,12 @@ public class OverhaulQuestScreen extends Screen {
         int stateX = Math.max(rect.x() + 20, rect.maxX() - stateWidth - 4);
         drawScaledString(graphics, Component.literal(state), stateX, rect.y() + 4, statusColor, MODAL_TEXT_SCALE);
         return y + 20;
+    }
+
+    private void renderSmallCheck(GuiGraphics graphics, int x, int y) {
+        graphics.fill(x, y + 4, x + 2, y + 6, 0xFF52E652);
+        graphics.fill(x + 2, y + 5, x + 4, y + 7, 0xFF52E652);
+        graphics.fill(x + 4, y + 1, x + 7, y + 4, 0xFF52E652);
     }
 
     private void renderScrollArrow(GuiGraphics graphics, int x, int y, boolean up, boolean active) {
@@ -1299,11 +1424,26 @@ public class OverhaulQuestScreen extends Screen {
         graphics.pose().popPose();
     }
 
-    private void renderFooterButton(GuiGraphics graphics, Rect rect, String label, boolean enabled, boolean hovered) {
+    private void renderFooterButton(GuiGraphics graphics, Rect rect, String label, boolean enabled, boolean hovered, boolean pressed) {
         drawVanillaButton(graphics, rect, enabled, hovered);
+        if (pressed) {
+            graphics.fill(rect.x() + 2, rect.y() + 2, rect.maxX() - 2, rect.maxY() - 2, 0x55201018);
+        }
         int textHeight = Math.round(font.lineHeight * MODAL_TEXT_SCALE);
         int textY = rect.y() + Math.max(0, (rect.height() - textHeight) / 2);
         drawCenteredScaledString(graphics, Component.literal(label), rect.centerX(), textY, enabled ? 0xFFE0E0E0 : 0xFFA0A0A0, MODAL_TEXT_SCALE);
+    }
+
+    private void renderNotificationMarker(GuiGraphics graphics, int x, int y, boolean completed) {
+        if (completed) {
+            graphics.fill(x, y + 3, x + 2, y + 5, 0xFF4DE047);
+            graphics.fill(x + 2, y + 4, x + 4, y + 6, 0xFF4DE047);
+            graphics.fill(x + 4, y + 1, x + 7, y + 4, 0xFF4DE047);
+        } else {
+            graphics.fill(x, y, x + 7, y + 7, 0xFFE92C2C);
+            graphics.fill(x + 3, y + 1, x + 4, y + 5, 0xFFFFFFFF);
+            graphics.fill(x + 3, y + 6, x + 4, y + 7, 0xFFFFFFFF);
+        }
     }
 
     private Rect footerButtonRect(int x, int y, int width, int containerHeight) {
@@ -1324,7 +1464,7 @@ public class OverhaulQuestScreen extends Screen {
 
         int contentHeight = 10 + objectiveLines.size() * 8 + 12;
         contentHeight += 10 + descriptionLines.size() * 8 + 12;
-        int requirementsHeight = 10 + Math.max(1, quest.tasks().size()) * 20;
+        int requirementsHeight = 10 + Math.max(1, visibleRequirementTasks(quest).size()) * 20;
         int rewardsHeight = 10 + Math.max(1, quest.rewards().size()) * 20;
         contentHeight += Math.max(requirementsHeight, rewardsHeight) + 6;
 
@@ -1367,6 +1507,37 @@ public class OverhaulQuestScreen extends Screen {
 
     private boolean canClaimAnyReward(QuestDataSnapshot.QuestSnapshot quest) {
         return quest.rewards().stream().anyMatch(QuestDataSnapshot.RewardSnapshot::canClaim);
+    }
+
+    private List<QuestDataSnapshot.TaskSnapshot> visibleRequirementTasks(QuestDataSnapshot.QuestSnapshot quest) {
+        if (quest.checkmarkOnly()) {
+            return List.of();
+        }
+        return quest.tasks();
+    }
+
+    private void acceptOrUnacceptQuest(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        Quest quest = resolveQuest(questSnapshot.id());
+        if (quest == null) {
+            return;
+        }
+
+        if (questSnapshot.pinned()) {
+            actionRouter.togglePin(quest);
+            QuestDataController.markDirty();
+            return;
+        }
+
+        if (questSnapshot.checkmarkOnly()) {
+            questSnapshot.tasks().stream()
+                    .filter(task -> !task.completed() && task.canInteract() && task.interactionMode() == TaskInteractionMode.SUBMIT)
+                    .findFirst()
+                    .map(task -> resolveTask(task.id()))
+                    .ifPresent(actionRouter::submitTask);
+        }
+
+        actionRouter.togglePin(quest);
+        QuestDataController.markDirty();
     }
 
     private void claimCurrentQuestRewards() {
@@ -1434,7 +1605,7 @@ public class OverhaulQuestScreen extends Screen {
             ensureSelectedChapterVisible(snapshot.chapters(), chapter.id());
         }
 
-        clampChapterScroll(snapshot.chapters().size());
+        clampChapterScroll(snapshot);
         updateTabPages();
     }
 
@@ -1445,6 +1616,15 @@ public class OverhaulQuestScreen extends Screen {
         } else {
             actionRouter.openVanillaRoot();
         }
+    }
+
+    private void openEditingMode() {
+        viewState.setDefaultFtbUiMode(true);
+        QuestDataController.saveViewState(viewState);
+        if (ClientQuestFile.exists() && !ClientQuestFile.canClientPlayerEdit()) {
+            actionRouter.toggleEditingMode();
+        }
+        actionRouter.openVanillaRoot();
     }
 
     private void toggleCurrentQuestPin() {
@@ -1496,36 +1676,41 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private boolean handleChapterScrollbarClick(QuestDataSnapshot snapshot, double mouseX, double mouseY) {
-        Rect scrollbarHitbox = chapterScrollbarHitbox(snapshot.chapters().size());
+        Rect scrollbarHitbox = chapterScrollbarHitbox(snapshot);
         if (scrollbarHitbox == null || !scrollbarHitbox.contains(mouseX, mouseY)) {
             return false;
         }
 
         chapterScrollbarDragging = true;
-        updateChapterScrollFromMouse(mouseY, snapshot.chapters().size());
+        updateChapterScrollFromMouse(mouseY, snapshot);
         return true;
     }
 
-    private void scrollChapterSelector(double delta, int chapterCount) {
-        if (chapterCount <= 0) {
+    private void scrollChapterSelector(double delta, QuestDataSnapshot snapshot) {
+        if (snapshot.chapters().isEmpty()) {
             chapterScroll = 0D;
             return;
         }
 
-        chapterScroll = Mth.clamp(chapterScroll + delta, 0D, maxChapterScroll(chapterCount));
+        chapterScroll = Mth.clamp(chapterScroll + delta, 0D, maxChapterScroll(snapshot));
     }
 
-    private void clampChapterScroll(int chapterCount) {
-        chapterScroll = Mth.clamp(chapterScroll, 0D, maxChapterScroll(chapterCount));
+    private void clampChapterScroll(QuestDataSnapshot snapshot) {
+        chapterScroll = Mth.clamp(chapterScroll, 0D, maxChapterScroll(snapshot));
     }
 
     private void ensureSelectedChapterVisible(List<QuestDataSnapshot.ChapterSnapshot> chapters, long selectedChapterId) {
+        int entryTop = 0;
         int selectedIndex = -1;
         for (int i = 0; i < chapters.size(); i++) {
+            if (chapters.get(i).firstInGroup()) {
+                entryTop += CHAPTER_GROUP_HEADER_HEIGHT;
+            }
             if (chapters.get(i).id() == selectedChapterId) {
                 selectedIndex = i;
                 break;
             }
+            entryTop += CHAPTER_SELECTOR_SCROLL_STEP;
         }
 
         if (selectedIndex < 0) {
@@ -1533,7 +1718,6 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         int viewportHeight = chapterSelectorViewportHeight();
-        int entryTop = selectedIndex * CHAPTER_SELECTOR_SCROLL_STEP;
         int entryBottom = entryTop + CHAPTER_BUTTON_HEIGHT;
         if (entryTop < chapterScroll) {
             chapterScroll = entryTop;
@@ -1541,12 +1725,13 @@ public class OverhaulQuestScreen extends Screen {
             chapterScroll = entryBottom - viewportHeight;
         }
 
-        clampChapterScroll(chapters.size());
+        QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
+        clampChapterScroll(snapshot);
     }
 
-    private void updateChapterScrollFromMouse(double mouseY, int chapterCount) {
+    private void updateChapterScrollFromMouse(double mouseY, QuestDataSnapshot snapshot) {
         Rect trackRect = chapterScrollbarTrackRect();
-        Rect thumbRect = chapterScrollbarThumbRect(chapterCount);
+        Rect thumbRect = chapterScrollbarThumbRect(snapshot);
         if (trackRect == null || thumbRect == null) {
             chapterScroll = 0D;
             return;
@@ -1559,12 +1744,12 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         double thumbOffset = Mth.clamp(mouseY - trackRect.y() - thumbRect.height() / 2D, 0D, maxThumbTravel);
-        chapterScroll = thumbOffset / maxThumbTravel * maxChapterScroll(chapterCount);
+        chapterScroll = thumbOffset / maxThumbTravel * maxChapterScroll(snapshot);
     }
 
-    private void renderChapterScrollbar(GuiGraphics graphics, int chapterCount) {
+    private void renderChapterScrollbar(GuiGraphics graphics, QuestDataSnapshot snapshot) {
         Rect trackRect = chapterScrollbarTrackRect();
-        Rect thumbRect = chapterScrollbarThumbRect(chapterCount);
+        Rect thumbRect = chapterScrollbarThumbRect(snapshot);
         if (trackRect == null || thumbRect == null) {
             return;
         }
@@ -1590,9 +1775,9 @@ public class OverhaulQuestScreen extends Screen {
                 CHAPTER_SCROLLBAR_WIDTH, viewportRect.height());
     }
 
-    private Rect chapterScrollbarThumbRect(int chapterCount) {
+    private Rect chapterScrollbarThumbRect(QuestDataSnapshot snapshot) {
         Rect trackRect = chapterScrollbarTrackRect();
-        int contentHeight = chapterContentHeight(chapterCount);
+        int contentHeight = chapterContentHeight(snapshot);
         if (contentHeight <= trackRect.height()) {
             return null;
         }
@@ -1600,15 +1785,15 @@ public class OverhaulQuestScreen extends Screen {
         int thumbHeight = Mth.clamp(Math.round((float) trackRect.height() * trackRect.height() / (float) contentHeight),
                 CHAPTER_SCROLLBAR_MIN_THUMB_HEIGHT, trackRect.height());
         int maxThumbTravel = Math.max(0, trackRect.height() - thumbHeight);
-        double maxScroll = maxChapterScroll(chapterCount);
+        double maxScroll = maxChapterScroll(snapshot);
         int thumbY = trackRect.y() + (maxScroll <= 0D || maxThumbTravel == 0 ? 0
                 : Mth.floor(chapterScroll / maxScroll * maxThumbTravel));
         return new Rect(trackRect.x(), thumbY, trackRect.width(), thumbHeight);
     }
 
-    private Rect chapterScrollbarHitbox(int chapterCount) {
+    private Rect chapterScrollbarHitbox(QuestDataSnapshot snapshot) {
         Rect trackRect = chapterScrollbarTrackRect();
-        if (chapterScrollbarThumbRect(chapterCount) == null) {
+        if (chapterScrollbarThumbRect(snapshot) == null) {
             return null;
         }
 
@@ -1616,16 +1801,32 @@ public class OverhaulQuestScreen extends Screen {
                 CHAPTER_SCROLLBAR_HITBOX_WIDTH, trackRect.height());
     }
 
-    private int chapterContentHeight(int chapterCount) {
-        return chapterCount <= 0 ? 0 : chapterCount * CHAPTER_SELECTOR_SCROLL_STEP - CHAPTER_SELECTOR_ENTRY_SPACING;
+    private int chapterContentHeight(QuestDataSnapshot snapshot) {
+        int height = 0;
+        for (QuestDataSnapshot.ChapterSnapshot chapter : snapshot.chapters()) {
+            if (chapter.firstInGroup()) {
+                height += CHAPTER_GROUP_HEADER_HEIGHT;
+            }
+            height += CHAPTER_SELECTOR_SCROLL_STEP;
+        }
+        return Math.max(0, height - CHAPTER_SELECTOR_ENTRY_SPACING);
     }
 
-    private double maxChapterScroll(int chapterCount) {
-        return Math.max(0D, chapterContentHeight(chapterCount) - chapterSelectorViewportHeight());
+    private double maxChapterScroll(QuestDataSnapshot snapshot) {
+        return Math.max(0D, chapterContentHeight(snapshot) - chapterSelectorViewportHeight());
     }
 
     private Rect frameRect() {
         return new Rect((width - BACKGROUND_WIDTH) / 2, (height - BACKGROUND_HEIGHT) / 2, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
+    }
+
+    private Rect treeViewportRect() {
+        Rect frame = frameRect();
+        return new Rect(frame.x() + TREE_X, frame.y() + TREE_Y, TREE_WIDTH, TREE_HEIGHT);
+    }
+
+    private boolean isCreativeControlsVisible() {
+        return minecraft == null || minecraft.gameMode == null || minecraft.gameMode.getPlayerMode() != GameType.SURVIVAL;
     }
 
     // ---- Drawing primitives ----

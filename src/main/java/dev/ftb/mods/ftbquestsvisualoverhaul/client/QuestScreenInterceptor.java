@@ -5,7 +5,10 @@ import dev.ftb.mods.ftbquests.client.gui.quests.QuestScreen;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.config.ModClientConfig;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.screen.OverhaulQuestScreen;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestOpenContext;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestViewState;
 import dev.ftb.mods.ftblibrary.ui.ScreenWrapper;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.level.GameType;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -22,7 +25,17 @@ public class QuestScreenInterceptor {
             return;
         }
 
-        QuestOpenContext context = QuestOpenContext.fromVanilla(questScreen, QuestDataController.copyPersistedViewState());
+        QuestViewState state = QuestDataController.copyPersistedViewState();
+        if (state.isDefaultFtbUiMode() && isCreativeOrEditorView()) {
+            return;
+        }
+
+        QuestOpenContext context = QuestOpenContext.fromVanilla(questScreen, state);
         event.setNewScreen(new OverhaulQuestScreen(context));
+    }
+
+    private static boolean isCreativeOrEditorView() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return minecraft.gameMode == null || minecraft.gameMode.getPlayerMode() != GameType.SURVIVAL;
     }
 }

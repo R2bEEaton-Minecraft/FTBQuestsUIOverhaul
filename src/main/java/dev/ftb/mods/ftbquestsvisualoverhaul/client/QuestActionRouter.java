@@ -4,6 +4,7 @@ import dev.ftb.mods.ftbquests.net.ClaimAllRewardsMessage;
 import dev.ftb.mods.ftbquests.net.ClaimChoiceRewardMessage;
 import dev.ftb.mods.ftbquests.net.ClaimRewardMessage;
 import dev.ftb.mods.ftbquests.net.SubmitTaskMessage;
+import dev.ftb.mods.ftbquests.net.ToggleEditingModeMessage;
 import dev.ftb.mods.ftbquests.net.TogglePinnedMessage;
 import dev.ftb.mods.ftbquests.quest.Quest;
 import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
@@ -29,6 +30,10 @@ public class QuestActionRouter {
 
     public void togglePin(Quest quest) {
         new TogglePinnedMessage(quest.getId()).sendToServer();
+    }
+
+    public void toggleEditingMode() {
+        new ToggleEditingModeMessage().sendToServer();
     }
 
     public void openVanillaForQuest(Quest quest) {

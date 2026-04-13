@@ -3,6 +3,7 @@ package dev.ftb.mods.ftbquestsvisualoverhaul.client.data;
 import dev.ftb.mods.ftbquests.api.FTBQuestsAPI;
 import dev.ftb.mods.ftbquests.client.FTBQuestsClient;
 import dev.ftb.mods.ftbquests.quest.Chapter;
+import dev.ftb.mods.ftbquests.quest.ChapterGroup;
 import dev.ftb.mods.ftbquests.quest.Quest;
 import dev.ftb.mods.ftbquests.quest.QuestObject;
 import dev.ftb.mods.ftbquests.quest.TeamData;
@@ -27,9 +28,18 @@ public class QuestDataSnapshotBuilder {
         Player player = FTBQuestsClient.getClientPlayer();
         UUID playerId = player == null ? null : player.getUUID();
         boolean hasFallbackEntries = false;
+        long previousGroupId = Long.MIN_VALUE;
 
         for (Chapter chapter : teamData.getFile().getVisibleChapters(teamData)) {
             List<QuestDataSnapshot.QuestSnapshot> quests = new ArrayList<>();
+            ChapterGroup group = chapter.getGroup();
+            long groupId = group.getId();
+            boolean firstInGroup = groupId != previousGroupId;
+            previousGroupId = groupId;
+            Component groupTitle = group.getTitle();
+            if (groupTitle.getString().isBlank()) {
+                groupTitle = group.isDefaultGroup() ? Component.literal("Quest Chapters") : group.getAltTitle();
+            }
 
             chapter.getQuests().stream()
                     .filter(quest -> quest.isVisible(teamData))
@@ -76,6 +86,7 @@ public class QuestDataSnapshotBuilder {
                             ));
                         }
 
+                        boolean checkmarkOnly = quest.getTasks().size() == 1 && quest.getTasks().stream().allMatch(CheckmarkTask.class::isInstance);
                         quests.add(new QuestDataSnapshot.QuestSnapshot(
                                 quest.getId(),
                                 chapter.getId(),
@@ -94,6 +105,7 @@ public class QuestDataSnapshotBuilder {
                                 teamData.canStartTasks(quest),
                                 quest.hideDetailsUntilStartable() && !teamData.canStartTasks(quest) && !teamData.isCompleted(quest),
                                 playerId != null && teamData.hasUnclaimedRewards(playerId, quest),
+                                checkmarkOnly,
                                 quest.streamDependencies()
                                         .filter(Quest.class::isInstance)
                                         .map(Quest.class::cast)
@@ -114,6 +126,9 @@ public class QuestDataSnapshotBuilder {
 
             chapters.add(new QuestDataSnapshot.ChapterSnapshot(
                     chapter.getId(),
+                    groupId,
+                    groupTitle,
+                    firstInGroup,
                     chapter.getTitle(),
                     Component.empty(),
                     chapter.getIcon(),

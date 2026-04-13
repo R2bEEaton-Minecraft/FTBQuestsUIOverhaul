@@ -1,6 +1,10 @@
 package dev.ftb.mods.ftbquestsvisualoverhaul.client.state;
 
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.config.ModClientConfig;
+import net.minecraft.resources.ResourceLocation;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class QuestViewState {
     private long selectedChapterId;
@@ -10,9 +14,11 @@ public class QuestViewState {
     private double detailScroll;
     private double treePanX;
     private double treePanY;
-    private double treeZoom;
+    private boolean freePan;
+    private boolean defaultFtbUiMode;
     private LayoutMode layoutMode;
     private QuestSortMode sortMode;
+    private Map<Long, ResourceLocation> chapterTitleTextures;
 
     public QuestViewState() {
         selectedChapterId = 0L;
@@ -22,9 +28,11 @@ public class QuestViewState {
         detailScroll = 0D;
         treePanX = 0D;
         treePanY = 0D;
-        treeZoom = 1D;
+        freePan = false;
+        defaultFtbUiMode = false;
         layoutMode = ModClientConfig.DEFAULT_LAYOUT.get();
         sortMode = QuestSortMode.PROGRESSION;
+        chapterTitleTextures = new HashMap<>();
     }
 
     public QuestViewState copy() {
@@ -36,9 +44,11 @@ public class QuestViewState {
         copy.detailScroll = detailScroll;
         copy.treePanX = treePanX;
         copy.treePanY = treePanY;
-        copy.treeZoom = treeZoom;
+        copy.freePan = freePan;
+        copy.defaultFtbUiMode = defaultFtbUiMode;
         copy.layoutMode = layoutMode;
         copy.sortMode = sortMode;
+        copy.chapterTitleTextures = new HashMap<>(chapterTitleTextures);
         return copy;
     }
 
@@ -98,12 +108,40 @@ public class QuestViewState {
         this.treePanY = treePanY;
     }
 
-    public double getTreeZoom() {
-        return treeZoom;
+    public boolean isFreePan() {
+        return freePan;
     }
 
-    public void setTreeZoom(double treeZoom) {
-        this.treeZoom = treeZoom;
+    public void setFreePan(boolean freePan) {
+        this.freePan = freePan;
+    }
+
+    public boolean isDefaultFtbUiMode() {
+        return defaultFtbUiMode;
+    }
+
+    public void setDefaultFtbUiMode(boolean defaultFtbUiMode) {
+        this.defaultFtbUiMode = defaultFtbUiMode;
+    }
+
+    public ResourceLocation getChapterTitleTexture(long chapterId) {
+        return chapterTitleTextures.get(chapterId);
+    }
+
+    public void setChapterTitleTexture(long chapterId, ResourceLocation texture) {
+        if (texture == null) {
+            chapterTitleTextures.remove(chapterId);
+        } else {
+            chapterTitleTextures.put(chapterId, texture);
+        }
+    }
+
+    public Map<Long, ResourceLocation> getChapterTitleTextures() {
+        return new HashMap<>(chapterTitleTextures);
+    }
+
+    public void setChapterTitleTextures(Map<Long, ResourceLocation> chapterTitleTextures) {
+        this.chapterTitleTextures = new HashMap<>(chapterTitleTextures);
     }
 
     public LayoutMode getLayoutMode() {
