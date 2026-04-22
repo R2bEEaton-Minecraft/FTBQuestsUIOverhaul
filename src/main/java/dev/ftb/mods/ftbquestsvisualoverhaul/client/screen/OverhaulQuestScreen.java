@@ -17,10 +17,13 @@ import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.RewardInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.TaskInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestOpenContext;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestViewState;
+import dev.ftb.mods.ftbquestsvisualoverhaul.FTBQuestsVisualOverhaul;
 import dev.ftb.mods.ftblibrary.ui.CursorType;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.level.GameType;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
@@ -35,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -74,7 +78,6 @@ public class OverhaulQuestScreen extends Screen {
     private static final int CHAPTER_SELECTOR_ICON_X_OFFSET = 5;
     private static final int CHAPTER_SELECTOR_TEXT_X_OFFSET = 21;
     private static final int CHAPTER_SELECTOR_TEXT_RIGHT_PADDING = 5;
-
     private static final int CHAPTER_SCROLLBAR_WIDTH = 1;
     private static final int CHAPTER_SCROLLBAR_GAP = 2;
     private static final int CHAPTER_SCROLLBAR_HITBOX_WIDTH = 5;
@@ -94,10 +97,19 @@ public class OverhaulQuestScreen extends Screen {
     private static final ResourceLocation WINDOW_LOCATION = new ResourceLocation("textures/gui/advancements/window.png");
     private static final ResourceLocation TABS_LOCATION = new ResourceLocation("textures/gui/advancements/tabs.png");
     private static final ResourceLocation WIDGETS_LOCATION = new ResourceLocation("textures/gui/advancements/widgets.png");
+    private static final ResourceLocation ADVANCEMENT_BOX_OBTAINED_TEXTURE = new ResourceLocation("minecraft", "textures/gui/sprites/advancements/box_obtained.png");
+    private static final ResourceLocation ADVANCEMENT_BOX_UNOBTAINED_TEXTURE = new ResourceLocation("minecraft", "textures/gui/sprites/advancements/box_unobtained.png");
+    private static final ResourceLocation ADVANCEMENT_TITLE_BOX_TEXTURE = new ResourceLocation("minecraft", "textures/gui/sprites/advancements/title_box.png");
+    private static final ResourceLocation ADVANCEMENT_TASK_FRAME_OBTAINED_TEXTURE = new ResourceLocation("minecraft", "textures/gui/sprites/advancements/task_frame_obtained.png");
+    private static final ResourceLocation ADVANCEMENT_TASK_FRAME_UNOBTAINED_TEXTURE = new ResourceLocation("minecraft", "textures/gui/sprites/advancements/task_frame_unobtained.png");
     private static final ResourceLocation BUTTONS_LOCATION = new ResourceLocation("textures/gui/widgets.png");
     private static final ResourceLocation OAK_PLANKS_TEXTURE = new ResourceLocation("minecraft", "textures/block/oak_planks.png");
     private static final ResourceLocation FTB_QUEST_LOCKED_TEXTURE = new ResourceLocation("ftbquests", "textures/gui/quest_locked.png");
     private static final ResourceLocation FTB_QUEST_CHECK_TEXTURE = new ResourceLocation("ftblibrary", "textures/icons/accept.png");
+    private static final int ADVANCEMENT_PANEL_TEXTURE_WIDTH = 200;
+    private static final int ADVANCEMENT_PANEL_TEXTURE_HEIGHT = 26;
+    private static final int ADVANCEMENT_PANEL_TEXTURE_BORDER = 10;
+    private static final int ADVANCEMENT_FRAME_TEXTURE_SIZE = 26;
 
     // --- Node spacing (based on AdvancementWidget, with wider horizontal gaps) ---
     // Vanilla uses displayX * 28 and displayY * 27, where displayX/Y are 0,1,2,...
@@ -127,15 +139,21 @@ public class OverhaulQuestScreen extends Screen {
     private static final int[] TEST_SPLIT_OFFSETS = new int[]{0, 10, -10, 25, -25};
 
     // --- Detail modal constants ---
-    private static final int MODAL_MIN_WIDTH = 168;
-    private static final int MODAL_MAX_WIDTH = 188;
-    private static final int MODAL_HEADER_HEIGHT = 34;
-    private static final int MODAL_FOOTER_HEIGHT = 24;
+    private static final int MODAL_MIN_WIDTH = 244;
+    private static final int MODAL_MAX_WIDTH = 286;
+    private static final int MODAL_HEADER_HEIGHT = 26;
+    private static final int MODAL_FOOTER_HEIGHT = 30;
     private static final int MODAL_MARGIN = 28;
     private static final int FOOTER_BUTTON_HEIGHT = 15;
     private static final int CHECK_BADGE_SIZE = 7;
     private static final int CHECK_BUTTON_SIZE = 8;
     private static final int CHECK_NOTIFICATION_SIZE = 8;
+    private static final int MODAL_CONTENT_SIDE_PADDING = 14;
+    private static final int MODAL_CONTENT_TOP_PADDING = 10;
+    private static final int MODAL_CONTENT_BOTTOM_PADDING = 10;
+    private static final int MODAL_SECTION_DIVIDER_INSET = 8;
+    private static final int MODAL_BUTTON_WIDTH = 86;
+    private static final int MODAL_BUTTON_GAP = 26;
     private static final float MODAL_TEXT_SCALE = 0.8F;
 
     private final QuestOpenContext openContext;
@@ -143,6 +161,7 @@ public class OverhaulQuestScreen extends Screen {
     private final QuestViewState viewState;
     private final List<ClickTarget> clickTargets = new ArrayList<>();
     private final Set<Long> collapsedChapterGroups = new HashSet<>();
+    private final Set<ResourceLocation> missingModalTextures = new HashSet<>();
 
     private final Map<Long, NodeLayout> visibleQuestNodes = new HashMap<>();
     private QuestDataSnapshot.QuestSnapshot hoveredQuest;
@@ -238,7 +257,7 @@ public class OverhaulQuestScreen extends Screen {
                 return true;
             }
             DetailLayout layout = buildDetailLayout(selectedQuest);
-            if (!layout.rect().contains(mouseX, mouseY)) {
+            if (!modalBounds(layout).contains(mouseX, mouseY)) {
                 closeViewedQuest();
             }
             return true;
@@ -270,6 +289,9 @@ public class OverhaulQuestScreen extends Screen {
             isScrolling = false;
             chapterScrollbarDragging = false;
         }
+        if (viewState.getViewedQuestId() != 0L) {
+            return true;
+        }
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
@@ -288,7 +310,7 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         if (viewState.getViewedQuestId() != 0L) {
-            return false;
+            return true;
         }
 
         if (chapterScrollbarDragging) {
@@ -377,7 +399,7 @@ public class OverhaulQuestScreen extends Screen {
         // Render tree content inside the tree panel area (vanilla advancement style)
         renderInside(graphics, snapshot, mouseX, mouseY, treeLeft, treeTop);
         renderActiveChapterTitle(graphics, snapshot, treeLeft, treeTop);
-        renderCreativeTreeControls(graphics, mouseX, mouseY);
+        renderCreativeTreeControls(graphics, mouseX, mouseY, selectedQuest == null);
 
         super.render(graphics, mouseX, mouseY, partialTick);
 
@@ -386,10 +408,12 @@ public class OverhaulQuestScreen extends Screen {
 
         // Detail modal overlay (quest-specific, not in vanilla advancements)
         if (renderDetailModal && selectedQuest != null) {
+            hoveredQuest = null;
+            clickTargets.clear();
             renderQuestDetailModal(graphics, selectedQuest, mouseX, mouseY);
         }
 
-        if (renderDefaultButton && shouldShowDefaultViewButton()) {
+        if (selectedQuest == null && renderDefaultButton && shouldShowDefaultViewButton()) {
             renderDefaultViewButton(graphics, mouseX, mouseY);
         }
 
@@ -528,7 +552,6 @@ public class OverhaulQuestScreen extends Screen {
         renderChapterScrollbar(graphics, snapshot);
     }
 
-
     private void renderChapterSelectorBottomShadow(GuiGraphics graphics, Rect viewportRect, QuestDataSnapshot snapshot) {
         if (chapterScroll >= maxChapterScroll(snapshot)) {
             return;
@@ -602,7 +625,7 @@ public class OverhaulQuestScreen extends Screen {
         graphics.disableScissor();
     }
 
-    private void renderCreativeTreeControls(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void renderCreativeTreeControls(GuiGraphics graphics, int mouseX, int mouseY, boolean interactive) {
         if (!isCreativeControlsVisible()) {
             return;
         }
@@ -611,11 +634,13 @@ public class OverhaulQuestScreen extends Screen {
         Rect freePanButton = new Rect(frame.x() + TREE_X + 1, frame.y() + TREE_Y + 2, 72, 11);
         Rect titleButton = new Rect(frame.x() + TREE_X + TREE_WIDTH - 72, frame.y() + TREE_Y + 2, 68, 11);
         renderSmallOverlayButton(graphics, freePanButton, viewState.isFreePan() ? "Free Pan: On" : "Free Pan: Off",
-                freePanButton.contains(mouseX, mouseY), viewState.isFreePan() ? 0xFFE6D176 : 0xFFE68E7C);
-        renderSmallOverlayButton(graphics, titleButton, "Change Tile", titleButton.contains(mouseX, mouseY), 0xFFF2E8D6);
+                interactive && freePanButton.contains(mouseX, mouseY), viewState.isFreePan() ? 0xFFE6D176 : 0xFFE68E7C);
+        renderSmallOverlayButton(graphics, titleButton, "Change Tile", interactive && titleButton.contains(mouseX, mouseY), 0xFFF2E8D6);
 
-        clickTargets.add(new ClickTarget(freePanButton, () -> viewState.setFreePan(!viewState.isFreePan())));
-        clickTargets.add(new ClickTarget(titleButton, this::openChapterTitleTextureSelector));
+        if (interactive) {
+            clickTargets.add(new ClickTarget(freePanButton, () -> viewState.setFreePan(!viewState.isFreePan())));
+            clickTargets.add(new ClickTarget(titleButton, this::openChapterTitleTextureSelector));
+        }
     }
 
     private void renderSmallOverlayButton(GuiGraphics graphics, Rect rect, String label, boolean hovered, int textColor) {
@@ -1225,44 +1250,43 @@ public class OverhaulQuestScreen extends Screen {
         DetailLayout layout = buildDetailLayout(quest);
         Rect rect = layout.rect();
         Rect header = layout.headerRect();
+        Rect panel = layout.panelRect();
         Rect body = layout.bodyRect();
         Rect footer = layout.footerRect();
 
-        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0xD4211711);
-        drawInsetBorder(graphics, rect, 0xFF8F6938, 0xCC160F0B);
-        graphics.fill(rect.x() + 6, rect.y() + 6, rect.maxX() - 6, rect.maxY() - 6, 0x96241711);
+        ResourceLocation headerTexture = selectedHeaderTexture(quest);
+        boolean panelTexturePresent = blitAdvancementPanel(graphics, ADVANCEMENT_TITLE_BOX_TEXTURE, panel);
+        boolean headerTexturePresent = blitAdvancementPanel(graphics, headerTexture, header);
+        Rect frameRect = new Rect(header.x() + 3, header.y(), ADVANCEMENT_FRAME_TEXTURE_SIZE, ADVANCEMENT_FRAME_TEXTURE_SIZE);
+        boolean frameTexturePresent = blitAdvancementFrame(graphics, selectedFrameTexture(quest), frameRect);
+        int headerTextY = header.y() + Math.max(0, (header.height() - Math.round(font.lineHeight * MODAL_TEXT_SCALE)) / 2);
 
-        graphics.fill(header.x(), header.y(), header.maxX(), header.maxY(), 0xCC8F6A1D);
-        drawInsetBorder(graphics, header, 0xFFD6A85C, 0xAA3E2B13);
-
-        quest.icon().draw(graphics, header.x() + 7, header.y() + 6, 16, 16);
-        drawCenteredScaledString(graphics, trim(quest.title(), (int) ((header.width() - 58) / MODAL_TEXT_SCALE)), header.centerX(), header.y() + 6, 0xFFF6EDDB, MODAL_TEXT_SCALE);
-        drawCenteredScaledString(graphics, Component.literal(statusLabel(quest)), header.centerX(), header.y() + 16, 0xFFD8C49D, MODAL_TEXT_SCALE);
+        quest.icon().draw(graphics,
+                frameRect.x() + (frameRect.width() - WIDGET_ICON_SIZE) / 2,
+                frameRect.y() + (frameRect.height() - WIDGET_ICON_SIZE) / 2,
+                WIDGET_ICON_SIZE, WIDGET_ICON_SIZE);
+        drawScaledString(graphics,
+                trim(quest.title(), (int) ((header.width() - TITLE_X - 26) / MODAL_TEXT_SCALE)),
+                header.x() + TITLE_X, headerTextY, 0xFFF6EDDB, MODAL_TEXT_SCALE, true);
 
         int closeX = header.maxX() - 18;
-        drawCenteredScaledString(graphics, Component.literal("x"), closeX + 5, header.y() + 8, 0xFFF6E8C9, MODAL_TEXT_SCALE);
+        drawCenteredScaledString(graphics, Component.literal("x"), closeX + 5, headerTextY, 0xFFE9DFC7, MODAL_TEXT_SCALE, true);
         clickTargets.add(new ClickTarget(new Rect(closeX, header.y() + 4, 12, 12), this::closeViewedQuest));
 
         graphics.enableScissor(body.x(), body.y(), body.maxX(), body.maxY());
-        int contentY = body.y() + 2 - (int) viewState.getDetailScroll();
+        int contentY = body.y() + MODAL_CONTENT_TOP_PADDING - (int) viewState.getDetailScroll();
 
-        contentY = renderSectionLabel(graphics, "Objective", body.x(), contentY);
-        for (FormattedCharSequence line : layout.objectiveLines()) {
-            drawScaledString(graphics, line, body.x(), contentY, 0xFF6FE142, MODAL_TEXT_SCALE);
-            contentY += 8;
-        }
-        contentY += 4;
-        drawSectionDivider(graphics, body.x(), body.width(), contentY);
-        contentY += 8;
+        contentY = renderObjectiveBlock(graphics, layout, quest, contentY);
+        drawSectionDivider(graphics, body.x() + MODAL_SECTION_DIVIDER_INSET, body.width() - MODAL_SECTION_DIVIDER_INSET * 2, contentY);
+        contentY += 10;
 
-        contentY = renderSectionLabel(graphics, "Details", body.x(), contentY);
         for (FormattedCharSequence line : layout.descriptionLines()) {
-            drawScaledString(graphics, line, body.x(), contentY, 0xFFF0E2C5, MODAL_TEXT_SCALE);
+            drawCenteredScaledString(graphics, line, body.centerX(), contentY, 0xFFF0E2C5, MODAL_TEXT_SCALE);
             contentY += 8;
         }
-        contentY += 4;
-        drawSectionDivider(graphics, body.x(), body.width(), contentY);
         contentY += 8;
+        drawSectionDivider(graphics, body.x() + MODAL_SECTION_DIVIDER_INSET, body.width() - MODAL_SECTION_DIVIDER_INSET * 2, contentY);
+        contentY += 10;
 
         int columnGap = 8;
         int columnWidth = (body.width() - columnGap) / 2;
@@ -1271,9 +1295,9 @@ public class OverhaulQuestScreen extends Screen {
         int columnStartY = contentY;
 
         List<QuestDataSnapshot.TaskSnapshot> visibleTasks = visibleRequirementTasks(quest);
-        int requirementsY = renderSectionLabel(graphics, "Requirements", leftX, columnStartY);
+        int requirementsY = renderSectionLabel(graphics, "Requirements", leftX, columnStartY, columnWidth);
         if (visibleTasks.isEmpty()) {
-            drawScaledString(graphics, Component.literal("No explicit requirements"), leftX, requirementsY, 0xFFC8B08C, MODAL_TEXT_SCALE);
+            drawCenteredScaledString(graphics, Component.literal("No explicit requirements"), leftX + columnWidth / 2, requirementsY, 0xFFC8B08C, MODAL_TEXT_SCALE);
             requirementsY += 10;
         } else {
             for (QuestDataSnapshot.TaskSnapshot task : visibleTasks) {
@@ -1281,9 +1305,9 @@ public class OverhaulQuestScreen extends Screen {
             }
         }
 
-        int rewardsY = renderSectionLabel(graphics, "Reward", rightX, columnStartY);
+        int rewardsY = renderSectionLabel(graphics, "Rewards", rightX, columnStartY, columnWidth);
         if (quest.rewards().isEmpty()) {
-            drawScaledString(graphics, Component.literal("No reward configured"), rightX, rewardsY, 0xFFC8B08C, MODAL_TEXT_SCALE);
+            drawCenteredScaledString(graphics, Component.literal("No reward configured"), rightX + columnWidth / 2, rewardsY, 0xFFC8B08C, MODAL_TEXT_SCALE);
             rewardsY += 10;
         } else {
             for (QuestDataSnapshot.RewardSnapshot reward : quest.rewards()) {
@@ -1295,7 +1319,7 @@ public class OverhaulQuestScreen extends Screen {
 
         if (layout.contentHeight() > body.height()) {
             int step = Math.max(48, body.height() - 28);
-            int arrowX = rect.maxX() - 20;
+            int arrowX = rect.maxX() - 25;
             int upY = body.y() + 2;
             int downY = footer.y() - 14;
             boolean canUp = viewState.getDetailScroll() > 0D;
@@ -1314,14 +1338,10 @@ public class OverhaulQuestScreen extends Screen {
             }
         }
 
-        graphics.fill(footer.x(), footer.y(), footer.maxX(), footer.maxY(), 0x7819100C);
-        drawInsetBorder(graphics, footer, 0xFF805C32, 0xCC1C1410);
-
-        int buttonGap = 8;
-        int buttonSlotWidth = (footer.width() - buttonGap) / 2;
-        int buttonWidth = Math.round(buttonSlotWidth * 0.75F);
-        Rect acceptButton = footerButtonRect(footer.x() + Math.max(0, (buttonSlotWidth - buttonWidth) / 2), footer.y(), buttonWidth, footer.height());
-        Rect completeButton = footerButtonRect(footer.x() + buttonSlotWidth + buttonGap + Math.max(0, (buttonSlotWidth - buttonWidth) / 2), footer.y(), buttonWidth, footer.height());
+        int buttonRowWidth = MODAL_BUTTON_WIDTH * 2 + MODAL_BUTTON_GAP;
+        int buttonRowLeft = footer.x() + Math.max(0, (footer.width() - buttonRowWidth) / 2);
+        Rect acceptButton = footerButtonRect(buttonRowLeft, footer.y(), MODAL_BUTTON_WIDTH, footer.height());
+        Rect completeButton = footerButtonRect(buttonRowLeft + MODAL_BUTTON_WIDTH + MODAL_BUTTON_GAP, footer.y(), MODAL_BUTTON_WIDTH, footer.height());
 
         renderFooterButton(graphics, acceptButton, quest.pinned() ? "Unaccept" : "Accept", true, acceptButton.contains(mouseX, mouseY), quest.pinned());
         boolean claimEnabled = canClaimAnyReward(quest);
@@ -1333,6 +1353,10 @@ public class OverhaulQuestScreen extends Screen {
         clickTargets.add(new ClickTarget(acceptButton, () -> acceptOrUnacceptQuest(quest)));
         if (claimEnabled) {
             clickTargets.add(new ClickTarget(completeButton, this::claimCurrentQuestRewards));
+        }
+
+        if (!headerTexturePresent || !panelTexturePresent || !frameTexturePresent) {
+            drawCenteredScaledString(graphics, Component.literal("Missing modal texture resource"), rect.centerX(), rect.maxY() - 12, 0xFFFF8080, 0.55F);
         }
         graphics.pose().popPose();
     }
@@ -1355,20 +1379,18 @@ public class OverhaulQuestScreen extends Screen {
         return minecraft == null || minecraft.gameMode == null || minecraft.gameMode.getPlayerMode() != GameType.SURVIVAL;
     }
 
-    private int renderSectionLabel(GuiGraphics graphics, String label, int x, int y) {
-        drawScaledString(graphics, Component.literal(label + ":"), x, y, 0xFFF6ECD6, MODAL_TEXT_SCALE);
+    private int renderSectionLabel(GuiGraphics graphics, String label, int x, int y, int width) {
+        drawCenteredScaledString(graphics, Component.literal(label + ":"), x + width / 2, y, 0xFFF6ECD6, MODAL_TEXT_SCALE);
         return y + 10;
     }
 
     private int renderTaskSummaryRow(GuiGraphics graphics, int x, int width, QuestDataSnapshot.TaskSnapshot task, int y) {
-        Rect rect = new Rect(x, y, width, 18);
-        Rect iconRect = new Rect(rect.x() + 2, rect.y() + 1, 14, 14);
+        Rect rect = new Rect(x, y, width, 22);
+        Rect iconRect = new Rect(rect.x() + width / 2 - 8, rect.y() + 1, 16, 16);
         boolean consumableTurnIn = task.consumesResources() && task.interactionMode() == TaskInteractionMode.SUBMIT;
-        Rect actionRect = consumableTurnIn ? new Rect(rect.maxX() - 37, rect.y() + 2, 33, 12) : null;
-        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0x5A3A2A1D);
-        drawInsetBorder(graphics, rect, 0x885F452F, 0x55201510);
+        Rect actionRect = consumableTurnIn ? new Rect(rect.centerX() - 17, rect.maxY() - 12, 34, 12) : null;
 
-        task.icon().draw(graphics, iconRect.x(), iconRect.y(), 14, 14);
+        task.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
         if (task.completed()) {
             renderSmallCheck(graphics, iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y());
         }
@@ -1378,14 +1400,8 @@ public class OverhaulQuestScreen extends Screen {
             }
             renderConsumableActionButton(graphics, actionRect, task.canInteract());
         }
-        int infoX = rect.x() + 20;
-        int progressWidth = Math.round(font.width(task.progressText()) * MODAL_TEXT_SCALE);
-        int progressRightBound = consumableTurnIn ? actionRect.x() - 6 : rect.maxX() - 34;
-        int progressX = Math.min(infoX, progressRightBound - progressWidth);
-        if (progressX < infoX) {
-            progressX = infoX;
-        }
-        drawScaledString(graphics, task.progressText(), progressX, rect.y() + 4, task.completed() ? 0xFF75D65C : 0xFFD9BE96, MODAL_TEXT_SCALE);
+        drawCenteredScaledString(graphics, task.progressText(), rect.centerX(), rect.y() + 16,
+                task.completed() ? 0xFF75D65C : 0xFFD9BE96, 0.65F);
 
         String state = switch (task.interactionMode()) {
             case SUBMIT -> consumableTurnIn && task.canInteract() ? "Turn in" : task.canInteract() ? "Ready" : task.completed() ? "Done" : "Locked";
@@ -1402,20 +1418,17 @@ public class OverhaulQuestScreen extends Screen {
                 }));
             }
         } else {
-            int stateWidth = Math.round(font.width(state) * MODAL_TEXT_SCALE);
-            int stateX = Math.max(infoX + progressWidth + 6, rect.maxX() - stateWidth - 4);
-            drawScaledString(graphics, Component.literal(state), stateX, rect.y() + 4, task.completed() ? 0xFF75D65C : 0xFFC8A97C, MODAL_TEXT_SCALE);
+            drawCenteredScaledString(graphics, Component.literal(state), rect.centerX(), rect.y() + 25,
+                    task.completed() ? 0xFF75D65C : 0xFFC8A97C, 0.58F);
         }
-        return y + 20;
+        return y + (consumableTurnIn ? 38 : 34);
     }
 
     private int renderRewardSummaryRow(GuiGraphics graphics, int x, int width, QuestDataSnapshot.RewardSnapshot rewardSnapshot, int y) {
-        Rect rect = new Rect(x, y, width, 18);
-        Rect iconRect = new Rect(rect.x() + 3, rect.y() + 1, 14, 14);
-        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0x5635261B);
-        drawInsetBorder(graphics, rect, 0x88634731, 0x55201510);
+        Rect rect = new Rect(x, y, width, 34);
+        Rect iconRect = new Rect(rect.x() + width / 2 - 8, rect.y() + 1, 16, 16);
 
-        rewardSnapshot.icon().draw(graphics, iconRect.x(), iconRect.y(), 14, 14);
+        rewardSnapshot.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
         if (rewardSnapshot.claimed()) {
             renderSmallCheck(graphics, iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y());
         }
@@ -1426,10 +1439,9 @@ public class OverhaulQuestScreen extends Screen {
             case CHOICE -> rewardSnapshot.canClaim() ? "Choose" : rewardSnapshot.claimed() ? "Claimed" : "Locked";
             case VANILLA_FALLBACK -> rewardSnapshot.canClaim() ? "Vanilla" : "Locked";
         };
-        int stateWidth = Math.round(font.width(state) * MODAL_TEXT_SCALE);
-        int stateX = Math.max(rect.x() + 20, rect.maxX() - stateWidth - 4);
-        drawScaledString(graphics, Component.literal(state), stateX, rect.y() + 4, statusColor, MODAL_TEXT_SCALE);
-        return y + 20;
+        drawCenteredScaledString(graphics, rewardSnapshot.statusText(), rect.centerX(), rect.y() + 16, statusColor, 0.65F);
+        drawCenteredScaledString(graphics, Component.literal(state), rect.centerX(), rect.y() + 25, statusColor, 0.58F);
+        return y + 34;
     }
 
     private void renderSmallCheck(GuiGraphics graphics, int x, int y) {
@@ -1505,29 +1517,35 @@ public class OverhaulQuestScreen extends Screen {
     private DetailLayout buildDetailLayout(QuestDataSnapshot.QuestSnapshot quest) {
         int desiredWidth = Math.max(
                 Math.max(font.width(quest.title()), font.width(resolveObjectiveText(quest))),
-                flattenDescription(resolveDescription(quest), MODAL_MAX_WIDTH - 56).stream().mapToInt(font::width).max().orElse(0)
-        ) + 54;
+                flattenDescription(resolveDescription(quest), MODAL_MAX_WIDTH - 64).stream().mapToInt(font::width).max().orElse(0)
+        ) + 88;
         int modalWidth = Mth.clamp(desiredWidth, MODAL_MIN_WIDTH, Math.min(MODAL_MAX_WIDTH, width - 36));
 
-        List<FormattedCharSequence> objectiveLines = font.split(resolveObjectiveText(quest), (int) ((modalWidth - 28) / MODAL_TEXT_SCALE));
-        List<FormattedCharSequence> descriptionLines = flattenDescription(resolveDescription(quest), (int) ((modalWidth - 28) / MODAL_TEXT_SCALE));
+        int textWidth = Math.max(8, Math.round(
+                (modalWidth - 64) / MODAL_TEXT_SCALE
+        ));
+        List<FormattedCharSequence> objectiveLines = font.split(resolveObjectiveText(quest), textWidth);
+        List<FormattedCharSequence> descriptionLines = flattenDescription(resolveDescription(quest), textWidth);
 
-        int contentHeight = 10 + objectiveLines.size() * 8 + 12;
-        contentHeight += 10 + descriptionLines.size() * 8 + 12;
-        int requirementsHeight = 10 + Math.max(1, visibleRequirementTasks(quest).size()) * 20;
-        int rewardsHeight = 10 + Math.max(1, quest.rewards().size()) * 20;
-        contentHeight += Math.max(requirementsHeight, rewardsHeight) + 6;
+        int objectiveHeight = 10 + objectiveLines.size() * 8;
+        int descriptionHeight = descriptionLines.size() * 8;
+        int requirementsHeight = 10 + Math.max(1, visibleRequirementTasks(quest).size()) * 34;
+        int rewardsHeight = 10 + Math.max(1, quest.rewards().size()) * 34;
+        int contentHeight = objectiveHeight + 10 + descriptionHeight + 10 + Math.max(requirementsHeight, rewardsHeight) + MODAL_CONTENT_BOTTOM_PADDING;
 
         int maxHeight = height - MODAL_MARGIN;
-        int chromeHeight = 14 + MODAL_HEADER_HEIGHT + MODAL_FOOTER_HEIGHT + 18;
+        int chromeHeight = 18 + MODAL_HEADER_HEIGHT + MODAL_FOOTER_HEIGHT + 24;
         int modalHeight = Math.min(contentHeight + chromeHeight, maxHeight);
         Rect rect = new Rect((width - modalWidth) / 2, (height - modalHeight) / 2, modalWidth, modalHeight);
         Rect headerRect = new Rect(rect.x() + 10, rect.y() + 8, rect.width() - 20, MODAL_HEADER_HEIGHT);
-        Rect footerRect = new Rect(rect.x() + 12, rect.maxY() - MODAL_FOOTER_HEIGHT - 8, rect.width() - 24, MODAL_FOOTER_HEIGHT);
-        Rect bodyRect = new Rect(rect.x() + 12, headerRect.maxY() + 8, rect.width() - 28, footerRect.y() - headerRect.maxY() - 14);
+        Rect panelRect = new Rect(headerRect.x(), headerRect.maxY() - ADVANCEMENT_PANEL_TEXTURE_BORDER, headerRect.width(),
+                rect.maxY() - (headerRect.maxY() - ADVANCEMENT_PANEL_TEXTURE_BORDER) - 8);
+        Rect footerRect = new Rect(panelRect.x() + 10, panelRect.maxY() - MODAL_FOOTER_HEIGHT - 8, panelRect.width() - 20, MODAL_FOOTER_HEIGHT);
+        Rect bodyRect = new Rect(panelRect.x() + MODAL_CONTENT_SIDE_PADDING, headerRect.maxY() + 4,
+                panelRect.width() - MODAL_CONTENT_SIDE_PADDING * 2, footerRect.y() - (headerRect.maxY() + 4) - 6);
 
         viewState.setDetailScroll(clampScroll(viewState.getDetailScroll(), contentHeight, bodyRect.height()));
-        return new DetailLayout(rect, headerRect, bodyRect, footerRect, objectiveLines, descriptionLines, contentHeight);
+        return new DetailLayout(rect, headerRect, panelRect, bodyRect, footerRect, objectiveLines, descriptionLines, contentHeight);
     }
 
     private List<FormattedCharSequence> flattenDescription(List<Component> description, int maxWidth) {
@@ -1896,6 +1914,17 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
+    private Rect modalBounds(DetailLayout layout) {
+        Rect rect = layout.rect();
+        Rect header = layout.headerRect();
+        Rect panel = layout.panelRect();
+        int minX = Math.min(rect.x(), Math.min(header.x(), panel.x()));
+        int minY = Math.min(rect.y(), Math.min(header.y(), panel.y()));
+        int maxX = Math.max(rect.maxX(), Math.max(header.maxX(), panel.maxX()));
+        int maxY = Math.max(rect.maxY(), Math.max(header.maxY(), panel.maxY()));
+        return new Rect(minX, minY, maxX - minX, maxY - minY);
+    }
+
     private Rect frameRect() {
         return new Rect((width - BACKGROUND_WIDTH) / 2, (height - BACKGROUND_HEIGHT) / 2, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
     }
@@ -1932,24 +1961,161 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void drawScaledString(GuiGraphics graphics, Component component, int x, int y, int color, float scale) {
+        drawScaledString(graphics, component, x, y, color, scale, false);
+    }
+
+    private void drawScaledString(GuiGraphics graphics, Component component, int x, int y, int color, float scale, boolean shadow) {
         graphics.pose().pushPose();
         graphics.pose().translate(x, y, 0F);
         graphics.pose().scale(scale, scale, 1F);
-        graphics.drawString(font, component, 0, 0, color, false);
+        graphics.drawString(font, component, 0, 0, color, shadow);
         graphics.pose().popPose();
     }
 
     private void drawScaledString(GuiGraphics graphics, FormattedCharSequence text, int x, int y, int color, float scale) {
+        drawScaledString(graphics, text, x, y, color, scale, false);
+    }
+
+    private void drawScaledString(GuiGraphics graphics, FormattedCharSequence text, int x, int y, int color, float scale, boolean shadow) {
         graphics.pose().pushPose();
         graphics.pose().translate(x, y, 0F);
         graphics.pose().scale(scale, scale, 1F);
-        graphics.drawString(font, text, 0, 0, color);
+        graphics.drawString(font, text, 0, 0, color, shadow);
         graphics.pose().popPose();
     }
 
     private void drawCenteredScaledString(GuiGraphics graphics, Component component, int centerX, int y, int color, float scale) {
+        drawCenteredScaledString(graphics, component, centerX, y, color, scale, false);
+    }
+
+    private void drawCenteredScaledString(GuiGraphics graphics, Component component, int centerX, int y, int color, float scale, boolean shadow) {
         int scaledWidth = Math.round(font.width(component) * scale);
-        drawScaledString(graphics, component, centerX - scaledWidth / 2, y, color, scale);
+        drawScaledString(graphics, component, centerX - scaledWidth / 2, y, color, scale, shadow);
+    }
+
+    private void drawCenteredScaledString(GuiGraphics graphics, FormattedCharSequence text, int centerX, int y, int color, float scale) {
+        drawCenteredScaledString(graphics, text, centerX, y, color, scale, false);
+    }
+
+    private void drawCenteredScaledString(GuiGraphics graphics, FormattedCharSequence text, int centerX, int y, int color, float scale, boolean shadow) {
+        int scaledWidth = Math.round(font.width(text) * scale);
+        drawScaledString(graphics, text, centerX - scaledWidth / 2, y, color, scale, shadow);
+    }
+
+    private int renderObjectiveBlock(GuiGraphics graphics, DetailLayout layout, QuestDataSnapshot.QuestSnapshot quest, int y) {
+        Component label = Component.literal("Objective:");
+        int labelWidth = Math.round(font.width(label) * MODAL_TEXT_SCALE);
+        FormattedCharSequence firstLine = layout.objectiveLines().isEmpty()
+                ? Language.getInstance().getVisualOrder(Component.empty())
+                : layout.objectiveLines().get(0);
+        int firstLineWidth = Math.round(font.width(firstLine) * MODAL_TEXT_SCALE);
+        int lineX = layout.bodyRect().centerX() - (labelWidth + 4 + firstLineWidth) / 2;
+
+        drawScaledString(graphics, label, lineX, y, 0xFFF6ECD6, MODAL_TEXT_SCALE);
+        drawScaledString(graphics, firstLine, lineX + labelWidth + 4, y, 0xFF6FE142, MODAL_TEXT_SCALE);
+        y += 10;
+
+        for (int i = 1; i < layout.objectiveLines().size(); i++) {
+            drawCenteredScaledString(graphics, layout.objectiveLines().get(i), layout.bodyRect().centerX(), y, 0xFF6FE142, MODAL_TEXT_SCALE);
+            y += 8;
+        }
+
+        return y;
+    }
+
+    private ResourceLocation selectedHeaderTexture(QuestDataSnapshot.QuestSnapshot quest) {
+        return quest.completed() || quest.hasUnclaimedRewards() ? ADVANCEMENT_BOX_OBTAINED_TEXTURE : ADVANCEMENT_BOX_UNOBTAINED_TEXTURE;
+    }
+
+    private ResourceLocation selectedFrameTexture(QuestDataSnapshot.QuestSnapshot quest) {
+        return quest.completed() || quest.hasUnclaimedRewards() ? ADVANCEMENT_TASK_FRAME_OBTAINED_TEXTURE : ADVANCEMENT_TASK_FRAME_UNOBTAINED_TEXTURE;
+    }
+
+    private boolean blitAdvancementPanel(GuiGraphics graphics, ResourceLocation texture, Rect rect) {
+        if (!hasGuiResource(texture)) {
+            renderMissingPanelFallback(graphics, rect, texture);
+            return false;
+        }
+        RenderSystem.enableBlend();
+        drawNineSlicePanel(graphics, texture, rect.x(), rect.y(), rect.width(), rect.height(),
+                ADVANCEMENT_PANEL_TEXTURE_WIDTH, ADVANCEMENT_PANEL_TEXTURE_HEIGHT, ADVANCEMENT_PANEL_TEXTURE_BORDER);
+        RenderSystem.disableBlend();
+        return true;
+    }
+
+    private boolean blitAdvancementFrame(GuiGraphics graphics, ResourceLocation texture, Rect rect) {
+        if (!hasGuiResource(texture)) {
+            renderMissingPanelFallback(graphics, rect, texture);
+            return false;
+        }
+
+        RenderSystem.enableBlend();
+        graphics.blit(texture, rect.x(), rect.y(), 0, 0.0F, 0.0F, rect.width(), rect.height(),
+                ADVANCEMENT_FRAME_TEXTURE_SIZE, ADVANCEMENT_FRAME_TEXTURE_SIZE);
+        RenderSystem.disableBlend();
+        return true;
+    }
+
+    private void drawNineSlicePanel(GuiGraphics graphics, ResourceLocation texture, int x, int y, int width, int height,
+                                    int textureWidth, int textureHeight, int border) {
+        int left = Math.min(border, width / 2);
+        int right = Math.min(border, width / 2);
+        int top = Math.min(border, height / 2);
+        int bottom = Math.min(border, height / 2);
+
+        int centerWidth = Math.max(0, width - left - right);
+        int centerHeight = Math.max(0, height - top - bottom);
+        int sourceCenterWidth = Math.max(0, textureWidth - border * 2);
+        int sourceCenterHeight = Math.max(0, textureHeight - border * 2);
+
+        blitPanelSlice(graphics, texture, x, y, left, top, 0, 0, left, top, textureWidth, textureHeight);
+        blitPanelSlice(graphics, texture, x + width - right, y, right, top, textureWidth - right, 0, right, top, textureWidth, textureHeight);
+        blitPanelSlice(graphics, texture, x, y + height - bottom, left, bottom, 0, textureHeight - bottom, left, bottom, textureWidth, textureHeight);
+        blitPanelSlice(graphics, texture, x + width - right, y + height - bottom, right, bottom,
+                textureWidth - right, textureHeight - bottom, right, bottom, textureWidth, textureHeight);
+
+        if (centerWidth > 0) {
+            blitPanelSlice(graphics, texture, x + left, y, centerWidth, top, border, 0, sourceCenterWidth, top, textureWidth, textureHeight);
+            blitPanelSlice(graphics, texture, x + left, y + height - bottom, centerWidth, bottom,
+                    border, textureHeight - bottom, sourceCenterWidth, bottom, textureWidth, textureHeight);
+        }
+        if (centerHeight > 0) {
+            blitPanelSlice(graphics, texture, x, y + top, left, centerHeight, 0, border, left, sourceCenterHeight, textureWidth, textureHeight);
+            blitPanelSlice(graphics, texture, x + width - right, y + top, right, centerHeight,
+                    textureWidth - right, border, right, sourceCenterHeight, textureWidth, textureHeight);
+        }
+        if (centerWidth > 0 && centerHeight > 0) {
+            blitPanelSlice(graphics, texture, x + left, y + top, centerWidth, centerHeight,
+                    border, border, sourceCenterWidth, sourceCenterHeight, textureWidth, textureHeight);
+        }
+    }
+
+    private void blitPanelSlice(GuiGraphics graphics, ResourceLocation texture, int x, int y, int width, int height,
+                                int u, int v, int uWidth, int vHeight, int textureWidth, int textureHeight) {
+        if (width <= 0 || height <= 0 || uWidth <= 0 || vHeight <= 0) {
+            return;
+        }
+
+        graphics.blit(texture, x, y, width, height, (float) u, (float) v, uWidth, vHeight, textureWidth, textureHeight);
+    }
+
+    private boolean hasGuiResource(ResourceLocation texture) {
+        Minecraft instance = Minecraft.getInstance();
+        Optional<Resource> resource = instance.getResourceManager().getResource(texture);
+        if (resource.isPresent()) {
+            return true;
+        }
+
+        if (missingModalTextures.add(texture)) {
+            FTBQuestsVisualOverhaul.LOGGER.warn("Missing quest modal texture resource: {}", texture);
+        }
+        return false;
+    }
+
+    private void renderMissingPanelFallback(GuiGraphics graphics, Rect rect, ResourceLocation texture) {
+        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0xD4211711);
+        drawInsetBorder(graphics, rect, 0xFF8F6938, 0xCC160F0B);
+        drawCenteredScaledString(graphics, Component.literal("Missing: " + texture), rect.centerX(), rect.centerY() - 3, 0xFFFF8080, 0.45F);
     }
 
     private double clampScroll(double scroll, int contentHeight, int visibleHeight) {
@@ -2038,6 +2204,7 @@ public class OverhaulQuestScreen extends Screen {
     private record DetailLayout(
             Rect rect,
             Rect headerRect,
+            Rect panelRect,
             Rect bodyRect,
             Rect footerRect,
             List<FormattedCharSequence> objectiveLines,
