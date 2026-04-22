@@ -6,7 +6,7 @@
   subtitle: [
     "A dense dependency layout for testing midpoint pipe bends"
   ],
-  group: "",
+  group: "4000000000000003",
   order_index: 25,
   default_quest_shape: "",
   default_hide_dependency_lines: false,

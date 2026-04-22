@@ -6,7 +6,7 @@
   subtitle: [
     "A compact real-mod quest line for UI testing"
   ],
-  group: "",
+  group: "4000000000000001",
   order_index: 0,
   default_quest_shape: "",
   default_hide_dependency_lines: false,
