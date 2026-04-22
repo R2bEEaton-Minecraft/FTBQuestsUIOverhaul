@@ -2,6 +2,7 @@
 .gradle/
 build/
 out/
+bin/
 
 # Java / IDE
 *.class
@@ -34,4 +35,3 @@ run/config/ftbquests/*
 !run/config/ftbquests/quests/**
 
 # If you decide to version more run assets later, add exceptions above.
-
