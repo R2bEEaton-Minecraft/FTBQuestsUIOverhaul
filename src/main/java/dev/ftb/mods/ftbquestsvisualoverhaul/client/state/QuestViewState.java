@@ -14,6 +14,7 @@ public class QuestViewState {
     private double detailScroll;
     private double treePanX;
     private double treePanY;
+    private double treeZoom;
     private boolean freePan;
     private boolean defaultFtbUiMode;
     private LayoutMode layoutMode;
@@ -28,6 +29,7 @@ public class QuestViewState {
         detailScroll = 0D;
         treePanX = 0D;
         treePanY = 0D;
+        treeZoom = 1D;
         freePan = false;
         defaultFtbUiMode = false;
         layoutMode = ModClientConfig.DEFAULT_LAYOUT.get();
@@ -44,6 +46,7 @@ public class QuestViewState {
         copy.detailScroll = detailScroll;
         copy.treePanX = treePanX;
         copy.treePanY = treePanY;
+        copy.treeZoom = treeZoom;
         copy.freePan = freePan;
         copy.defaultFtbUiMode = defaultFtbUiMode;
         copy.layoutMode = layoutMode;
@@ -106,6 +109,14 @@ public class QuestViewState {
 
     public void setTreePanY(double treePanY) {
         this.treePanY = treePanY;
+    }
+
+    public double getTreeZoom() {
+        return treeZoom;
+    }
+
+    public void setTreeZoom(double treeZoom) {
+        this.treeZoom = treeZoom;
     }
 
     public boolean isFreePan() {
