@@ -1,0 +1,156 @@
+{
+	default_hide_dependency_lines: false
+	default_quest_shape: ""
+	filename: "custom_positioning_demo"
+	group: "4000000000000001"
+	icon: "minecraft:compass"
+	id: "1000000000002001"
+	order_index: 2
+	quest_links: [ ]
+	quests: [
+		{
+			description: [
+				"This chapter is intentionally laid out with uneven spacing, negative coordinates, and half-step offsets."
+				"Use it to verify that the overhaul preserves the authored quest pattern instead of normalizing the gaps."
+			]
+			icon: "minecraft:lodestone"
+			id: "1000000000002101"
+			rewards: [{
+				count: 4
+				id: "1000000000002301"
+				item: "minecraft:paper"
+				type: "item"
+			}]
+			subtitle: "Start point"
+			tasks: [{
+				id: "1000000000002201"
+				type: "checkmark"
+			}]
+			title: "Anchor"
+			x: -12.0d
+			y: 0.0d
+		}
+		{
+			dependencies: ["1000000000002101"]
+			description: ["This branch sits above and to the right of the anchor with a non-integer offset."]
+			icon: "minecraft:feather"
+			id: "1000000000002102"
+			rewards: [{
+				count: 3
+				id: "1000000000002302"
+				item: "minecraft:feather"
+				type: "item"
+			}]
+			subtitle: "Upper offset"
+			tasks: [{
+				id: "1000000000002202"
+				type: "checkmark"
+			}]
+			title: "High Branch"
+			x: -6.0d
+			y: -4.5d
+		}
+		{
+			dependencies: ["1000000000002101"]
+			description: ["This branch uses a different horizontal gap from the high branch to test relative spacing."]
+			icon: "minecraft:redstone"
+			id: "1000000000002103"
+			rewards: [{
+				count: 6
+				id: "1000000000002303"
+				item: "minecraft:redstone"
+				type: "item"
+			}]
+			subtitle: "Lower offset"
+			tasks: [{
+				id: "1000000000002203"
+				type: "checkmark"
+			}]
+			title: "Low Branch"
+			x: -2.5d
+			y: 3.0d
+		}
+		{
+			dependencies: [
+				"1000000000002102"
+				"1000000000002103"
+			]
+			description: ["This merge quest should land between the two branches without snapping them into a uniform grid."]
+			icon: "minecraft:clock"
+			id: "1000000000002104"
+			rewards: [{
+				id: "1000000000002304"
+				item: "minecraft:clock"
+				type: "item"
+			}]
+			subtitle: "Center knot"
+			tasks: [{
+				id: "1000000000002204"
+				type: "checkmark"
+			}]
+			title: "Merge"
+			x: 2.5d
+			y: -1.5d
+		}
+		{
+			dependencies: ["1000000000002104"]
+			description: ["A long jump upward to make the custom shape obvious."]
+			icon: "minecraft:spyglass"
+			id: "1000000000002105"
+			rewards: [{
+				id: "1000000000002305"
+				item: "minecraft:spyglass"
+				type: "item"
+			}]
+			subtitle: "Long upper reach"
+			tasks: [{
+				id: "1000000000002205"
+				type: "checkmark"
+			}]
+			title: "Far Up"
+			x: 8.5d
+			y: -7.0d
+		}
+		{
+			dependencies: ["1000000000002104"]
+			description: ["This middle continuation is intentionally not aligned with the upper or lower branch."]
+			icon: "minecraft:map"
+			id: "1000000000002106"
+			rewards: [{
+				id: "1000000000002306"
+				item: "minecraft:filled_map"
+				type: "item"
+			}]
+			subtitle: "Straight continuation"
+			tasks: [{
+				id: "1000000000002206"
+				type: "checkmark"
+			}]
+			title: "Far Mid"
+			x: 10.0d
+			y: -1.0d
+		}
+		{
+			dependencies: ["1000000000002104"]
+			description: ["A lower continuation with a different spacing again, to verify the authored pattern holds."]
+			icon: "minecraft:amethyst_shard"
+			id: "1000000000002107"
+			rewards: [{
+				count: 4
+				id: "1000000000002307"
+				item: "minecraft:amethyst_shard"
+				type: "item"
+			}]
+			subtitle: "Long lower reach"
+			tasks: [{
+				id: "1000000000002207"
+				type: "checkmark"
+			}]
+			title: "Far Down"
+			x: 7.0d
+			y: 5.5d
+		}
+	]
+	subtitle: ["Uneven coordinates for testing authored quest layouts"]
+	title: "Custom Positioning Demo"
+}

@@ -1,0 +1,679 @@
+{
+	default_hide_dependency_lines: false
+	default_quest_shape: ""
+	filename: "dragonfyre_age_of_dragons_layout"
+	group: "4000000000000001"
+	icon: "minecraft:dragon_head"
+	id: "1000000000003001"
+	order_index: 3
+	quest_links: [ ]
+	quests: [
+		{
+			dependencies: ["0D904A47C1EDA7DE"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:compass"
+			id: "4B4BF1FF89C31ACA"
+			rewards: [{
+				id: "1000000000003301"
+				item: "minecraft:paper"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003201"
+				type: "checkmark"
+			}]
+			title: "Prudent Preparation"
+			x: -30.0d
+			y: -1.5d
+		}
+		{
+			dependencies: ["4B4BF1FF89C31ACA"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:map"
+			id: "2FB1578EBE95B902"
+			rewards: [{
+				id: "1000000000003302"
+				item: "minecraft:bread"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003202"
+				type: "checkmark"
+			}]
+			title: "Studious and Strong"
+			x: -27.0d
+			y: -1.5d
+		}
+		{
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:clock"
+			id: "57F0E543419B8D21"
+			rewards: [{
+				id: "1000000000003303"
+				item: "minecraft:torch"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003203"
+				type: "checkmark"
+			}]
+			title: "Shining Silver"
+			x: -34.5d
+			y: 4.5d
+		}
+		{
+			dependencies: ["42821297260C128F"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:spyglass"
+			id: "7799076A92B03CA8"
+			rewards: [{
+				id: "1000000000003304"
+				item: "minecraft:iron_nugget"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003204"
+				type: "checkmark"
+			}]
+			title: "Summoning Winter"
+			x: -13.5d
+			y: -1.5d
+		}
+		{
+			dependencies: ["32E7D93BB699594E"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:feather"
+			id: "4E213C9D6719A0E0"
+			rewards: [{
+				id: "1000000000003305"
+				item: "minecraft:feather"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003205"
+				type: "checkmark"
+			}]
+			title: "Summoning Thunder"
+			x: -13.5d
+			y: 1.5d
+		}
+		{
+			dependencies: ["2FB1578EBE95B902"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:amethyst_shard"
+			id: "49B6952745916F6A"
+			rewards: [{
+				id: "1000000000003306"
+				item: "minecraft:redstone"
+				type: "item"
+			}]
+			subtitle: "Pixie Pals"
+			tasks: [{
+				id: "1000000000003206"
+				type: "checkmark"
+			}]
+			title: "Befriend a pixie"
+			x: -27.0d
+			y: 7.5d
+		}
+		{
+			dependencies: ["2FB1578EBE95B902"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:diamond"
+			id: "42115CD2D6BECADC"
+			rewards: [{
+				id: "1000000000003307"
+				item: "minecraft:gold_nugget"
+				type: "item"
+			}]
+			subtitle: "Hiring Hippocampi"
+			tasks: [{
+				id: "1000000000003207"
+				type: "checkmark"
+			}]
+			title: "Tame a Hippocampus"
+			x: -30.0d
+			y: 7.5d
+		}
+		{
+			dependencies: ["2FB1578EBE95B902"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:emerald"
+			id: "1A46CB18C1EBA3CC"
+			rewards: [{
+				id: "1000000000003308"
+				item: "minecraft:book"
+				type: "item"
+			}]
+			subtitle: "Hippogryph come Home"
+			tasks: [{
+				id: "1000000000003208"
+				type: "checkmark"
+			}]
+			title: "Tame a Hippogryth"
+			x: -24.0d
+			y: 7.5d
+		}
+		{
+			dependencies: [
+				"7799076A92B03CA8"
+				"6B949CDB464620FC"
+				"4E213C9D6719A0E0"
+			]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:redstone"
+			id: "08F7CB6DC5642787"
+			rewards: [{
+				id: "1000000000003309"
+				item: "minecraft:string"
+				type: "item"
+			}]
+			subtitle: "Gravemaster's Key"
+			tasks: [{
+				id: "1000000000003209"
+				type: "checkmark"
+			}]
+			title: "Kill a Dread Lich"
+			x: -10.5d
+			y: -1.5d
+		}
+		{
+			dependencies: ["08F7CB6DC5642787"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:gold_ingot"
+			id: "739E8ACF6D6CB5F2"
+			rewards: [{
+				id: "1000000000003310"
+				item: "minecraft:arrow"
+				type: "item"
+			}]
+			subtitle: "The Dark Fortress"
+			tasks: [{
+				id: "1000000000003210"
+				type: "checkmark"
+			}]
+			title: "Find the Mausoleum"
+			x: -7.5d
+			y: -1.5d
+		}
+		{
+			dependencies: ["2FB1578EBE95B902"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:iron_ingot"
+			id: "3581698345B96E17"
+			rewards: [{
+				id: "1000000000003311"
+				item: "minecraft:paper"
+				type: "item"
+			}]
+			subtitle: "Wrath of the Inferno"
+			tasks: [{
+				id: "1000000000003211"
+				type: "checkmark"
+			}]
+			title: "Slay Fire Dragons"
+			x: -22.5d
+			y: -4.5d
+		}
+		{
+			dependencies: ["2FB1578EBE95B902"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:book"
+			id: "5FDFC696623E2BDA"
+			rewards: [{
+				id: "1000000000003312"
+				item: "minecraft:bread"
+				type: "item"
+			}]
+			subtitle: "Wrath of Thunder"
+			tasks: [{
+				id: "1000000000003212"
+				type: "checkmark"
+			}]
+			title: "Slay Lightning Dragons"
+			x: -22.5d
+			y: 1.5d
+		}
+		{
+			dependencies: ["2FB1578EBE95B902"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:paper"
+			id: "76EA98DB3C884C58"
+			rewards: [{
+				id: "1000000000003313"
+				item: "minecraft:torch"
+				type: "item"
+			}]
+			subtitle: "Wrath of Winter"
+			tasks: [{
+				id: "1000000000003213"
+				type: "checkmark"
+			}]
+			title: "Slay Ice Dragons"
+			x: -22.5d
+			y: -1.5d
+		}
+		{
+			dependencies: ["50D03004776882CB"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: {
+				Count: 1
+				id: "minecraft:shield"
+				tag: {
+					Damage: 0
+				}
+			}
+			id: "6B949CDB464620FC"
+			rewards: [{
+				id: "1000000000003314"
+				item: "minecraft:iron_nugget"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003214"
+				type: "checkmark"
+			}]
+			title: "Summoning Flame"
+			x: -13.5d
+			y: -4.5d
+		}
+		{
+			dependencies: ["2FB1578EBE95B902"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: {
+				Count: 1
+				id: "minecraft:bow"
+				tag: {
+					Damage: 0
+				}
+			}
+			id: "415040716E8B4EDB"
+			rewards: [{
+				id: "1000000000003315"
+				item: "minecraft:feather"
+				type: "item"
+			}]
+			subtitle: "Crucifying the Cyclops"
+			tasks: [{
+				id: "1000000000003215"
+				type: "checkmark"
+			}]
+			title: "The Cyclops"
+			x: -30.0d
+			y: -9.0d
+		}
+		{
+			dependencies: ["2FB1578EBE95B902"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:ender_pearl"
+			id: "17CCA12D76F9F396"
+			rewards: [{
+				id: "1000000000003316"
+				item: "minecraft:redstone"
+				type: "item"
+			}]
+			subtitle: "Meddling with Medusa"
+			tasks: [{
+				id: "1000000000003216"
+				type: "checkmark"
+			}]
+			title: "The Gorgon"
+			x: -27.0d
+			y: -9.0d
+		}
+		{
+			dependencies: ["2FB1578EBE95B902"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:echo_shard"
+			id: "0116C409C773F4A2"
+			rewards: [{
+				id: "1000000000003317"
+				item: "minecraft:gold_nugget"
+				type: "item"
+			}]
+			subtitle: "Heads and Horrors"
+			tasks: [{
+				id: "1000000000003217"
+				type: "checkmark"
+			}]
+			title: "The Hydra"
+			x: -24.0d
+			y: -9.0d
+		}
+		{
+			dependencies: [
+				"76EA98DB3C884C58"
+				"3581698345B96E17"
+				"5FDFC696623E2BDA"
+			]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:heart_of_the_sea"
+			id: "2B2CFA2D079B5332"
+			rewards: [{
+				id: "1000000000003318"
+				item: "minecraft:book"
+				type: "item"
+			}]
+			subtitle: "Mother of Dragons"
+			tasks: [{
+				id: "1000000000003218"
+				type: "checkmark"
+			}]
+			title: "Tame a Dragon"
+			x: -19.5d
+			y: -1.5d
+		}
+		{
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:nautilus_shell"
+			id: "674BA70002F3196E"
+			rewards: [{
+				id: "1000000000003319"
+				item: "minecraft:string"
+				type: "item"
+			}]
+			subtitle: "End of An Era"
+			tasks: [{
+				id: "1000000000003219"
+				type: "checkmark"
+			}]
+			title: "Fallen Heroes"
+			x: -42.0d
+			y: -2.0d
+		}
+		{
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:blaze_rod"
+			id: "292408BF95DC3F81"
+			rewards: [{
+				id: "1000000000003320"
+				item: "minecraft:arrow"
+				type: "item"
+			}]
+			subtitle: "Sovereign Sleeps"
+			tasks: [{
+				id: "1000000000003220"
+				type: "checkmark"
+			}]
+			title: "Alexander"
+			x: -38.0d
+			y: -2.0d
+		}
+		{
+			dependencies: ["292408BF95DC3F81"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:compass"
+			id: "0D904A47C1EDA7DE"
+			rewards: [{
+				id: "1000000000003321"
+				item: "minecraft:paper"
+				type: "item"
+			}]
+			subtitle: "Age of Dragons"
+			tasks: [{
+				id: "1000000000003221"
+				type: "checkmark"
+			}]
+			title: "Draconic Era"
+			x: -34.0d
+			y: -2.0d
+		}
+		{
+			dependencies: ["2B2CFA2D079B5332"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:map"
+			id: "32E7D93BB699594E"
+			rewards: [{
+				id: "1000000000003322"
+				item: "minecraft:bread"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003222"
+				type: "checkmark"
+			}]
+			title: "Seeking Thunder"
+			x: -16.5d
+			y: 1.5d
+		}
+		{
+			dependencies: ["2B2CFA2D079B5332"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:clock"
+			id: "50D03004776882CB"
+			rewards: [{
+				id: "1000000000003323"
+				item: "minecraft:torch"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003223"
+				type: "checkmark"
+			}]
+			title: "Seeking Flame"
+			x: -16.5d
+			y: -4.5d
+		}
+		{
+			dependencies: ["2B2CFA2D079B5332"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:spyglass"
+			id: "42821297260C128F"
+			rewards: [{
+				id: "1000000000003324"
+				item: "minecraft:iron_nugget"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003224"
+				type: "checkmark"
+			}]
+			title: "Seeking Winter"
+			x: -16.5d
+			y: -1.5d
+		}
+		{
+			dependencies: ["2B2CFA2D079B5332"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:feather"
+			id: "630C84A0FD01DD37"
+			rewards: [{
+				id: "1000000000003325"
+				item: "minecraft:feather"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003225"
+				type: "checkmark"
+			}]
+			title: "Dohaeras !"
+			x: -19.5d
+			y: 4.5d
+		}
+		{
+			dependencies: ["739E8ACF6D6CB5F2"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:amethyst_shard"
+			id: "65747B80333E3613"
+			rewards: [{
+				id: "1000000000003326"
+				item: "minecraft:redstone"
+				type: "item"
+			}]
+			subtitle: "Forged in Flame"
+			tasks: [{
+				id: "1000000000003226"
+				type: "checkmark"
+			}]
+			title: "Craft Dragonsteel"
+			x: -4.5d
+			y: -1.5d
+		}
+		{
+			dependencies: ["65747B80333E3613"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:diamond"
+			id: "2E78225F6244BF7A"
+			rewards: [{
+				id: "1000000000003327"
+				item: "minecraft:gold_nugget"
+				type: "item"
+			}]
+			subtitle: "Dreadforged Steel"
+			tasks: [{
+				id: "1000000000003227"
+				type: "checkmark"
+			}]
+			title: "Craft dreadsteel"
+			x: -1.5d
+			y: -1.5d
+		}
+		{
+			dependencies: ["2E78225F6244BF7A"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:emerald"
+			id: "5129A01A2DC55BB4"
+			rewards: [{
+				id: "1000000000003328"
+				item: "minecraft:book"
+				type: "item"
+			}]
+			subtitle: "Dreadknight"
+			tasks: [{
+				id: "1000000000003228"
+				type: "checkmark"
+			}]
+			title: "Craft Dreadsteel Armor"
+			x: 1.5d
+			y: -1.5d
+		}
+		{
+			dependencies: ["2E78225F6244BF7A"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:redstone"
+			id: "031859030D60C602"
+			rewards: [{
+				id: "1000000000003329"
+				item: "minecraft:string"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003229"
+				type: "checkmark"
+			}]
+			title: "Dreadforged Scythe"
+			x: -1.5d
+			y: -4.5d
+		}
+		{
+			dependencies: ["2E78225F6244BF7A"]
+			description: [
+				"Converted from Cisco's Legacy Dragonfyre."
+				"This local test chapter preserves the original quest coordinates and dependency layout while using vanilla-safe content."
+			]
+			icon: "minecraft:gold_ingot"
+			id: "635DD0DAC9CF17D5"
+			rewards: [{
+				id: "1000000000003330"
+				item: "minecraft:arrow"
+				type: "item"
+			}]
+			tasks: [{
+				id: "1000000000003230"
+				type: "checkmark"
+			}]
+			title: "Dreadforged Shield"
+			x: -1.5d
+			y: 2.0d
+		}
+	]
+	subtitle: ["Real quest coordinates and dependencies converted to vanilla-safe test content"]
+	title: "Dragonfyre Layout: Age of Dragons"
+}

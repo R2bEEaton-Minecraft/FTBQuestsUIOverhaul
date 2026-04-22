@@ -111,12 +111,11 @@ public class OverhaulQuestScreen extends Screen {
     private static final int ADVANCEMENT_PANEL_TEXTURE_BORDER = 10;
     private static final int ADVANCEMENT_FRAME_TEXTURE_SIZE = 26;
 
-    // --- Node spacing (based on AdvancementWidget, with wider horizontal gaps) ---
-    // Vanilla uses displayX * 28 and displayY * 27, where displayX/Y are 0,1,2,...
-    // FTB quest coordinates use a different scale, so we normalize to vanilla units
-    // first (via xStepSize/yStepSize) before multiplying by these constants.
-    private static final int NODE_SPACING_X = 42;
-    private static final int NODE_SPACING_Y = 27;
+    // --- Node positioning ---
+    // FTB Quests stores authored quest positions directly in chapter data.
+    // Use one shared scale for both axes so custom layouts keep their original
+    // proportions instead of being distorted by per-axis normalization.
+    private static final double NODE_POSITION_SCALE = 14.0D;
     private static final int WIDGET_WIDTH = 26;
     private static final int WIDGET_HEIGHT = 26;
     private static final int WIDGET_ICON_X = 8;
@@ -125,6 +124,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final int QUEST_TILE_SHADOW_OFFSET = 2;
     private static final int QUEST_TILE_SHADOW_COLOR = 0x26000000;
     private static final int QUEST_TILE_SHADOW_EDGE_COLOR = 0x33000000;
+    private static final int TREE_PAN_BOUND_PADDING = 12;
 
     // --- Vanilla advancement tab dimensions (from AdvancementTabType.ABOVE) ---
     private static final int TAB_WIDTH = 28;
@@ -155,11 +155,20 @@ public class OverhaulQuestScreen extends Screen {
     private static final int MODAL_BUTTON_WIDTH = 86;
     private static final int MODAL_BUTTON_GAP = 26;
     private static final float MODAL_TEXT_SCALE = 0.8F;
+    private static final float MODAL_SECTION_LABEL_SCALE = 0.65F;
+    private static final float MODAL_SECTION_NOTE_SCALE = 0.58F;
+    private static final int MODAL_SECTION_ITEM_GAP = 4;
+    private static final int MODAL_SECTION_GROUP_GAP = 12;
+    private static final int MODAL_SECTION_ICON_SIZE = 16;
+    private static final int MODAL_SECTION_ICON_GAP_X = 2;
+    private static final int MODAL_SECTION_ICON_GAP_Y = 4;
+    private static final int MODAL_SECTION_MAX_COLUMNS = 4;
 
     private final QuestOpenContext openContext;
     private final QuestActionRouter actionRouter = new QuestActionRouter();
     private final QuestViewState viewState;
     private final List<ClickTarget> clickTargets = new ArrayList<>();
+    private final List<TooltipTarget> modalTooltipTargets = new ArrayList<>();
     private final Set<Long> collapsedChapterGroups = new HashSet<>();
     private final Set<ResourceLocation> missingModalTextures = new HashSet<>();
 
@@ -179,11 +188,6 @@ public class OverhaulQuestScreen extends Screen {
     private int minNodeY = Integer.MAX_VALUE;
     private int maxNodeX = Integer.MIN_VALUE;
     private int maxNodeY = Integer.MIN_VALUE;
-
-    // Normalized step sizes: minimum non-zero gap between quest positions,
-    // so we scale FTB coords to vanilla's 0,1,2,... units before multiplying by 28/27.
-    private double xStepSize = 1.0;
-    private double yStepSize = 1.0;
 
     public OverhaulQuestScreen(QuestOpenContext openContext) {
         super(Component.literal("Quests"));
@@ -355,12 +359,8 @@ public class OverhaulQuestScreen extends Screen {
             viewState.setTreePanY(viewState.getTreePanY() + deltaY);
             return;
         }
-        if (maxNodeX - minNodeX > TREE_WIDTH) {
-            viewState.setTreePanX(Mth.clamp(viewState.getTreePanX() + deltaX, -(maxNodeX - TREE_WIDTH), 0.0D));
-        }
-        if (maxNodeY - minNodeY > TREE_HEIGHT) {
-            viewState.setTreePanY(Mth.clamp(viewState.getTreePanY() + deltaY, -(maxNodeY - TREE_HEIGHT), 0.0D));
-        }
+        viewState.setTreePanX(clampTreePanAxis(viewState.getTreePanX() + deltaX, minNodeX, maxNodeX, TREE_WIDTH));
+        viewState.setTreePanY(clampTreePanAxis(viewState.getTreePanY() + deltaY, minNodeY, maxNodeY, TREE_HEIGHT));
     }
 
     // ---- Rendering ----
@@ -381,6 +381,7 @@ public class OverhaulQuestScreen extends Screen {
         hoveredQuest = null;
         visibleQuestNodes.clear();
         clickTargets.clear();
+        modalTooltipTargets.clear();
 
         Rect frame = frameRect();
         int treeLeft = frame.x() + TREE_X;
@@ -410,7 +411,9 @@ public class OverhaulQuestScreen extends Screen {
         if (renderDetailModal && selectedQuest != null) {
             hoveredQuest = null;
             clickTargets.clear();
+            modalTooltipTargets.clear();
             renderQuestDetailModal(graphics, selectedQuest, mouseX, mouseY);
+            renderModalTooltips(graphics, mouseX, mouseY);
         }
 
         if (selectedQuest == null && renderDefaultButton && shouldShowDefaultViewButton()) {
@@ -445,6 +448,9 @@ public class OverhaulQuestScreen extends Screen {
             viewState.setTreePanX((TREE_WIDTH / 2.0) - (maxNodeX + minNodeX) / 2.0);
             viewState.setTreePanY((TREE_HEIGHT / 2.0) - (maxNodeY + minNodeY) / 2.0);
             centered = true;
+        }
+        if (!viewState.isFreePan()) {
+            clampTreePanToQuestBounds();
         }
 
         // Scissor to tree panel area (matching AdvancementTab.drawContents)
@@ -768,22 +774,20 @@ public class OverhaulQuestScreen extends Screen {
     // ---- Node position calculations (matching AdvancementWidget) ----
 
     /**
-     * Converts a quest's raw FTB x coordinate to a pixel position.
-     * Normalizes by xStepSize so the minimum inter-node gap matches vanilla's
-     * 0→1→2 integer unit scale, then multiplies by NODE_SPACING_X.
+     * Converts the quest's authored FTB center position into a widget top-left.
+     * FTB Quests stores coordinates as center positions in chapter space.
      */
     private int getNodeX(QuestDataSnapshot.QuestSnapshot quest) {
-        return Mth.floor((quest.x() / xStepSize) * NODE_SPACING_X);
+        return Mth.floor(quest.x() * NODE_POSITION_SCALE - WIDGET_WIDTH / 2F);
     }
 
     private int getNodeY(QuestDataSnapshot.QuestSnapshot quest) {
-        return Mth.floor((quest.y() / yStepSize) * NODE_SPACING_Y);
+        return Mth.floor(quest.y() * NODE_POSITION_SCALE - WIDGET_HEIGHT / 2F);
     }
 
     /**
      * Compute min/max node bounds (matching AdvancementTab.addWidget bounds tracking)
-     * and derive xStepSize/yStepSize by finding the minimum non-zero gap between
-     * quest coordinates. This normalizes FTB's coordinate scale to vanilla units.
+     * from the authored quest positions after mapping them into widget space.
      */
     private void computeNodeBounds(List<QuestDataSnapshot.QuestSnapshot> quests) {
         minNodeX = Integer.MAX_VALUE;
@@ -791,34 +795,32 @@ public class OverhaulQuestScreen extends Screen {
         maxNodeX = Integer.MIN_VALUE;
         maxNodeY = Integer.MIN_VALUE;
 
-        // Derive step sizes from the data before computing pixel positions
-        xStepSize = computeStepSize(quests.stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::x).sorted().distinct().toArray());
-        yStepSize = computeStepSize(quests.stream().mapToDouble(QuestDataSnapshot.QuestSnapshot::y).sorted().distinct().toArray());
-
         for (QuestDataSnapshot.QuestSnapshot quest : quests) {
             int x = getNodeX(quest);
             int y = getNodeY(quest);
             minNodeX = Math.min(minNodeX, x);
-            maxNodeX = Math.max(maxNodeX, x + NODE_SPACING_X);
+            maxNodeX = Math.max(maxNodeX, x + WIDGET_WIDTH);
             minNodeY = Math.min(minNodeY, y);
-            maxNodeY = Math.max(maxNodeY, y + NODE_SPACING_Y);
+            maxNodeY = Math.max(maxNodeY, y + WIDGET_HEIGHT);
         }
     }
 
-    /**
-     * Finds the minimum non-zero absolute difference between consecutive values
-     * in a sorted array. Returns 1.0 if there are fewer than 2 distinct values.
-     */
-    private static double computeStepSize(double[] sortedValues) {
-        if (sortedValues.length < 2) return 1.0;
-        double minStep = Double.MAX_VALUE;
-        for (int i = 1; i < sortedValues.length; i++) {
-            double gap = sortedValues[i] - sortedValues[i - 1];
-            if (gap > 1e-6) {
-                minStep = Math.min(minStep, gap);
-            }
+    private void clampTreePanToQuestBounds() {
+        viewState.setTreePanX(clampTreePanAxis(viewState.getTreePanX(), minNodeX, maxNodeX, TREE_WIDTH));
+        viewState.setTreePanY(clampTreePanAxis(viewState.getTreePanY(), minNodeY, maxNodeY, TREE_HEIGHT));
+    }
+
+    private static double clampTreePanAxis(double pan, int minNode, int maxNode, int viewportSize) {
+        minNode -= TREE_PAN_BOUND_PADDING;
+        maxNode += TREE_PAN_BOUND_PADDING;
+        int contentSize = maxNode - minNode;
+        if (contentSize <= viewportSize) {
+            return (viewportSize - contentSize) / 2.0 - minNode;
         }
-        return minStep == Double.MAX_VALUE ? 1.0 : minStep;
+
+        double minPan = viewportSize - maxNode;
+        double maxPan = -minNode;
+        return Mth.clamp(pan, minPan, maxPan);
     }
 
     // ---- Connection line drawing ----
@@ -967,7 +969,7 @@ public class OverhaulQuestScreen extends Screen {
         int size = (int) (WIDGET_WIDTH / 8F * 3F);
         float scale = size / 16F;
         graphics.pose().pushPose();
-        graphics.pose().translate(nodeX + WIDGET_ICON_X + WIDGET_ICON_SIZE - size, nodeY + WIDGET_ICON_Y, 0.0F);
+        graphics.pose().translate(nodeX + WIDGET_ICON_X + WIDGET_ICON_SIZE - size + 6, nodeY + WIDGET_ICON_Y - 9, 0.0F);
         graphics.pose().scale(scale, scale, 1.0F);
         graphics.blit(FTB_QUEST_LOCKED_TEXTURE, 0, 0, 0.0F, 0.0F, 16, 16, 16, 16);
         graphics.pose().popPose();
@@ -1038,9 +1040,9 @@ public class OverhaulQuestScreen extends Screen {
 
         if (widgetState == 2) {
             splitJ = tooltipWidth / 2;
-            obtainedIdx = 2; // LOCKED
-            unobtainedIdx = 2; // LOCKED
-            frameIdx = 2; // LOCKED
+            obtainedIdx = 1; // UNOBTAINED
+            unobtainedIdx = 1; // UNOBTAINED
+            frameIdx = 1; // UNOBTAINED
         } else if (percent >= 1.0F) {
             splitJ = tooltipWidth / 2;
             obtainedIdx = 0; // OBTAINED
@@ -1288,33 +1290,16 @@ public class OverhaulQuestScreen extends Screen {
         drawSectionDivider(graphics, body.x() + MODAL_SECTION_DIVIDER_INSET, body.width() - MODAL_SECTION_DIVIDER_INSET * 2, contentY);
         contentY += 10;
 
-        int columnGap = 8;
-        int columnWidth = (body.width() - columnGap) / 2;
-        int leftX = body.x();
-        int rightX = body.x() + columnWidth + columnGap;
-        int columnStartY = contentY;
-
         List<QuestDataSnapshot.TaskSnapshot> visibleTasks = visibleRequirementTasks(quest);
-        int requirementsY = renderSectionLabel(graphics, "Requirements", leftX, columnStartY, columnWidth);
-        if (visibleTasks.isEmpty()) {
-            drawCenteredScaledString(graphics, Component.literal("No explicit requirements"), leftX + columnWidth / 2, requirementsY, 0xFFC8B08C, MODAL_TEXT_SCALE);
-            requirementsY += 10;
-        } else {
-            for (QuestDataSnapshot.TaskSnapshot task : visibleTasks) {
-                requirementsY = renderTaskSummaryRow(graphics, leftX, columnWidth, task, requirementsY);
-            }
-        }
-
-        int rewardsY = renderSectionLabel(graphics, "Rewards", rightX, columnStartY, columnWidth);
-        if (quest.rewards().isEmpty()) {
-            drawCenteredScaledString(graphics, Component.literal("No reward configured"), rightX + columnWidth / 2, rewardsY, 0xFFC8B08C, MODAL_TEXT_SCALE);
-            rewardsY += 10;
-        } else {
-            for (QuestDataSnapshot.RewardSnapshot reward : quest.rewards()) {
-                rewardsY = renderRewardSummaryRow(graphics, rightX, columnWidth, reward, rewardsY);
-            }
-        }
-        contentY = Math.max(requirementsY, rewardsY);
+        SectionPairLayout sections = layout.sectionLayout();
+        int sectionsX = body.x() + Math.max(0, (body.width() - sections.width()) / 2);
+        int requirementsBottom = renderTaskSection(graphics, sectionsX, contentY, sections.requirements(), visibleTasks);
+        int rewardsBottom = renderRewardSection(graphics,
+                sectionsX + sections.requirements().width() + sections.gap(),
+                contentY,
+                sections.rewards(),
+                quest.rewards());
+        contentY = Math.max(requirementsBottom, rewardsBottom);
         graphics.disableScissor();
 
         if (layout.contentHeight() > body.height()) {
@@ -1379,69 +1364,86 @@ public class OverhaulQuestScreen extends Screen {
         return minecraft == null || minecraft.gameMode == null || minecraft.gameMode.getPlayerMode() != GameType.SURVIVAL;
     }
 
-    private int renderSectionLabel(GuiGraphics graphics, String label, int x, int y, int width) {
-        drawCenteredScaledString(graphics, Component.literal(label + ":"), x + width / 2, y, 0xFFF6ECD6, MODAL_TEXT_SCALE);
-        return y + 10;
-    }
-
-    private int renderTaskSummaryRow(GuiGraphics graphics, int x, int width, QuestDataSnapshot.TaskSnapshot task, int y) {
-        Rect rect = new Rect(x, y, width, 22);
-        Rect iconRect = new Rect(rect.x() + width / 2 - 8, rect.y() + 1, 16, 16);
-        boolean consumableTurnIn = task.consumesResources() && task.interactionMode() == TaskInteractionMode.SUBMIT;
-        Rect actionRect = consumableTurnIn ? new Rect(rect.centerX() - 17, rect.maxY() - 12, 34, 12) : null;
-
-        task.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
-        if (task.completed()) {
-            renderSmallCheck(graphics, iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y());
+    private int renderTaskSection(GuiGraphics graphics, int x, int y, IconSectionLayout sectionLayout, List<QuestDataSnapshot.TaskSnapshot> tasks) {
+        drawSectionHeading(graphics, sectionLayout.label(), x, y);
+        int contentX = x + sectionLayout.labelWidth() + MODAL_SECTION_ITEM_GAP;
+        if (tasks.isEmpty()) {
+            drawScaledString(graphics, Component.literal(sectionLayout.emptyText()), contentX, y + 4, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
+            return y + sectionLayout.height();
         }
-        if (consumableTurnIn) {
-            if (task.canInteract()) {
+
+        for (int i = 0; i < tasks.size(); i++) {
+            QuestDataSnapshot.TaskSnapshot task = tasks.get(i);
+            int col = i % sectionLayout.columns();
+            int row = i / sectionLayout.columns();
+            int iconX = contentX + col * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_X);
+            int iconY = y + row * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_Y);
+            Rect iconRect = new Rect(iconX, iconY, MODAL_SECTION_ICON_SIZE, MODAL_SECTION_ICON_SIZE);
+
+            renderSectionIconSlot(graphics, iconRect, task.canInteract() || task.completed());
+            task.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
+            if (task.completed()) {
+                renderSmallCheck(graphics, iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y());
+            } else if (task.canInteract() && task.interactionMode() == TaskInteractionMode.SUBMIT) {
                 renderRequirementMarker(graphics, iconRect, true);
             }
-            renderConsumableActionButton(graphics, actionRect, task.canInteract());
-        }
-        drawCenteredScaledString(graphics, task.progressText(), rect.centerX(), rect.y() + 16,
-                task.completed() ? 0xFF75D65C : 0xFFD9BE96, 0.65F);
 
-        String state = switch (task.interactionMode()) {
-            case SUBMIT -> consumableTurnIn && task.canInteract() ? "Turn in" : task.canInteract() ? "Ready" : task.completed() ? "Done" : "Locked";
-            case VANILLA_FALLBACK -> "Vanilla";
-            case READ_ONLY -> task.completed() ? "Done" : "Track";
-        };
-        if (consumableTurnIn) {
-            if (task.canInteract()) {
-                clickTargets.add(new ClickTarget(actionRect, () -> {
-                    Task liveTask = resolveTask(task.id());
-                    if (liveTask != null) {
-                        actionRouter.submitTask(liveTask);
-                    }
-                }));
+            if (task.canInteract() && task.interactionMode() == TaskInteractionMode.SUBMIT) {
+                clickTargets.add(new ClickTarget(expand(iconRect, 1), () -> submitTask(task)));
+            } else if (task.canInteract() && task.interactionMode() == TaskInteractionMode.VANILLA_FALLBACK) {
+                clickTargets.add(new ClickTarget(expand(iconRect, 1), this::openVanillaSelected));
             }
-        } else {
-            drawCenteredScaledString(graphics, Component.literal(state), rect.centerX(), rect.y() + 25,
-                    task.completed() ? 0xFF75D65C : 0xFFC8A97C, 0.58F);
+
+            modalTooltipTargets.add(new TooltipTarget(expand(iconRect, 1), buildTaskTooltip(task)));
         }
-        return y + (consumableTurnIn ? 38 : 34);
+
+        return y + sectionLayout.height();
     }
 
-    private int renderRewardSummaryRow(GuiGraphics graphics, int x, int width, QuestDataSnapshot.RewardSnapshot rewardSnapshot, int y) {
-        Rect rect = new Rect(x, y, width, 34);
-        Rect iconRect = new Rect(rect.x() + width / 2 - 8, rect.y() + 1, 16, 16);
-
-        rewardSnapshot.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
-        if (rewardSnapshot.claimed()) {
-            renderSmallCheck(graphics, iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y());
+    private int renderRewardSection(GuiGraphics graphics, int x, int y, IconSectionLayout sectionLayout, List<QuestDataSnapshot.RewardSnapshot> rewards) {
+        drawSectionHeading(graphics, sectionLayout.label(), x, y);
+        int contentX = x + sectionLayout.labelWidth() + MODAL_SECTION_ITEM_GAP;
+        if (rewards.isEmpty()) {
+            drawScaledString(graphics, Component.literal(sectionLayout.emptyText()), contentX, y + 4, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
+            return y + sectionLayout.height();
         }
 
-        int statusColor = rewardSnapshot.canClaim() ? 0xFF7DE25E : rewardSnapshot.claimed() ? 0xFFB6B6B6 : 0xFFD5B58C;
-        String state = switch (rewardSnapshot.interactionMode()) {
-            case CLAIM -> rewardSnapshot.canClaim() ? "Claim" : rewardSnapshot.claimed() ? "Claimed" : "Locked";
-            case CHOICE -> rewardSnapshot.canClaim() ? "Choose" : rewardSnapshot.claimed() ? "Claimed" : "Locked";
-            case VANILLA_FALLBACK -> rewardSnapshot.canClaim() ? "Vanilla" : "Locked";
-        };
-        drawCenteredScaledString(graphics, rewardSnapshot.statusText(), rect.centerX(), rect.y() + 16, statusColor, 0.65F);
-        drawCenteredScaledString(graphics, Component.literal(state), rect.centerX(), rect.y() + 25, statusColor, 0.58F);
-        return y + 34;
+        for (int i = 0; i < rewards.size(); i++) {
+            QuestDataSnapshot.RewardSnapshot reward = rewards.get(i);
+            int col = i % sectionLayout.columns();
+            int row = i / sectionLayout.columns();
+            int iconX = contentX + col * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_X);
+            int iconY = y + row * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_Y);
+            Rect iconRect = new Rect(iconX, iconY, MODAL_SECTION_ICON_SIZE, MODAL_SECTION_ICON_SIZE);
+
+            renderSectionIconSlot(graphics, iconRect, reward.canClaim() || reward.claimed());
+            reward.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
+            if (reward.claimed()) {
+                renderSmallCheck(graphics, iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y());
+            } else if (reward.canClaim()) {
+                renderRequirementMarker(graphics, iconRect, true);
+            }
+
+            if (reward.canClaim()) {
+                clickTargets.add(new ClickTarget(expand(iconRect, 1), () -> handleRewardClick(reward)));
+            }
+
+            modalTooltipTargets.add(new TooltipTarget(expand(iconRect, 1), buildRewardTooltip(reward)));
+        }
+
+        return y + sectionLayout.height();
+    }
+
+    private void drawSectionHeading(GuiGraphics graphics, String label, int x, int y) {
+        int labelHeight = Math.max(8, Math.round(font.lineHeight * MODAL_SECTION_LABEL_SCALE));
+        int textY = y + Math.max(0, (MODAL_SECTION_ICON_SIZE - labelHeight) / 2);
+        drawScaledString(graphics, Component.literal(label + ":"), x, textY, 0xFFF6ECD6, MODAL_SECTION_LABEL_SCALE);
+    }
+
+    private void renderSectionIconSlot(GuiGraphics graphics, Rect iconRect, boolean active) {
+        Rect slot = expand(iconRect, 1);
+        graphics.fill(slot.x(), slot.y(), slot.maxX(), slot.maxY(), active ? 0xB1241B14 : 0x8C1C140F);
+        drawInsetBorder(graphics, slot, active ? 0xD3A67A43 : 0xAA5E4630, 0xAA120D09);
     }
 
     private void renderSmallCheck(GuiGraphics graphics, int x, int y) {
@@ -1459,12 +1461,6 @@ public class OverhaulQuestScreen extends Screen {
         graphics.fill(badge.x(), badge.y(), badge.maxX(), badge.maxY(), active ? 0xFFD2A63B : 0xAA705C3D);
         drawInsetBorder(graphics, badge, active ? 0xFFFFE1A3 : 0xCC9B8764, 0xAA24180F);
         drawCenteredScaledString(graphics, Component.literal("!"), badge.centerX(), badge.y(), active ? 0xFF2B1706 : 0xFF24180F, 0.55F);
-    }
-
-    private void renderConsumableActionButton(GuiGraphics graphics, Rect rect, boolean active) {
-        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), active ? 0xCC926B21 : 0x99433528);
-        drawInsetBorder(graphics, rect, active ? 0xFFE1BC72 : 0xAA78624B, 0xAA1C140F);
-        drawScaledString(graphics, Component.literal("Turn in"), rect.x() + 2, rect.y() + 4, active ? 0xFFF7EAD1 : 0xFF9A8470, MODAL_TEXT_SCALE);
     }
 
     private void drawVanillaButton(GuiGraphics graphics, Rect rect, boolean enabled, boolean hovered) {
@@ -1515,23 +1511,21 @@ public class OverhaulQuestScreen extends Screen {
     // ---- Layout and state helpers ----
 
     private DetailLayout buildDetailLayout(QuestDataSnapshot.QuestSnapshot quest) {
-        int desiredWidth = Math.max(
-                Math.max(font.width(quest.title()), font.width(resolveObjectiveText(quest))),
-                flattenDescription(resolveDescription(quest), MODAL_MAX_WIDTH - 64).stream().mapToInt(font::width).max().orElse(0)
-        ) + 88;
-        int modalWidth = Mth.clamp(desiredWidth, MODAL_MIN_WIDTH, Math.min(MODAL_MAX_WIDTH, width - 36));
+        int maxModalWidth = Math.min(MODAL_MAX_WIDTH, width - 36);
+        SectionPairLayout preferredSections = buildRequirementRewardLayout(quest, Integer.MAX_VALUE);
+        int desiredWidth = Math.max(MODAL_MIN_WIDTH, preferredSections.width() + 48);
+        int modalWidth = Mth.clamp(desiredWidth, MODAL_MIN_WIDTH, maxModalWidth);
 
         int textWidth = Math.max(8, Math.round(
                 (modalWidth - 64) / MODAL_TEXT_SCALE
         ));
         List<FormattedCharSequence> objectiveLines = font.split(resolveObjectiveText(quest), textWidth);
         List<FormattedCharSequence> descriptionLines = flattenDescription(resolveDescription(quest), textWidth);
+        SectionPairLayout sectionLayout = buildRequirementRewardLayout(quest, modalWidth - 48);
 
         int objectiveHeight = 10 + objectiveLines.size() * 8;
         int descriptionHeight = descriptionLines.size() * 8;
-        int requirementsHeight = 10 + Math.max(1, visibleRequirementTasks(quest).size()) * 34;
-        int rewardsHeight = 10 + Math.max(1, quest.rewards().size()) * 34;
-        int contentHeight = objectiveHeight + 10 + descriptionHeight + 10 + Math.max(requirementsHeight, rewardsHeight) + MODAL_CONTENT_BOTTOM_PADDING;
+        int contentHeight = objectiveHeight + 10 + descriptionHeight + 10 + sectionLayout.height() + MODAL_CONTENT_BOTTOM_PADDING;
 
         int maxHeight = height - MODAL_MARGIN;
         int chromeHeight = 18 + MODAL_HEADER_HEIGHT + MODAL_FOOTER_HEIGHT + 24;
@@ -1545,7 +1539,60 @@ public class OverhaulQuestScreen extends Screen {
                 panelRect.width() - MODAL_CONTENT_SIDE_PADDING * 2, footerRect.y() - (headerRect.maxY() + 4) - 6);
 
         viewState.setDetailScroll(clampScroll(viewState.getDetailScroll(), contentHeight, bodyRect.height()));
-        return new DetailLayout(rect, headerRect, panelRect, bodyRect, footerRect, objectiveLines, descriptionLines, contentHeight);
+        return new DetailLayout(rect, headerRect, panelRect, bodyRect, footerRect, objectiveLines, descriptionLines, sectionLayout, contentHeight);
+    }
+
+    private SectionPairLayout buildRequirementRewardLayout(QuestDataSnapshot.QuestSnapshot quest, int availableWidth) {
+        List<QuestDataSnapshot.TaskSnapshot> tasks = visibleRequirementTasks(quest);
+        int requirementColumns = Math.max(1, Math.min(MODAL_SECTION_MAX_COLUMNS, tasks.size()));
+        int rewardColumns = Math.max(1, Math.min(MODAL_SECTION_MAX_COLUMNS, quest.rewards().size()));
+        IconSectionLayout requirements = measureSectionLayout("Requirements", tasks.size(), requirementColumns, "None");
+        IconSectionLayout rewards = measureSectionLayout("Rewards", quest.rewards().size(), rewardColumns, "None");
+
+        while (availableWidth < Integer.MAX_VALUE
+                && requirements.width() + rewards.width() + MODAL_SECTION_GROUP_GAP > availableWidth
+                && (requirements.columns() > 1 || rewards.columns() > 1)) {
+            if (requirements.width() >= rewards.width() && requirements.columns() > 1) {
+                requirementColumns--;
+            } else if (rewards.columns() > 1) {
+                rewardColumns--;
+            } else {
+                requirementColumns--;
+            }
+
+            requirements = measureSectionLayout("Requirements", tasks.size(), requirementColumns, "None");
+            rewards = measureSectionLayout("Rewards", quest.rewards().size(), rewardColumns, "None");
+        }
+
+        int gap = MODAL_SECTION_GROUP_GAP;
+        if (availableWidth < Integer.MAX_VALUE) {
+            int remaining = availableWidth - requirements.width() - rewards.width();
+            gap = Math.max(0, Math.min(MODAL_SECTION_GROUP_GAP, remaining));
+        }
+
+        return new SectionPairLayout(requirements, rewards, gap,
+                requirements.width() + rewards.width() + gap,
+                Math.max(requirements.height(), rewards.height()));
+    }
+
+    private IconSectionLayout measureSectionLayout(String label, int count, int columns, String emptyText) {
+        int labelWidth = Math.round(font.width(Component.literal(label + ":")) * MODAL_SECTION_LABEL_SCALE);
+        int labelHeight = Math.max(8, Math.round(font.lineHeight * MODAL_SECTION_LABEL_SCALE));
+        if (count <= 0) {
+            int noteHeight = Math.max(8, Math.round(font.lineHeight * MODAL_SECTION_NOTE_SCALE));
+            int noteWidth = Math.round(font.width(Component.literal(emptyText)) * MODAL_SECTION_NOTE_SCALE);
+            return new IconSectionLayout(label, 1, 0, labelWidth, labelHeight,
+                    labelWidth + MODAL_SECTION_ITEM_GAP + noteWidth,
+                    Math.max(labelHeight, noteHeight), emptyText);
+        }
+
+        int effectiveColumns = Math.max(1, Math.min(columns, Math.min(MODAL_SECTION_MAX_COLUMNS, count)));
+        int rows = Mth.ceil(count / (float) effectiveColumns);
+        int gridWidth = effectiveColumns * MODAL_SECTION_ICON_SIZE + Math.max(0, effectiveColumns - 1) * MODAL_SECTION_ICON_GAP_X;
+        int gridHeight = rows * MODAL_SECTION_ICON_SIZE + Math.max(0, rows - 1) * MODAL_SECTION_ICON_GAP_Y;
+        return new IconSectionLayout(label, effectiveColumns, rows, labelWidth, labelHeight,
+                labelWidth + MODAL_SECTION_ITEM_GAP + gridWidth,
+                Math.max(labelHeight, gridHeight), emptyText);
     }
 
     private List<FormattedCharSequence> flattenDescription(List<Component> description, int maxWidth) {
@@ -1639,6 +1686,67 @@ public class OverhaulQuestScreen extends Screen {
                 }
             }
         }
+    }
+
+    private void submitTask(QuestDataSnapshot.TaskSnapshot taskSnapshot) {
+        Task liveTask = resolveTask(taskSnapshot.id());
+        if (liveTask != null) {
+            actionRouter.submitTask(liveTask);
+        }
+    }
+
+    private void handleRewardClick(QuestDataSnapshot.RewardSnapshot rewardSnapshot) {
+        if (!rewardSnapshot.canClaim()) {
+            return;
+        }
+
+        Reward liveReward = resolveReward(rewardSnapshot.id());
+        if (liveReward == null) {
+            return;
+        }
+
+        if (rewardSnapshot.interactionMode() == RewardInteractionMode.CLAIM) {
+            actionRouter.claimReward(liveReward, true);
+        } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.CHOICE && liveReward instanceof ChoiceReward choiceReward) {
+            minecraft.setScreen(new ChoiceRewardSelectScreen(this, choiceReward, actionRouter));
+        } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.VANILLA_FALLBACK) {
+            openVanillaSelected();
+        }
+    }
+
+    private List<Component> buildTaskTooltip(QuestDataSnapshot.TaskSnapshot task) {
+        List<Component> tooltip = new ArrayList<>();
+        tooltip.add(task.title());
+        tooltip.add(task.progressText());
+
+        String state = switch (task.interactionMode()) {
+            case SUBMIT -> task.canInteract() ? "Ready to turn in" : task.completed() ? "Completed" : "Locked";
+            case VANILLA_FALLBACK -> task.canInteract() ? "Use vanilla action" : "Locked";
+            case READ_ONLY -> task.completed() ? "Completed" : "Tracked automatically";
+        };
+        tooltip.add(Component.literal(state).withStyle(task.completed() ? Style.EMPTY.withColor(0x75D65C) : Style.EMPTY.withColor(0xD9BE96)));
+        if (!task.fallbackReason().isBlank()) {
+            tooltip.add(Component.literal(task.fallbackReason()).withStyle(Style.EMPTY.withColor(0xC8B08C)));
+        }
+        return tooltip;
+    }
+
+    private List<Component> buildRewardTooltip(QuestDataSnapshot.RewardSnapshot reward) {
+        List<Component> tooltip = new ArrayList<>();
+        tooltip.add(reward.title());
+        tooltip.add(reward.statusText());
+
+        String state = switch (reward.interactionMode()) {
+            case CLAIM -> reward.canClaim() ? "Click to claim" : reward.claimed() ? "Claimed" : "Locked";
+            case CHOICE -> reward.canClaim() ? "Click to choose" : reward.claimed() ? "Claimed" : "Locked";
+            case VANILLA_FALLBACK -> reward.canClaim() ? "Use vanilla action" : "Locked";
+        };
+        int color = reward.canClaim() ? 0x7DE25E : reward.claimed() ? 0xB6B6B6 : 0xD5B58C;
+        tooltip.add(Component.literal(state).withStyle(Style.EMPTY.withColor(color)));
+        if (!reward.fallbackReason().isBlank()) {
+            tooltip.add(Component.literal(reward.fallbackReason()).withStyle(Style.EMPTY.withColor(0xC8B08C)));
+        }
+        return tooltip;
     }
 
     private int getQuestWidgetState(QuestDataSnapshot.QuestSnapshot quest) {
@@ -1914,6 +2022,16 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
+    private void renderModalTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
+        for (int i = modalTooltipTargets.size() - 1; i >= 0; i--) {
+            TooltipTarget target = modalTooltipTargets.get(i);
+            if (target.rect().contains(mouseX, mouseY)) {
+                graphics.renderComponentTooltip(font, target.lines(), mouseX, mouseY);
+                return;
+            }
+        }
+    }
+
     private Rect modalBounds(DetailLayout layout) {
         Rect rect = layout.rect();
         Rect header = layout.headerRect();
@@ -2130,6 +2248,10 @@ public class OverhaulQuestScreen extends Screen {
         return Component.literal(font.plainSubstrByWidth(component.getString(), Math.max(8, Math.round(width / Math.max(0.1F, scale)))));
     }
 
+    private Rect expand(Rect rect, int amount) {
+        return new Rect(rect.x() - amount, rect.y() - amount, rect.width() + amount * 2, rect.height() + amount * 2);
+    }
+
     private void renderScrollingChapterLabel(GuiGraphics graphics, Component component, Rect buttonRect, int textLeft, int textY,
                                              int availableWidth, int color, boolean animate) {
         int textWidth = Math.round(font.width(component) * CHAPTER_SELECTOR_TEXT_SCALE);
@@ -2191,6 +2313,9 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
+    private record TooltipTarget(Rect rect, List<Component> lines) {
+    }
+
     private record NodeLayout(QuestDataSnapshot.QuestSnapshot quest, Rect rect) {
         int centerX() {
             return rect.centerX();
@@ -2209,7 +2334,29 @@ public class OverhaulQuestScreen extends Screen {
             Rect footerRect,
             List<FormattedCharSequence> objectiveLines,
             List<FormattedCharSequence> descriptionLines,
+            SectionPairLayout sectionLayout,
             int contentHeight
+    ) {
+    }
+
+    private record SectionPairLayout(
+            IconSectionLayout requirements,
+            IconSectionLayout rewards,
+            int gap,
+            int width,
+            int height
+    ) {
+    }
+
+    private record IconSectionLayout(
+            String label,
+            int columns,
+            int rows,
+            int labelWidth,
+            int labelHeight,
+            int width,
+            int height,
+            String emptyText
     ) {
     }
 
