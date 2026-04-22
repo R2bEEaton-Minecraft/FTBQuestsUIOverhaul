@@ -31,9 +31,11 @@ import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Quest screen that replicates the vanilla Minecraft advancements screen
@@ -72,6 +74,10 @@ public class OverhaulQuestScreen extends Screen {
     private static final int CHAPTER_SELECTOR_ICON_X_OFFSET = 5;
     private static final int CHAPTER_SELECTOR_TEXT_X_OFFSET = 21;
     private static final int CHAPTER_SELECTOR_TEXT_RIGHT_PADDING = 5;
+    private static final int CHAPTER_GROUP_CHILD_INDENT = 7;
+    private static final int CHAPTER_GROUP_RAIL_X_OFFSET = 5;
+    private static final int CHAPTER_GROUP_RAIL_COLOR = 0xAA8D7354;
+    private static final int CHAPTER_GROUP_RAIL_SHADOW_COLOR = 0x66130E0B;
     private static final int CHAPTER_SCROLLBAR_WIDTH = 1;
     private static final int CHAPTER_SCROLLBAR_GAP = 2;
     private static final int CHAPTER_SCROLLBAR_HITBOX_WIDTH = 5;
@@ -94,6 +100,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final ResourceLocation BUTTONS_LOCATION = new ResourceLocation("textures/gui/widgets.png");
     private static final ResourceLocation OAK_PLANKS_TEXTURE = new ResourceLocation("minecraft", "textures/block/oak_planks.png");
     private static final ResourceLocation FTB_QUEST_LOCKED_TEXTURE = new ResourceLocation("ftbquests", "textures/gui/quest_locked.png");
+    private static final ResourceLocation FTB_QUEST_CHECK_TEXTURE = new ResourceLocation("ftblibrary", "textures/icons/accept.png");
 
     // --- Node spacing (based on AdvancementWidget, with wider horizontal gaps) ---
     // Vanilla uses displayX * 28 and displayY * 27, where displayX/Y are 0,1,2,...
@@ -105,6 +112,10 @@ public class OverhaulQuestScreen extends Screen {
     private static final int WIDGET_HEIGHT = 26;
     private static final int WIDGET_ICON_X = 8;
     private static final int WIDGET_ICON_Y = 5;
+    private static final int WIDGET_ICON_SIZE = 16;
+    private static final int QUEST_TILE_SHADOW_OFFSET = 2;
+    private static final int QUEST_TILE_SHADOW_COLOR = 0x26000000;
+    private static final int QUEST_TILE_SHADOW_EDGE_COLOR = 0x33000000;
 
     // --- Vanilla advancement tab dimensions (from AdvancementTabType.ABOVE) ---
     private static final int TAB_WIDTH = 28;
@@ -125,12 +136,16 @@ public class OverhaulQuestScreen extends Screen {
     private static final int MODAL_FOOTER_HEIGHT = 24;
     private static final int MODAL_MARGIN = 28;
     private static final int FOOTER_BUTTON_HEIGHT = 15;
+    private static final int CHECK_BADGE_SIZE = 7;
+    private static final int CHECK_BUTTON_SIZE = 8;
+    private static final int CHECK_NOTIFICATION_SIZE = 8;
     private static final float MODAL_TEXT_SCALE = 0.8F;
 
     private final QuestOpenContext openContext;
     private final QuestActionRouter actionRouter = new QuestActionRouter();
     private final QuestViewState viewState;
     private final List<ClickTarget> clickTargets = new ArrayList<>();
+    private final Set<Long> collapsedChapterGroups = new HashSet<>();
 
     private final Map<Long, NodeLayout> visibleQuestNodes = new HashMap<>();
     private QuestDataSnapshot.QuestSnapshot hoveredQuest;
@@ -455,13 +470,27 @@ public class OverhaulQuestScreen extends Screen {
 
         for (QuestDataSnapshot.ChapterSnapshot chapter : snapshot.chapters()) {
             if (chapter.firstInGroup()) {
+                boolean collapsed = isChapterGroupCollapsed(chapter.groupId());
                 Rect headerRect = new Rect(viewportRect.x(), y, viewportRect.width(), CHAPTER_GROUP_HEADER_HEIGHT);
+                boolean headerHovered = interactive && headerRect.contains(mouseX, mouseY);
                 if (headerRect.intersects(viewportRect)) {
-                    graphics.fill(headerRect.x(), headerRect.y() + 1, headerRect.maxX() - 4, headerRect.maxY() - 1, 0x77140E0C);
-                    drawScaledString(graphics, trim(chapter.groupTitle(), headerRect.width() - 6, CHAPTER_GROUP_TEXT_SCALE),
+                    graphics.fill(headerRect.x(), headerRect.y() + 1, headerRect.maxX() - 4, headerRect.maxY() - 1,
+                            headerHovered ? 0x99221712 : 0x77140E0C);
+                    drawScaledString(graphics, Component.literal(collapsed ? ">" : "v"),
                             headerRect.x() + 4, headerRect.y() + 3, 0xFFF0E4CB, CHAPTER_GROUP_TEXT_SCALE);
+                    drawScaledString(graphics, trim(chapter.groupTitle(), headerRect.width() - 17, CHAPTER_GROUP_TEXT_SCALE),
+                            headerRect.x() + 13, headerRect.y() + 3, 0xFFF0E4CB, CHAPTER_GROUP_TEXT_SCALE);
+                }
+                if (interactive) {
+                    addClippedClickTarget(headerRect, viewportRect, () -> toggleChapterGroup(chapter.groupId()));
                 }
                 y += CHAPTER_GROUP_HEADER_HEIGHT;
+                if (collapsed) {
+                    continue;
+                }
+            }
+            if (isChapterGroupCollapsed(chapter.groupId())) {
+                continue;
             }
 
             boolean selected = chapter.id() == viewState.getSelectedChapterId();
@@ -477,13 +506,10 @@ public class OverhaulQuestScreen extends Screen {
                 RenderSystem.enableBlend();
                 graphics.blit(texture, textureRect.x(), textureRect.y(), 0, 0, textureRect.width(), textureRect.height(), textureWidth, CHAPTER_BUTTON_TEXTURE_HEIGHT);
                 RenderSystem.disableBlend();
-
-                int iconX = buttonRect.x() + CHAPTER_SELECTOR_ICON_X_OFFSET;
-                int iconY = buttonRect.y() + Math.max(0, (buttonRect.height() - CHAPTER_SELECTOR_ICON_SIZE) / 2);
-                chapter.icon().draw(graphics, iconX, iconY, CHAPTER_SELECTOR_ICON_SIZE, CHAPTER_SELECTOR_ICON_SIZE);
+                renderChapterGroupRail(graphics, viewportRect, buttonRect);
 
                 float scaledTextHeight = font.lineHeight * CHAPTER_SELECTOR_TEXT_SCALE;
-                int textLeft = buttonRect.x() + CHAPTER_SELECTOR_TEXT_X_OFFSET;
+                int textLeft = buttonRect.x() + CHAPTER_GROUP_RAIL_X_OFFSET + CHAPTER_GROUP_CHILD_INDENT + 2;
                 int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + 2;
                 int availableWidth = buttonRect.maxX() - textLeft - CHAPTER_SELECTOR_TEXT_RIGHT_PADDING;
                 int textColor = selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
@@ -491,12 +517,7 @@ public class OverhaulQuestScreen extends Screen {
             }
 
             if (interactive && buttonRect.intersects(viewportRect)) {
-                int clippedY = Math.max(buttonRect.y(), viewportRect.y());
-                int clippedHeight = Math.min(buttonRect.maxY(), viewportRect.maxY()) - clippedY;
-                if (clippedHeight > 0) {
-                    clickTargets.add(new ClickTarget(new Rect(buttonRect.x(), clippedY, buttonRect.width(), clippedHeight),
-                            () -> selectChapter(chapter.id())));
-                }
+                addClippedClickTarget(buttonRect, viewportRect, () -> selectChapter(chapter.id()));
             }
 
             y += CHAPTER_SELECTOR_SCROLL_STEP;
@@ -505,6 +526,17 @@ public class OverhaulQuestScreen extends Screen {
         renderChapterSelectorBottomShadow(graphics, viewportRect, snapshot);
         graphics.disableScissor();
         renderChapterScrollbar(graphics, snapshot);
+    }
+
+    private void renderChapterGroupRail(GuiGraphics graphics, Rect viewportRect, Rect buttonRect) {
+        int railX = viewportRect.x() + CHAPTER_GROUP_RAIL_X_OFFSET;
+        int railTop = Math.max(buttonRect.y() - 1, viewportRect.y());
+        int railBottom = Math.min(buttonRect.maxY() + 1, viewportRect.maxY());
+        int railMidY = Mth.clamp(buttonRect.centerY(), viewportRect.y(), viewportRect.maxY());
+
+        graphics.fill(railX + 1, railTop, railX + 2, railBottom, CHAPTER_GROUP_RAIL_SHADOW_COLOR);
+        graphics.fill(railX, railTop, railX + 1, railBottom, CHAPTER_GROUP_RAIL_COLOR);
+        graphics.fill(railX, railMidY, railX + CHAPTER_GROUP_CHILD_INDENT, railMidY + 1, CHAPTER_GROUP_RAIL_COLOR);
     }
 
     private void renderChapterSelectorBottomShadow(GuiGraphics graphics, Rect viewportRect, QuestDataSnapshot snapshot) {
@@ -858,6 +890,8 @@ public class OverhaulQuestScreen extends Screen {
             // We use TASK (0) as the default frame for all quests
             int frameU = 0;
 
+            renderQuestWidgetShadow(graphics, scrollX + nodeX, scrollY + nodeY);
+
             // Matching vanilla: blit at (scrollX + x + 3, scrollY + y)
             graphics.blit(WIDGETS_LOCATION,
                     scrollX + nodeX + 3, scrollY + nodeY,
@@ -868,7 +902,7 @@ public class OverhaulQuestScreen extends Screen {
             quest.icon().draw(graphics,
                     scrollX + nodeX + WIDGET_ICON_X,
                     scrollY + nodeY + WIDGET_ICON_Y,
-                    16, 16);
+                    WIDGET_ICON_SIZE, WIDGET_ICON_SIZE);
 
             if (!obtained && !isQuestAvailable(quest)) {
                 renderLockOverlay(graphics, scrollX + nodeX, scrollY + nodeY);
@@ -897,11 +931,28 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
+    private void renderQuestWidgetShadow(GuiGraphics graphics, int nodeX, int nodeY) {
+        int x = nodeX + 3;
+        int y = nodeY;
+        int right = x + WIDGET_WIDTH;
+        int bottom = y + WIDGET_HEIGHT;
+
+        graphics.fill(x + QUEST_TILE_SHADOW_OFFSET, y + QUEST_TILE_SHADOW_OFFSET,
+                right + QUEST_TILE_SHADOW_OFFSET, bottom + QUEST_TILE_SHADOW_OFFSET,
+                QUEST_TILE_SHADOW_COLOR);
+        graphics.fill(x + QUEST_TILE_SHADOW_OFFSET + 1, bottom + 1,
+                right + QUEST_TILE_SHADOW_OFFSET, bottom + QUEST_TILE_SHADOW_OFFSET + 1,
+                QUEST_TILE_SHADOW_EDGE_COLOR);
+        graphics.fill(right + 1, y + QUEST_TILE_SHADOW_OFFSET + 1,
+                right + QUEST_TILE_SHADOW_OFFSET + 1, bottom + QUEST_TILE_SHADOW_OFFSET,
+                QUEST_TILE_SHADOW_EDGE_COLOR);
+    }
+
     private void renderLockOverlay(GuiGraphics graphics, int nodeX, int nodeY) {
         int size = (int) (WIDGET_WIDTH / 8F * 3F);
         float scale = size / 16F;
         graphics.pose().pushPose();
-        graphics.pose().translate(nodeX + WIDGET_WIDTH - size, nodeY + WIDGET_HEIGHT - 1 - size, 0.0F);
+        graphics.pose().translate(nodeX + WIDGET_ICON_X + WIDGET_ICON_SIZE - size, nodeY + WIDGET_ICON_Y, 0.0F);
         graphics.pose().scale(scale, scale, 1.0F);
         graphics.blit(FTB_QUEST_LOCKED_TEXTURE, 0, 0, 0.0F, 0.0F, 16, 16, 16, 16);
         graphics.pose().popPose();
@@ -1053,7 +1104,10 @@ public class OverhaulQuestScreen extends Screen {
         quest.icon().draw(graphics,
                 scrollX + nodeX + WIDGET_ICON_X,
                 scrollY + nodeY + WIDGET_ICON_Y,
-                16, 16);
+                WIDGET_ICON_SIZE, WIDGET_ICON_SIZE);
+        if (locked) {
+            renderLockOverlay(graphics, scrollX + nodeX, scrollY + nodeY);
+        }
     }
 
     /**
@@ -1326,7 +1380,7 @@ public class OverhaulQuestScreen extends Screen {
 
         task.icon().draw(graphics, iconRect.x(), iconRect.y(), 14, 14);
         if (task.completed()) {
-            renderSmallCheck(graphics, iconRect.maxX() - 4, iconRect.y() - 2);
+            renderSmallCheck(graphics, iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y());
         }
         if (consumableTurnIn) {
             if (task.canInteract()) {
@@ -1367,12 +1421,13 @@ public class OverhaulQuestScreen extends Screen {
 
     private int renderRewardSummaryRow(GuiGraphics graphics, int x, int width, QuestDataSnapshot.RewardSnapshot rewardSnapshot, int y) {
         Rect rect = new Rect(x, y, width, 18);
+        Rect iconRect = new Rect(rect.x() + 3, rect.y() + 1, 14, 14);
         graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0x5635261B);
         drawInsetBorder(graphics, rect, 0x88634731, 0x55201510);
 
-        rewardSnapshot.icon().draw(graphics, rect.x() + 3, rect.y() + 1, 14, 14);
+        rewardSnapshot.icon().draw(graphics, iconRect.x(), iconRect.y(), 14, 14);
         if (rewardSnapshot.claimed()) {
-            renderSmallCheck(graphics, rect.x() + 13, rect.y() - 1);
+            renderSmallCheck(graphics, iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y());
         }
 
         int statusColor = rewardSnapshot.canClaim() ? 0xFF7DE25E : rewardSnapshot.claimed() ? 0xFFB6B6B6 : 0xFFD5B58C;
@@ -1388,9 +1443,7 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderSmallCheck(GuiGraphics graphics, int x, int y) {
-        graphics.fill(x, y + 4, x + 2, y + 6, 0xFF52E652);
-        graphics.fill(x + 2, y + 5, x + 4, y + 7, 0xFF52E652);
-        graphics.fill(x + 4, y + 1, x + 7, y + 4, 0xFF52E652);
+        renderCheckTexture(graphics, x, y, CHECK_BADGE_SIZE);
     }
 
     private void renderScrollArrow(GuiGraphics graphics, int x, int y, boolean up, boolean active) {
@@ -1432,18 +1485,25 @@ public class OverhaulQuestScreen extends Screen {
         int textHeight = Math.round(font.lineHeight * MODAL_TEXT_SCALE);
         int textY = rect.y() + Math.max(0, (rect.height() - textHeight) / 2);
         drawCenteredScaledString(graphics, Component.literal(label), rect.centerX(), textY, enabled ? 0xFFE0E0E0 : 0xFFA0A0A0, MODAL_TEXT_SCALE);
+        if (pressed) {
+            renderCheckTexture(graphics, rect.maxX() - CHECK_BUTTON_SIZE - 3, rect.y() + 3, CHECK_BUTTON_SIZE);
+        }
     }
 
     private void renderNotificationMarker(GuiGraphics graphics, int x, int y, boolean completed) {
         if (completed) {
-            graphics.fill(x, y + 3, x + 2, y + 5, 0xFF4DE047);
-            graphics.fill(x + 2, y + 4, x + 4, y + 6, 0xFF4DE047);
-            graphics.fill(x + 4, y + 1, x + 7, y + 4, 0xFF4DE047);
+            renderCheckTexture(graphics, x - 1, y - 1, CHECK_NOTIFICATION_SIZE);
         } else {
             graphics.fill(x, y, x + 7, y + 7, 0xFFE92C2C);
             graphics.fill(x + 3, y + 1, x + 4, y + 5, 0xFFFFFFFF);
             graphics.fill(x + 3, y + 6, x + 4, y + 7, 0xFFFFFFFF);
         }
+    }
+
+    private void renderCheckTexture(GuiGraphics graphics, int x, int y, int size) {
+        RenderSystem.enableBlend();
+        graphics.blit(FTB_QUEST_CHECK_TEXTURE, x, y, 0.0F, 0.0F, size, size, 16, 16);
+        RenderSystem.disableBlend();
     }
 
     private Rect footerButtonRect(int x, int y, int width, int containerHeight) {
@@ -1703,12 +1763,16 @@ public class OverhaulQuestScreen extends Screen {
         int entryTop = 0;
         int selectedIndex = -1;
         for (int i = 0; i < chapters.size(); i++) {
-            if (chapters.get(i).firstInGroup()) {
+            QuestDataSnapshot.ChapterSnapshot chapter = chapters.get(i);
+            if (chapter.firstInGroup()) {
                 entryTop += CHAPTER_GROUP_HEADER_HEIGHT;
             }
-            if (chapters.get(i).id() == selectedChapterId) {
+            if (chapter.id() == selectedChapterId) {
                 selectedIndex = i;
                 break;
+            }
+            if (isChapterGroupCollapsed(chapter.groupId())) {
+                continue;
             }
             entryTop += CHAPTER_SELECTOR_SCROLL_STEP;
         }
@@ -1807,6 +1871,9 @@ public class OverhaulQuestScreen extends Screen {
             if (chapter.firstInGroup()) {
                 height += CHAPTER_GROUP_HEADER_HEIGHT;
             }
+            if (isChapterGroupCollapsed(chapter.groupId())) {
+                continue;
+            }
             height += CHAPTER_SELECTOR_SCROLL_STEP;
         }
         return Math.max(0, height - CHAPTER_SELECTOR_ENTRY_SPACING);
@@ -1814,6 +1881,29 @@ public class OverhaulQuestScreen extends Screen {
 
     private double maxChapterScroll(QuestDataSnapshot snapshot) {
         return Math.max(0D, chapterContentHeight(snapshot) - chapterSelectorViewportHeight());
+    }
+
+    private boolean isChapterGroupCollapsed(long groupId) {
+        return collapsedChapterGroups.contains(groupId);
+    }
+
+    private void toggleChapterGroup(long groupId) {
+        if (!collapsedChapterGroups.remove(groupId)) {
+            collapsedChapterGroups.add(groupId);
+        }
+        clampChapterScroll(QuestDataController.getSnapshot());
+    }
+
+    private void addClippedClickTarget(Rect rect, Rect viewportRect, Runnable action) {
+        if (!rect.intersects(viewportRect)) {
+            return;
+        }
+
+        int clippedY = Math.max(rect.y(), viewportRect.y());
+        int clippedHeight = Math.min(rect.maxY(), viewportRect.maxY()) - clippedY;
+        if (clippedHeight > 0) {
+            clickTargets.add(new ClickTarget(new Rect(rect.x(), clippedY, rect.width(), clippedHeight), action));
+        }
     }
 
     private Rect frameRect() {
