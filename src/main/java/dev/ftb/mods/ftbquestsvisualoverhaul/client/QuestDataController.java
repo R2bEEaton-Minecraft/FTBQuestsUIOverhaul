@@ -22,6 +22,10 @@ public class QuestDataController {
             .resolve("ftbquests")
             .resolve("quests")
             .resolve("ftbquestsvisualoverhaul_tiles.properties");
+    private static final Path FREE_PAN_FILE = FMLPaths.CONFIGDIR.get()
+            .resolve("ftbquests")
+            .resolve("quests")
+            .resolve("ftbquestsvisualoverhaul_free_pan.properties");
     private static final Path LEGACY_TILE_TEXTURES_FILE = FMLPaths.CONFIGDIR.get().resolve("ftbquestsvisualoverhaul_tiles.properties");
 
     private static QuestViewState persistedViewState = new QuestViewState();
@@ -30,6 +34,7 @@ public class QuestDataController {
 
     static {
         loadPersistentTileTextures();
+        loadPersistentFreePanStates();
     }
 
     private QuestDataController() {
@@ -54,6 +59,7 @@ public class QuestDataController {
     public static void saveViewState(QuestViewState state) {
         persistedViewState = state.copy();
         savePersistentTileTextures();
+        savePersistentFreePanStates();
     }
 
     private static void loadPersistentTileTextures() {
@@ -94,6 +100,50 @@ public class QuestDataController {
             Files.createDirectories(TILE_TEXTURES_FILE.getParent());
             try (OutputStream stream = Files.newOutputStream(TILE_TEXTURES_FILE)) {
                 properties.store(stream, "FTB Quests UI Overhaul selected chapter tile textures");
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    private static void loadPersistentFreePanStates() {
+        if (!Files.isRegularFile(FREE_PAN_FILE)) {
+            return;
+        }
+
+        Properties properties = new Properties();
+        try (InputStream stream = Files.newInputStream(FREE_PAN_FILE)) {
+            properties.load(stream);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            return;
+        }
+
+        Map<Long, Boolean> freePanStates = new LinkedHashMap<>();
+        for (String key : properties.stringPropertyNames()) {
+            try {
+                if (Boolean.parseBoolean(properties.getProperty(key))) {
+                    freePanStates.put(Long.parseUnsignedLong(key), true);
+                }
+            } catch (Exception ex) {
+                System.err.println("Ignoring invalid FTB Quests UI Overhaul free-pan entry: " + key + "=" + properties.getProperty(key));
+            }
+        }
+        persistedViewState.setChapterFreePanStates(freePanStates);
+    }
+
+    private static void savePersistentFreePanStates() {
+        Properties properties = new Properties();
+        for (Map.Entry<Long, Boolean> entry : persistedViewState.getChapterFreePanStates().entrySet()) {
+            if (Boolean.TRUE.equals(entry.getValue())) {
+                properties.setProperty(Long.toUnsignedString(entry.getKey()), "true");
+            }
+        }
+
+        try {
+            Files.createDirectories(FREE_PAN_FILE.getParent());
+            try (OutputStream stream = Files.newOutputStream(FREE_PAN_FILE)) {
+                properties.store(stream, "FTB Quests UI Overhaul chapter free-pan preferences");
             }
         } catch (IOException ex) {
             ex.printStackTrace();

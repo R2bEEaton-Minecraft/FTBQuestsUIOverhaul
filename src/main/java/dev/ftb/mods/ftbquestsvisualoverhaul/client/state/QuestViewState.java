@@ -15,11 +15,11 @@ public class QuestViewState {
     private double treePanX;
     private double treePanY;
     private double treeZoom;
-    private boolean freePan;
     private boolean defaultFtbUiMode;
     private LayoutMode layoutMode;
     private QuestSortMode sortMode;
     private Map<Long, ResourceLocation> chapterTitleTextures;
+    private Map<Long, Boolean> chapterFreePanStates;
 
     public QuestViewState() {
         selectedChapterId = 0L;
@@ -30,11 +30,11 @@ public class QuestViewState {
         treePanX = 0D;
         treePanY = 0D;
         treeZoom = 1D;
-        freePan = false;
         defaultFtbUiMode = false;
         layoutMode = ModClientConfig.DEFAULT_LAYOUT.get();
         sortMode = QuestSortMode.PROGRESSION;
         chapterTitleTextures = new HashMap<>();
+        chapterFreePanStates = new HashMap<>();
     }
 
     public QuestViewState copy() {
@@ -47,11 +47,11 @@ public class QuestViewState {
         copy.treePanX = treePanX;
         copy.treePanY = treePanY;
         copy.treeZoom = treeZoom;
-        copy.freePan = freePan;
         copy.defaultFtbUiMode = defaultFtbUiMode;
         copy.layoutMode = layoutMode;
         copy.sortMode = sortMode;
         copy.chapterTitleTextures = new HashMap<>(chapterTitleTextures);
+        copy.chapterFreePanStates = new HashMap<>(chapterFreePanStates);
         return copy;
     }
 
@@ -119,12 +119,16 @@ public class QuestViewState {
         this.treeZoom = treeZoom;
     }
 
-    public boolean isFreePan() {
-        return freePan;
+    public boolean isFreePan(long chapterId) {
+        return chapterFreePanStates.getOrDefault(chapterId, false);
     }
 
-    public void setFreePan(boolean freePan) {
-        this.freePan = freePan;
+    public void setFreePan(long chapterId, boolean freePan) {
+        if (freePan) {
+            chapterFreePanStates.put(chapterId, true);
+        } else {
+            chapterFreePanStates.remove(chapterId);
+        }
     }
 
     public boolean isDefaultFtbUiMode() {
@@ -153,6 +157,14 @@ public class QuestViewState {
 
     public void setChapterTitleTextures(Map<Long, ResourceLocation> chapterTitleTextures) {
         this.chapterTitleTextures = new HashMap<>(chapterTitleTextures);
+    }
+
+    public Map<Long, Boolean> getChapterFreePanStates() {
+        return new HashMap<>(chapterFreePanStates);
+    }
+
+    public void setChapterFreePanStates(Map<Long, Boolean> chapterFreePanStates) {
+        this.chapterFreePanStates = new HashMap<>(chapterFreePanStates);
     }
 
     public LayoutMode getLayoutMode() {

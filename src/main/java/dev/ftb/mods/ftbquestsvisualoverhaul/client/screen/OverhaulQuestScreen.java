@@ -386,9 +386,7 @@ public class OverhaulQuestScreen extends Screen {
         viewState.setTreePanY(relMouseY - contentY * newZoom);
 
         computeNodeBounds(chapter.quests());
-        if (!viewState.isFreePan()) {
-            clampTreePanToQuestBounds();
-        }
+        clampTreePanToQuestBounds();
 
         return true;
     }
@@ -396,11 +394,6 @@ public class OverhaulQuestScreen extends Screen {
     // ---- Scroll/Pan (matching vanilla AdvancementTab.scroll) ----
 
     private void scroll(double deltaX, double deltaY) {
-        if (isCreativeControlsVisible() && viewState.isFreePan()) {
-            viewState.setTreePanX(viewState.getTreePanX() + deltaX);
-            viewState.setTreePanY(viewState.getTreePanY() + deltaY);
-            return;
-        }
         viewState.setTreePanX(clampTreePanAxis(viewState.getTreePanX() + deltaX, minNodeX, maxNodeX, TREE_WIDTH));
         viewState.setTreePanY(clampTreePanAxis(viewState.getTreePanY() + deltaY, minNodeY, maxNodeY, TREE_HEIGHT));
     }
@@ -491,9 +484,7 @@ public class OverhaulQuestScreen extends Screen {
             viewState.setTreePanY((TREE_HEIGHT / 2.0D) - ((maxNodeY + minNodeY) * viewState.getTreeZoom()) / 2.0D);
             centered = true;
         }
-        if (!viewState.isFreePan()) {
-            clampTreePanToQuestBounds();
-        }
+        clampTreePanToQuestBounds();
 
         // Scissor to tree panel area (matching AdvancementTab.drawContents)
         graphics.enableScissor(treeLeft, treeTop, treeLeft + TREE_WIDTH, treeTop + TREE_HEIGHT);
@@ -690,12 +681,12 @@ public class OverhaulQuestScreen extends Screen {
         Rect frame = frameRect();
         Rect freePanButton = new Rect(frame.x() + TREE_X + 1, frame.y() + TREE_Y + 2, 72, 11);
         Rect titleButton = new Rect(frame.x() + TREE_X + TREE_WIDTH - 72, frame.y() + TREE_Y + 2, 68, 11);
-        renderSmallOverlayButton(graphics, freePanButton, viewState.isFreePan() ? "Free Pan: On" : "Free Pan: Off",
-                interactive && freePanButton.contains(mouseX, mouseY), viewState.isFreePan() ? 0xFFE6D176 : 0xFFE68E7C);
+        renderSmallOverlayButton(graphics, freePanButton, isCurrentChapterFreePan() ? "Free Pan: On" : "Free Pan: Off",
+                interactive && freePanButton.contains(mouseX, mouseY), isCurrentChapterFreePan() ? 0xFFE6D176 : 0xFFE68E7C);
         renderSmallOverlayButton(graphics, titleButton, "Change Tile", interactive && titleButton.contains(mouseX, mouseY), 0xFFF2E8D6);
 
         if (interactive) {
-            clickTargets.add(new ClickTarget(freePanButton, () -> viewState.setFreePan(!viewState.isFreePan())));
+            clickTargets.add(new ClickTarget(freePanButton, this::toggleCurrentChapterFreePan));
             clickTargets.add(new ClickTarget(titleButton, this::openChapterTitleTextureSelector));
         }
     }
@@ -735,6 +726,16 @@ public class OverhaulQuestScreen extends Screen {
             return new ResourceLocation(selectedTexture.getNamespace(), "textures/" + path + ".png");
         }
         return new ResourceLocation(selectedTexture.getNamespace(), "textures/" + path);
+    }
+
+    private boolean isCurrentChapterFreePan() {
+        return viewState.isFreePan(viewState.getSelectedChapterId());
+    }
+
+    private void toggleCurrentChapterFreePan() {
+        long chapterId = viewState.getSelectedChapterId();
+        viewState.setFreePan(chapterId, !viewState.isFreePan(chapterId));
+        QuestDataController.saveViewState(viewState);
     }
 
     /**
@@ -874,8 +875,12 @@ public class OverhaulQuestScreen extends Screen {
 
     private double clampTreePanAxis(double pan, int minNode, int maxNode, int viewportSize) {
         double zoom = viewState.getTreeZoom();
-        double minContent = (minNode - TREE_PAN_BOUND_PADDING) * zoom;
-        double maxContent = (maxNode + TREE_PAN_BOUND_PADDING) * zoom;
+        int padding = TREE_PAN_BOUND_PADDING;
+        if (isCurrentChapterFreePan()) {
+            padding = Math.max(TREE_PAN_BOUND_PADDING, Mth.ceil(viewportSize / zoom));
+        }
+        double minContent = (minNode - padding) * zoom;
+        double maxContent = (maxNode + padding) * zoom;
         double contentSize = maxContent - minContent;
         if (contentSize <= viewportSize) {
             return (viewportSize - contentSize) / 2.0D - minContent;
