@@ -1,0 +1,197 @@
+{
+	default_hide_dependency_lines: false
+	default_quest_shape: ""
+	filename: "modal_stress_demo"
+	group: "4000000000000001"
+	icon: "minecraft:written_book"
+	id: "1000000000004001"
+	order_index: 4
+	quest_links: [ ]
+	quests: [
+		{
+			description: ["The smallest baseline: short title, one requirement, one reward, almost no text."]
+			icon: "minecraft:paper"
+			id: "1000000000004101"
+			rewards: [{
+				id: "1000000000004301"
+				item: "minecraft:paper"
+				type: "item"
+			}]
+			subtitle: "Small baseline"
+			tasks: [{
+				id: "1000000000004201"
+				type: "checkmark"
+			}]
+			title: "Tiny Modal"
+			x: -6.0d
+			y: -3.0d
+		}
+		{
+			description: [
+				"This quest is for vertical growth."
+				"It keeps the requirements and rewards nearly empty so the modal is driven mostly by text."
+				"Use it to check line wrapping, paragraph spacing, and the minimum width behavior."
+				"The title is still short on purpose."
+				"The description is not."
+				"It should stack into a tall reading panel rather than forcing the window wider than necessary."
+			]
+			icon: "minecraft:book"
+			id: "1000000000004102"
+			rewards: [{
+				id: "1000000000004302"
+				item: "minecraft:book"
+				type: "item"
+			}]
+			subtitle: "Tall text only"
+			tasks: [{
+				id: "1000000000004202"
+				type: "checkmark"
+			}]
+			title: "Tall Text"
+			x: 0.0d
+			y: -3.0d
+		}
+		{
+			description: [
+				"Almost no text."
+				"Lots of rewards."
+			]
+			icon: "minecraft:gold_ingot"
+			id: "1000000000004103"
+			rewards: [
+				{id: "1000000000004303" item: "minecraft:apple" type: "item"}
+				{id: "1000000000004304" item: "minecraft:bread" type: "item"}
+				{id: "1000000000004305" item: "minecraft:torch" type: "item"}
+				{id: "1000000000004306" item: "minecraft:map" type: "item"}
+				{id: "1000000000004307" item: "minecraft:compass" type: "item"}
+				{id: "1000000000004308" item: "minecraft:string" type: "item"}
+				{id: "1000000000004309" item: "minecraft:arrow" type: "item"}
+				{id: "1000000000004310" item: "minecraft:bone" type: "item"}
+				{id: "1000000000004311" item: "minecraft:clock" type: "item"}
+				{id: "1000000000004312" item: "minecraft:book" type: "item"}
+				{id: "1000000000004313" item: "minecraft:feather" type: "item"}
+				{id: "1000000000004314" item: "minecraft:spyglass" type: "item"}
+				{id: "1000000000004315" item: "minecraft:paper" type: "item"}
+				{id: "1000000000004316" item: "minecraft:emerald" type: "item"}
+				{id: "1000000000004317" item: "minecraft:diamond" type: "item"}
+			]
+			subtitle: "Fifteen rewards"
+			tasks: [{
+				id: "1000000000004203"
+				type: "checkmark"
+			}]
+			title: "Wide Rewards"
+			x: 6.0d
+			y: -3.0d
+		}
+		{
+			description: [
+				"Minimal reward output."
+				"Heavy requirements input."
+			]
+			icon: "minecraft:iron_pickaxe"
+			id: "1000000000004104"
+			rewards: [{
+				id: "1000000000004318"
+				item: "minecraft:iron_pickaxe"
+				type: "item"
+			}]
+			subtitle: "Fifteen requirements"
+			tasks: [
+				{id: "1000000000004204" type: "checkmark"}
+				{id: "1000000000004205" type: "checkmark"}
+				{id: "1000000000004206" type: "checkmark"}
+				{id: "1000000000004207" type: "checkmark"}
+				{id: "1000000000004208" type: "checkmark"}
+				{id: "1000000000004209" type: "checkmark"}
+				{id: "1000000000004210" type: "checkmark"}
+				{id: "1000000000004211" type: "checkmark"}
+				{id: "1000000000004212" type: "checkmark"}
+				{id: "1000000000004213" type: "checkmark"}
+				{id: "1000000000004214" type: "checkmark"}
+				{id: "1000000000004215" type: "checkmark"}
+				{id: "1000000000004216" type: "checkmark"}
+				{id: "1000000000004217" type: "checkmark"}
+				{id: "1000000000004218" type: "checkmark"}
+			]
+			title: "Wide Requirements"
+			x: -6.0d
+			y: 3.0d
+		}
+		{
+			description: [
+				"A middle-of-the-road case with enough text and icons to feel real without hitting the extremes."
+				"Use this one as your visual sanity check between the tiny and overloaded examples."
+			]
+			icon: "minecraft:compass"
+			id: "1000000000004105"
+			rewards: [
+				{id: "1000000000004319" item: "minecraft:compass" type: "item"}
+				{id: "1000000000004320" item: "minecraft:map" type: "item"}
+				{id: "1000000000004321" item: "minecraft:paper" type: "item"}
+				{id: "1000000000004322" item: "minecraft:spyglass" type: "item"}
+			]
+			subtitle: "Medium reference"
+			tasks: [
+				{id: "1000000000004219" type: "checkmark"}
+				{id: "1000000000004220" type: "checkmark"}
+				{id: "1000000000004221" type: "checkmark"}
+				{id: "1000000000004222" type: "checkmark"}
+			]
+			title: "Balanced Medium"
+			x: 0.0d
+			y: 3.0d
+		}
+		{
+			description: [
+				"This quest is the overload case."
+				"It combines a long description with many requirements and many rewards."
+				"Use it to inspect the modal once it has to expand both vertically and horizontally."
+				"The icon sections should wrap into rows of four while the text continues to push the body taller."
+				"If anything clips, overlaps, or feels cramped, this is the quest that should reveal it."
+			]
+			icon: "minecraft:nether_star"
+			id: "1000000000004106"
+			rewards: [
+				{id: "1000000000004323" item: "minecraft:apple" type: "item"}
+				{id: "1000000000004324" item: "minecraft:bread" type: "item"}
+				{id: "1000000000004325" item: "minecraft:torch" type: "item"}
+				{id: "1000000000004326" item: "minecraft:map" type: "item"}
+				{id: "1000000000004327" item: "minecraft:compass" type: "item"}
+				{id: "1000000000004328" item: "minecraft:string" type: "item"}
+				{id: "1000000000004329" item: "minecraft:arrow" type: "item"}
+				{id: "1000000000004330" item: "minecraft:bone" type: "item"}
+				{id: "1000000000004331" item: "minecraft:clock" type: "item"}
+				{id: "1000000000004332" item: "minecraft:book" type: "item"}
+				{id: "1000000000004333" item: "minecraft:feather" type: "item"}
+				{id: "1000000000004334" item: "minecraft:spyglass" type: "item"}
+				{id: "1000000000004335" item: "minecraft:paper" type: "item"}
+				{id: "1000000000004336" item: "minecraft:emerald" type: "item"}
+				{id: "1000000000004337" item: "minecraft:diamond" type: "item"}
+			]
+			subtitle: "Long text plus fifteen and fifteen"
+			tasks: [
+				{id: "1000000000004223" type: "checkmark"}
+				{id: "1000000000004224" type: "checkmark"}
+				{id: "1000000000004225" type: "checkmark"}
+				{id: "1000000000004226" type: "checkmark"}
+				{id: "1000000000004227" type: "checkmark"}
+				{id: "1000000000004228" type: "checkmark"}
+				{id: "1000000000004229" type: "checkmark"}
+				{id: "1000000000004230" type: "checkmark"}
+				{id: "1000000000004231" type: "checkmark"}
+				{id: "1000000000004232" type: "checkmark"}
+				{id: "1000000000004233" type: "checkmark"}
+				{id: "1000000000004234" type: "checkmark"}
+				{id: "1000000000004235" type: "checkmark"}
+				{id: "1000000000004236" type: "checkmark"}
+				{id: "1000000000004237" type: "checkmark"}
+			]
+			title: "Max Pressure"
+			x: 6.0d
+			y: 3.0d
+		}
+	]
+	subtitle: ["Quests designed to stress the detail modal at several sizes and content mixes"]
+	title: "Modal Stress Demo"
+}

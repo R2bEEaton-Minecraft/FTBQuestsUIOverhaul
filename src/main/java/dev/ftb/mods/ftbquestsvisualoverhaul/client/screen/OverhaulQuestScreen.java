@@ -164,6 +164,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final float MODAL_SECTION_NOTE_SCALE = 0.58F;
     private static final int MODAL_SECTION_ITEM_GAP = 4;
     private static final int MODAL_SECTION_GROUP_GAP = 12;
+    private static final int MODAL_SECTION_LABEL_GAP = 4;
     private static final int MODAL_SECTION_ICON_SIZE = 16;
     private static final int MODAL_SECTION_ICON_GAP_X = 2;
     private static final int MODAL_SECTION_ICON_GAP_Y = 4;
@@ -1475,10 +1476,11 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private int renderTaskSection(GuiGraphics graphics, int x, int y, IconSectionLayout sectionLayout, List<QuestDataSnapshot.TaskSnapshot> tasks) {
-        drawSectionHeading(graphics, sectionLayout.label(), x, y);
-        int contentX = x + sectionLayout.labelWidth() + MODAL_SECTION_ITEM_GAP;
+        drawSectionHeading(graphics, sectionLayout.label(), x, y, sectionLayout.width());
+        int contentY = y + sectionLayout.labelHeight() + MODAL_SECTION_LABEL_GAP;
+        int contentX = x + Math.max(0, (sectionLayout.width() - sectionLayout.contentWidth()) / 2);
         if (tasks.isEmpty()) {
-            drawScaledString(graphics, Component.literal(sectionLayout.emptyText()), contentX, y + 4, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
+            drawScaledString(graphics, Component.literal(sectionLayout.emptyText()), contentX, contentY, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
             return y + sectionLayout.height();
         }
 
@@ -1487,7 +1489,7 @@ public class OverhaulQuestScreen extends Screen {
             int col = i % sectionLayout.columns();
             int row = i / sectionLayout.columns();
             int iconX = contentX + col * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_X);
-            int iconY = y + row * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_Y);
+            int iconY = contentY + row * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_Y);
             Rect iconRect = new Rect(iconX, iconY, MODAL_SECTION_ICON_SIZE, MODAL_SECTION_ICON_SIZE);
 
             renderSectionIconSlot(graphics, iconRect, task.canInteract() || task.completed());
@@ -1511,10 +1513,11 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private int renderRewardSection(GuiGraphics graphics, int x, int y, IconSectionLayout sectionLayout, List<QuestDataSnapshot.RewardSnapshot> rewards) {
-        drawSectionHeading(graphics, sectionLayout.label(), x, y);
-        int contentX = x + sectionLayout.labelWidth() + MODAL_SECTION_ITEM_GAP;
+        drawSectionHeading(graphics, sectionLayout.label(), x, y, sectionLayout.width());
+        int contentY = y + sectionLayout.labelHeight() + MODAL_SECTION_LABEL_GAP;
+        int contentX = x + Math.max(0, (sectionLayout.width() - sectionLayout.contentWidth()) / 2);
         if (rewards.isEmpty()) {
-            drawScaledString(graphics, Component.literal(sectionLayout.emptyText()), contentX, y + 4, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
+            drawScaledString(graphics, Component.literal(sectionLayout.emptyText()), contentX, contentY, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
             return y + sectionLayout.height();
         }
 
@@ -1523,7 +1526,7 @@ public class OverhaulQuestScreen extends Screen {
             int col = i % sectionLayout.columns();
             int row = i / sectionLayout.columns();
             int iconX = contentX + col * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_X);
-            int iconY = y + row * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_Y);
+            int iconY = contentY + row * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_Y);
             Rect iconRect = new Rect(iconX, iconY, MODAL_SECTION_ICON_SIZE, MODAL_SECTION_ICON_SIZE);
 
             renderSectionIconSlot(graphics, iconRect, reward.canClaim() || reward.claimed());
@@ -1544,10 +1547,10 @@ public class OverhaulQuestScreen extends Screen {
         return y + sectionLayout.height();
     }
 
-    private void drawSectionHeading(GuiGraphics graphics, String label, int x, int y) {
+    private void drawSectionHeading(GuiGraphics graphics, String label, int x, int y, int width) {
         int labelHeight = Math.max(8, Math.round(font.lineHeight * MODAL_SECTION_LABEL_SCALE));
-        int textY = y + Math.max(0, (MODAL_SECTION_ICON_SIZE - labelHeight) / 2);
-        drawScaledString(graphics, Component.literal(label + ":"), x, textY, 0xFFF6ECD6, MODAL_SECTION_LABEL_SCALE);
+        int textY = y;
+        drawCenteredScaledString(graphics, Component.literal(label + ":"), x + width / 2, textY, 0xFFF6ECD6, MODAL_SECTION_LABEL_SCALE);
     }
 
     private void renderSectionIconSlot(GuiGraphics graphics, Rect iconRect, boolean active) {
@@ -1691,18 +1694,19 @@ public class OverhaulQuestScreen extends Screen {
         if (count <= 0) {
             int noteHeight = Math.max(8, Math.round(font.lineHeight * MODAL_SECTION_NOTE_SCALE));
             int noteWidth = Math.round(font.width(Component.literal(emptyText)) * MODAL_SECTION_NOTE_SCALE);
-            return new IconSectionLayout(label, 1, 0, labelWidth, labelHeight,
-                    labelWidth + MODAL_SECTION_ITEM_GAP + noteWidth,
-                    Math.max(labelHeight, noteHeight), emptyText);
+            int width = Math.max(labelWidth, noteWidth);
+            return new IconSectionLayout(label, 1, 0, labelWidth, labelHeight, noteWidth,
+                    width,
+                    labelHeight + MODAL_SECTION_LABEL_GAP + noteHeight, emptyText);
         }
 
         int effectiveColumns = Math.max(1, Math.min(columns, Math.min(MODAL_SECTION_MAX_COLUMNS, count)));
         int rows = Mth.ceil(count / (float) effectiveColumns);
         int gridWidth = effectiveColumns * MODAL_SECTION_ICON_SIZE + Math.max(0, effectiveColumns - 1) * MODAL_SECTION_ICON_GAP_X;
         int gridHeight = rows * MODAL_SECTION_ICON_SIZE + Math.max(0, rows - 1) * MODAL_SECTION_ICON_GAP_Y;
-        return new IconSectionLayout(label, effectiveColumns, rows, labelWidth, labelHeight,
-                labelWidth + MODAL_SECTION_ITEM_GAP + gridWidth,
-                Math.max(labelHeight, gridHeight), emptyText);
+        return new IconSectionLayout(label, effectiveColumns, rows, labelWidth, labelHeight, gridWidth,
+                Math.max(labelWidth, gridWidth),
+                labelHeight + MODAL_SECTION_LABEL_GAP + gridHeight, emptyText);
     }
 
     private List<FormattedCharSequence> flattenDescription(List<Component> description, int maxWidth) {
@@ -2489,6 +2493,7 @@ public class OverhaulQuestScreen extends Screen {
             int rows,
             int labelWidth,
             int labelHeight,
+            int contentWidth,
             int width,
             int height,
             String emptyText

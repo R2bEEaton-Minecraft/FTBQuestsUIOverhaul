@@ -120,14 +120,14 @@ public class QuestViewState {
     }
 
     public boolean isFreePan(long chapterId) {
-        return chapterFreePanStates.getOrDefault(chapterId, false);
+        return chapterFreePanStates.getOrDefault(chapterId, true);
     }
 
     public void setFreePan(long chapterId, boolean freePan) {
         if (freePan) {
-            chapterFreePanStates.put(chapterId, true);
-        } else {
             chapterFreePanStates.remove(chapterId);
+        } else {
+            chapterFreePanStates.put(chapterId, false);
         }
     }
 

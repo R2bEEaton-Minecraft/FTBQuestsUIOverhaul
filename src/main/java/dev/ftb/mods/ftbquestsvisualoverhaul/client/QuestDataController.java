@@ -122,9 +122,7 @@ public class QuestDataController {
         Map<Long, Boolean> freePanStates = new LinkedHashMap<>();
         for (String key : properties.stringPropertyNames()) {
             try {
-                if (Boolean.parseBoolean(properties.getProperty(key))) {
-                    freePanStates.put(Long.parseUnsignedLong(key), true);
-                }
+                freePanStates.put(Long.parseUnsignedLong(key), Boolean.parseBoolean(properties.getProperty(key)));
             } catch (Exception ex) {
                 System.err.println("Ignoring invalid FTB Quests UI Overhaul free-pan entry: " + key + "=" + properties.getProperty(key));
             }
@@ -135,8 +133,8 @@ public class QuestDataController {
     private static void savePersistentFreePanStates() {
         Properties properties = new Properties();
         for (Map.Entry<Long, Boolean> entry : persistedViewState.getChapterFreePanStates().entrySet()) {
-            if (Boolean.TRUE.equals(entry.getValue())) {
-                properties.setProperty(Long.toUnsignedString(entry.getKey()), "true");
+            if (Boolean.FALSE.equals(entry.getValue())) {
+                properties.setProperty(Long.toUnsignedString(entry.getKey()), "false");
             }
         }
 
