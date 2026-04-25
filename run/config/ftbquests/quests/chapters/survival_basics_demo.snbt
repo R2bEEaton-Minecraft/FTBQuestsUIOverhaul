@@ -1,73 +1,67 @@
 {
-  id: "1000000000001001",
-  filename: "survival_basics_demo",
-  title: "Survival Basics Demo",
-  icon: "minecraft:stone_pickaxe",
-  subtitle: [
-    "A second chapter for chapter-switching tests"
-  ],
-  group: "4000000000000001",
-  order_index: 1,
-  default_quest_shape: "",
-  default_hide_dependency_lines: false,
-  quests: [
-    {
-      id: "1000000000001101",
-      title: "Mine Stone",
-      subtitle: "Basic progression",
-      icon: "minecraft:cobblestone",
-      x: 0.0d,
-      y: 0.0d,
-      description: [
-        "Collect a piece of cobblestone to begin the second demo chapter.",
-        "This exists purely so the left-side chapter selector has another visible chapter to switch to."
-      ],
-      tasks: [
-        {
-          id: "1000000000001201",
-          type: "item",
-          item: "minecraft:cobblestone"
-        }
-      ],
-      rewards: [
-        {
-          id: "1000000000001301",
-          type: "item",
-          item: "minecraft:stick",
-          count: 4
-        }
-      ]
-    },
-    {
-      id: "1000000000001102",
-      title: "Upgrade to Iron",
-      subtitle: "Follow-up",
-      icon: "minecraft:iron_ingot",
-      x: 3.0d,
-      y: 1.0d,
-      dependencies: [
-        "1000000000001101"
-      ],
-      description: [
-        "Obtain an iron ingot to confirm chapter navigation and quest rendering in a different tree.",
-        "This gives the second chapter at least one dependency link to render."
-      ],
-      tasks: [
-        {
-          id: "1000000000001202",
-          type: "item",
-          item: "minecraft:iron_ingot"
-        }
-      ],
-      rewards: [
-        {
-          id: "1000000000001302",
-          type: "item",
-          item: "minecraft:bread",
-          count: 2
-        }
-      ]
-    }
-  ],
-  quest_links: []
+	default_hide_dependency_lines: false
+	default_quest_shape: ""
+	filename: "survival_basics_demo"
+	group: "4000000000000001"
+	icon: {
+		Count: 1
+		id: "minecraft:stone_pickaxe"
+		tag: {
+			Damage: 0
+		}
+	}
+	id: "1000000000001001"
+	order_index: 1
+	quest_links: [ ]
+	quests: [
+		{
+			description: [
+				"Collect a piece of cobblestone to begin the second demo chapter."
+				"This exists purely so the left-side chapter selector has another visible chapter to switch to."
+			]
+			icon: "minecraft:cobblestone"
+			id: "1000000000001101"
+			rewards: [{
+				count: 4
+				id: "1000000000001301"
+				item: "minecraft:stick"
+				type: "item"
+			}]
+			subtitle: "Basic progression"
+			tasks: [{
+				id: "1000000000001201"
+				item: "minecraft:cobblestone"
+				type: "item"
+			}]
+			title: "Mine Stone"
+			x: 0.0d
+			y: 0.0d
+		}
+		{
+			dependencies: ["1000000000001101"]
+			description: [
+				"Obtain an iron ingot to confirm chapter navigation and quest rendering in a different tree."
+				"This gives the second chapter at least one dependency link to render."
+			]
+			icon: "minecraft:iron_ingot"
+			id: "1000000000001102"
+			rewards: [{
+				count: 2
+				id: "1000000000001302"
+				item: "minecraft:bread"
+				type: "item"
+			}]
+			subtitle: "Follow-up"
+			tasks: [{
+				id: "1000000000001202"
+				item: "minecraft:iron_ingot"
+				type: "item"
+			}]
+			title: "Upgrade to Iron"
+			x: 3.0d
+			y: 1.0d
+		}
+	]
+	subtitle: ["A second chapter for chapter-switching tests"]
+	title: "Survival Basics Demo"
 }

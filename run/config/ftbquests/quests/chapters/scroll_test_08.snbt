@@ -1,42 +1,33 @@
 {
-  id: "2000000000000008",
-  filename: "scroll_test_08",
-  title: "Scroll Test 08",
-  icon: "minecraft:lapis_lazuli",
-  subtitle: [
-    "Extra chapter for chapter selector scrolling tests"
-  ],
-  group: "4000000000000002",
-  order_index: 17,
-  default_quest_shape: "",
-  default_hide_dependency_lines: false,
-  quests: [
-    {
-      id: "2000000000000108",
-      title: "Tap to Complete 08",
-      subtitle: "Quick smoke test",
-      icon: "minecraft:lapis_lazuli",
-      x: 0.0d,
-      y: 0.0d,
-      description: [
-        "A disposable test quest for sidebar scrolling.",
-        "This chapter exists so the selector has more entries."
-      ],
-      tasks: [
-        {
-          id: "2000000000000208",
-          type: "checkmark"
-        }
-      ],
-      rewards: [
-        {
-          id: "2000000000000308",
-          type: "item",
-          item: "minecraft:bread",
-          count: 1
-        }
-      ]
-    }
-  ],
-  quest_links: []
+	default_hide_dependency_lines: false
+	default_quest_shape: ""
+	filename: "scroll_test_08"
+	group: "4000000000000002"
+	icon: "minecraft:lapis_lazuli"
+	id: "2000000000000008"
+	order_index: 7
+	quest_links: [ ]
+	quests: [{
+		description: [
+			"A disposable test quest for sidebar scrolling."
+			"This chapter exists so the selector has more entries."
+		]
+		icon: "minecraft:lapis_lazuli"
+		id: "2000000000000108"
+		rewards: [{
+			id: "2000000000000308"
+			item: "minecraft:bread"
+			type: "item"
+		}]
+		subtitle: "Quick smoke test"
+		tasks: [{
+			id: "2000000000000208"
+			type: "checkmark"
+		}]
+		title: "Tap to Complete 08"
+		x: 0.0d
+		y: 0.0d
+	}]
+	subtitle: ["Extra chapter for chapter selector scrolling tests"]
+	title: "Scroll Test 08"
 }

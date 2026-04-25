@@ -1,42 +1,33 @@
 {
-  id: "2000000000000010",
-  filename: "scroll_test_10",
-  title: "Scroll Test 10",
-  icon: "minecraft:copper_ingot",
-  subtitle: [
-    "Extra chapter for chapter selector scrolling tests"
-  ],
-  group: "4000000000000002",
-  order_index: 19,
-  default_quest_shape: "",
-  default_hide_dependency_lines: false,
-  quests: [
-    {
-      id: "2000000000000110",
-      title: "Tap to Complete 10",
-      subtitle: "Quick smoke test",
-      icon: "minecraft:copper_ingot",
-      x: 0.0d,
-      y: 0.0d,
-      description: [
-        "A disposable test quest for sidebar scrolling.",
-        "This chapter exists so the selector has more entries."
-      ],
-      tasks: [
-        {
-          id: "2000000000000210",
-          type: "checkmark"
-        }
-      ],
-      rewards: [
-        {
-          id: "2000000000000310",
-          type: "item",
-          item: "minecraft:bread",
-          count: 1
-        }
-      ]
-    }
-  ],
-  quest_links: []
+	default_hide_dependency_lines: false
+	default_quest_shape: ""
+	filename: "scroll_test_10"
+	group: "4000000000000002"
+	icon: "minecraft:copper_ingot"
+	id: "2000000000000010"
+	order_index: 9
+	quest_links: [ ]
+	quests: [{
+		description: [
+			"A disposable test quest for sidebar scrolling."
+			"This chapter exists so the selector has more entries."
+		]
+		icon: "minecraft:copper_ingot"
+		id: "2000000000000110"
+		rewards: [{
+			id: "2000000000000310"
+			item: "minecraft:bread"
+			type: "item"
+		}]
+		subtitle: "Quick smoke test"
+		tasks: [{
+			id: "2000000000000210"
+			type: "checkmark"
+		}]
+		title: "Tap to Complete 10"
+		x: 0.0d
+		y: 0.0d
+	}]
+	subtitle: ["Extra chapter for chapter selector scrolling tests"]
+	title: "Scroll Test 10"
 }

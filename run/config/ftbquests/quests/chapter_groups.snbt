@@ -1,7 +1,7 @@
 {
-  chapter_groups: [
-    { id: "4000000000000001", title: "Demo Chapters" },
-    { id: "4000000000000002", title: "Scroll Tests" },
-    { id: "4000000000000003", title: "Stress Tests" }
-  ]
+	chapter_groups: [
+		{ id: "4000000000000001", title: "Demo Chapters" }
+		{ id: "4000000000000002", title: "Scroll Tests" }
+		{ id: "4000000000000003", title: "Stress Tests" }
+	]
 }

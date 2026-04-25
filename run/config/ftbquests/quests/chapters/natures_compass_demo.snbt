@@ -1,212 +1,176 @@
 {
-  id: "1000000000000001",
-  filename: "natures_compass_demo",
-  title: "Nature's Compass Demo",
-  icon: "naturescompass:naturescompass",
-  subtitle: [
-    "A compact real-mod quest line for UI testing"
-  ],
-  group: "4000000000000001",
-  order_index: 0,
-  default_quest_shape: "",
-  default_hide_dependency_lines: false,
-  quests: [
-    {
-      id: "1000000000000101",
-      title: "Gather a Compass",
-      subtitle: "Vanilla setup",
-      icon: "minecraft:compass",
-      x: 0.0d,
-      y: 0.0d,
-      description: [
-        "Craft or obtain a vanilla compass.",
-        "This non-consuming task is here to exercise automatic item progress."
-      ],
-      tasks: [
-        {
-          id: "1000000000000201",
-          type: "item",
-          item: "minecraft:compass"
-        }
-      ],
-      rewards: [
-        {
-          id: "1000000000000301",
-          type: "item",
-          item: "minecraft:paper",
-          count: 8
-        }
-      ]
-    },
-    {
-      id: "1000000000000102",
-      title: "Bring a Sapling",
-      subtitle: "Consumable test",
-      icon: "minecraft:oak_sapling",
-      x: 0.0d,
-      y: 2.0d,
-      description: [
-        "Bring an oak sapling for the Nature's Compass recipe.",
-        "This task consumes the item so the addon's submit path gets exercised."
-      ],
-      tasks: [
-        {
-          id: "1000000000000202",
-          type: "item",
-          item: "minecraft:oak_sapling",
-          consume_items: true
-        }
-      ],
-      rewards: [
-        {
-          id: "1000000000000302",
-          type: "item",
-          item: "minecraft:redstone",
-          count: 4
-        }
-      ]
-    },
-    {
-      id: "1000000000000103",
-      title: "Build Nature's Compass",
-      subtitle: "Real mod item",
-      icon: "naturescompass:naturescompass",
-      x: 3.0d,
-      y: 1.0d,
-      dependencies: [
-        "1000000000000101",
-        "1000000000000102"
-      ],
-      description: [
-        "Craft Nature's Compass itself.",
-        "Once you have it in your inventory, the quest should complete automatically."
-      ],
-      tasks: [
-        {
-          id: "1000000000000203",
-          type: "item",
-          item: "naturescompass:naturescompass"
-        }
-      ],
-      rewards: [
-        {
-          id: "1000000000000303",
-          type: "choice",
-          title: "Field Kit",
-          table_id: -1L,
-          table_data: {
-            loot_size: 1,
-            rewards: [
-              {
-                item: "minecraft:bread",
-                count: 8
-              },
-              {
-                item: "minecraft:torch",
-                count: 16
-              },
-              {
-                item: "minecraft:oak_sapling",
-                count: 4
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      id: "1000000000000104",
-      title: "Map a Warm Biome",
-      subtitle: "Manual branch",
-      icon: "minecraft:sand",
-      x: 6.0d,
-      y: 0.0d,
-      dependencies: [
-        "1000000000000103"
-      ],
-      description: [
-        "Use Nature's Compass to search for a warm biome such as a desert or savanna.",
-        "Mark this complete manually once you've used the compass."
-      ],
-      tasks: [
-        {
-          id: "1000000000000204",
-          type: "checkmark"
-        }
-      ],
-      rewards: [
-        {
-          id: "1000000000000304",
-          type: "item",
-          item: "minecraft:gold_ingot",
-          count: 2
-        }
-      ]
-    },
-    {
-      id: "1000000000000105",
-      title: "Map a Cool Biome",
-      subtitle: "Manual branch",
-      icon: "minecraft:snowball",
-      x: 6.0d,
-      y: 2.0d,
-      dependencies: [
-        "1000000000000103"
-      ],
-      description: [
-        "Use Nature's Compass to search for a cool biome such as snowy plains or taiga.",
-        "This gives you a second branch so the screen has an actual mini tree to render."
-      ],
-      tasks: [
-        {
-          id: "1000000000000205",
-          type: "checkmark"
-        }
-      ],
-      rewards: [
-        {
-          id: "1000000000000305",
-          type: "item",
-          item: "minecraft:lapis_lazuli",
-          count: 4
-        }
-      ]
-    },
-    {
-      id: "1000000000000106",
-      title: "Complete the Survey",
-      subtitle: "Final merge",
-      icon: "minecraft:map",
-      x: 9.0d,
-      y: 1.0d,
-      dependencies: [
-        "1000000000000104",
-        "1000000000000105"
-      ],
-      description: [
-        "Finish both branches to complete the demo.",
-        "This quest gives a final reward so you can test claim-all on multiple completed quests."
-      ],
-      tasks: [
-        {
-          id: "1000000000000206",
-          type: "checkmark"
-        }
-      ],
-      rewards: [
-        {
-          id: "1000000000000306",
-          type: "item",
-          item: "minecraft:emerald",
-          count: 4
-        },
-        {
-          id: "1000000000000307",
-          type: "xp_levels",
-          xp_levels: 3
-        }
-      ]
-    }
-  ],
-  quest_links: []
+	default_hide_dependency_lines: false
+	default_quest_shape: ""
+	filename: "natures_compass_demo"
+	group: "4000000000000001"
+	icon: "naturescompass:naturescompass"
+	id: "1000000000000001"
+	order_index: 0
+	quest_links: [ ]
+	quests: [
+		{
+			description: [
+				"Craft or obtain a vanilla compass."
+				"This non-consuming task is here to exercise automatic item progress."
+			]
+			icon: "minecraft:compass"
+			id: "1000000000000101"
+			rewards: [{
+				count: 8
+				id: "1000000000000301"
+				item: "minecraft:paper"
+				type: "item"
+			}]
+			subtitle: "Vanilla setup"
+			tasks: [{
+				id: "1000000000000201"
+				item: "minecraft:compass"
+				type: "item"
+			}]
+			title: "Gather a Compass"
+			x: 0.0d
+			y: 0.0d
+		}
+		{
+			description: [
+				"Bring an oak sapling for the Nature's Compass recipe."
+				"This task consumes the item so the addon's submit path gets exercised."
+			]
+			icon: "minecraft:oak_sapling"
+			id: "1000000000000102"
+			rewards: [{
+				count: 4
+				id: "1000000000000302"
+				item: "minecraft:redstone"
+				type: "item"
+			}]
+			subtitle: "Consumable test"
+			tasks: [{
+				consume_items: true
+				id: "1000000000000202"
+				item: "minecraft:oak_sapling"
+				type: "item"
+			}]
+			title: "Bring a Sapling"
+			x: 0.0d
+			y: 2.0d
+		}
+		{
+			dependencies: [
+				"1000000000000101"
+				"1000000000000102"
+			]
+			description: [
+				"Craft Nature's Compass itself."
+				"Once you have it in your inventory, the quest should complete automatically."
+			]
+			icon: "naturescompass:naturescompass"
+			id: "1000000000000103"
+			rewards: [{
+				id: "1000000000000303"
+				table_data: {
+					loot_size: 1
+					rewards: [
+						{ count: 8, item: "minecraft:bread" }
+						{ count: 16, item: "minecraft:torch" }
+						{ count: 4, item: "minecraft:oak_sapling" }
+					]
+					title: "Internal"
+				}
+				table_id: -1L
+				title: "Field Kit"
+				type: "choice"
+			}]
+			subtitle: "Real mod item"
+			tasks: [{
+				id: "1000000000000203"
+				item: "naturescompass:naturescompass"
+				type: "item"
+			}]
+			title: "Build Nature's Compass"
+			x: 3.0d
+			y: 1.0d
+		}
+		{
+			dependencies: ["1000000000000103"]
+			description: [
+				"Use Nature's Compass to search for a warm biome such as a desert or savanna."
+				"Mark this complete manually once you've used the compass."
+			]
+			icon: "minecraft:sand"
+			id: "1000000000000104"
+			rewards: [{
+				count: 2
+				id: "1000000000000304"
+				item: "minecraft:gold_ingot"
+				type: "item"
+			}]
+			subtitle: "Manual branch"
+			tasks: [{
+				id: "1000000000000204"
+				type: "checkmark"
+			}]
+			title: "Map a Warm Biome"
+			x: 6.0d
+			y: 0.0d
+		}
+		{
+			dependencies: ["1000000000000103"]
+			description: [
+				"Use Nature's Compass to search for a cool biome such as snowy plains or taiga."
+				"This gives you a second branch so the screen has an actual mini tree to render."
+			]
+			icon: "minecraft:snowball"
+			id: "1000000000000105"
+			rewards: [{
+				count: 4
+				id: "1000000000000305"
+				item: "minecraft:lapis_lazuli"
+				type: "item"
+			}]
+			subtitle: "Manual branch"
+			tasks: [{
+				id: "1000000000000205"
+				type: "checkmark"
+			}]
+			title: "Map a Cool Biome"
+			x: 6.0d
+			y: 2.0d
+		}
+		{
+			dependencies: [
+				"1000000000000104"
+				"1000000000000105"
+			]
+			description: [
+				"Finish both branches to complete the demo."
+				"This quest gives a final reward so you can test claim-all on multiple completed quests."
+			]
+			icon: "minecraft:map"
+			id: "1000000000000106"
+			rewards: [
+				{
+					count: 4
+					id: "1000000000000306"
+					item: "minecraft:emerald"
+					type: "item"
+				}
+				{
+					id: "1000000000000307"
+					type: "xp_levels"
+					xp_levels: 3
+				}
+			]
+			subtitle: "Final merge"
+			tasks: [{
+				id: "1000000000000206"
+				type: "checkmark"
+			}]
+			title: "Complete the Survey"
+			x: 9.0d
+			y: 1.0d
+		}
+	]
+	subtitle: ["A compact real-mod quest line for UI testing"]
+	title: "Nature's Compass Demo"
 }
