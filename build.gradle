@@ -46,6 +46,9 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven { url = 'https://maven.minecraftforge.net' }
+    flatDir {
+        dirs 'run/mods-disabled'
+    }
     maven {
         url = 'https://www.cursemaven.com'
         content {
@@ -82,6 +85,17 @@ dependencies {
 
     // Demo content mod used by the example quest tree under run/config/ftbquests/quests
     runtimeOnly fg.deobf("curse.maven:natures-compass-252848:4712189")
+
+    // Local dev-only mod kept outside run/mods so ForgeGradle can remap it for userdev.
+    if (file("run/mods-disabled/cosmeticarmorreworked-1.20.1-v1a.jar").exists()) {
+        runtimeOnly fg.deobf("dev.local:cosmeticarmorreworked:1.20.1-v1a")
+    }
+    if (file("run/mods-disabled/ApothicAttributes-1.20.1-1.3.7.jar").exists()) {
+        runtimeOnly fg.deobf("dev.local:ApothicAttributes:1.20.1-1.3.7")
+    }
+    if (file("run/mods-disabled/Placebo-1.20.1-8.6.3.jar").exists()) {
+        runtimeOnly fg.deobf("dev.local:Placebo:1.20.1-8.6.3")
+    }
 }
 
 tasks.named('processResources', ProcessResources).configure {
