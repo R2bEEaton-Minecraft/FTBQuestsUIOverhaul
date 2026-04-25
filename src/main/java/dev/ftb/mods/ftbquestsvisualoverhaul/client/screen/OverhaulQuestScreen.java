@@ -67,6 +67,8 @@ public class OverhaulQuestScreen extends Screen {
     private static final int TREE_HEIGHT = 173;
     private static final int CHAPTER_SELECTOR_X = 15;
     private static final int CHAPTER_SELECTOR_Y = 13;
+    private static final int CHAPTER_SELECTOR_TITLE_HEIGHT = 10;
+    private static final int CHAPTER_SELECTOR_TITLE_BOTTOM_GAP = 8;
     private static final int CHAPTER_SELECTOR_BOTTOM_PADDING = 18;
     private static final int CHAPTER_BUTTON_ACTIVE_WIDTH = 98;
     private static final int CHAPTER_BUTTON_REGULAR_WIDTH = 86;
@@ -77,6 +79,8 @@ public class OverhaulQuestScreen extends Screen {
     private static final int CHAPTER_SELECTOR_ICON_SIZE = 13;
     private static final int CHAPTER_SELECTOR_ICON_X_OFFSET = 5;
     private static final int CHAPTER_SELECTOR_TEXT_X_OFFSET = 21;
+    private static final int CHAPTER_SELECTOR_TEXT_Y_OFFSET = 2;
+    private static final int CHAPTER_GROUP_TEXT_Y_OFFSET = 5;
     private static final int CHAPTER_SELECTOR_TEXT_RIGHT_PADDING = 5;
     private static final int CHAPTER_SCROLLBAR_WIDTH = 1;
     private static final int CHAPTER_SCROLLBAR_GAP = 2;
@@ -84,14 +88,27 @@ public class OverhaulQuestScreen extends Screen {
     private static final int CHAPTER_SCROLLBAR_MIN_THUMB_HEIGHT = 11;
     private static final int CHAPTER_SELECTOR_BOTTOM_SHADOW_HEIGHT = 13;
     private static final float CHAPTER_SELECTOR_TEXT_SCALE = 0.6F;
+    private static final float CHAPTER_SELECTOR_TITLE_SCALE = 0.7F;
     private static final float CHAPTER_GROUP_TEXT_SCALE = 0.65F;
     private static final int CHAPTER_GROUP_HEADER_HEIGHT = 15;
+    private static final int CREATIVE_TREE_BUTTON_HEIGHT = 10;
+    private static final int CREATIVE_TREE_BUTTON_PADDING_X = 4;
+    private static final int CREATIVE_TREE_BUTTON_MIN_WIDTH = 32;
+    private static final float CREATIVE_TREE_BUTTON_TEXT_SCALE = 0.5F;
+    private static final int MODE_SWITCH_BUTTON_HEIGHT = 14;
+    private static final int MODE_SWITCH_BUTTON_PADDING_X = 6;
+    private static final int MODE_SWITCH_BUTTON_MIN_WIDTH = 64;
+    private static final int MODE_SWITCH_BUTTON_MARGIN = 8;
     private static final int ACTIVE_CHAPTER_TITLE_TOP_PADDING = 12;
     private static final int ACTIVE_CHAPTER_TITLE_BOTTOM_PADDING = 4;
     private static final int ACTIVE_CHAPTER_TITLE_SIDE_PADDING = 5;
     private static final int ACTIVE_CHAPTER_TITLE_ICON_SIZE = 11;
     private static final int ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING = 4;
+    private static final int ACTIVE_CHAPTER_TITLE_Y_OFFSET = -1;
+    private static final float ACTIVE_CHAPTER_TITLE_TEXT_Y_OFFSET = 0.5F;
+    private static final float ACTIVE_CHAPTER_TITLE_ICON_EXTRA_Y_OFFSET = -0.5F;
     private static final float ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET = 2.0F;
+    private static final Component CHAPTER_SELECTOR_TITLE = Component.literal("QUEST CHAPTERS");
 
     // --- Vanilla advancement textures ---
     private static final ResourceLocation WINDOW_LOCATION = new ResourceLocation("textures/gui/advancements/window.png");
@@ -106,6 +123,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final ResourceLocation OAK_PLANKS_TEXTURE = new ResourceLocation("minecraft", "textures/block/oak_planks.png");
     private static final ResourceLocation FTB_QUEST_LOCKED_TEXTURE = new ResourceLocation("ftbquests", "textures/gui/quest_locked.png");
     private static final ResourceLocation FTB_QUEST_CHECK_TEXTURE = new ResourceLocation("ftblibrary", "textures/icons/accept.png");
+    private static final ResourceLocation FTB_QUEST_ALERT_TEXTURE = new ResourceLocation("ftbquests", "textures/gui/alert.png");
     private static final int ADVANCEMENT_PANEL_TEXTURE_WIDTH = 200;
     private static final int ADVANCEMENT_PANEL_TEXTURE_HEIGHT = 26;
     private static final int ADVANCEMENT_PANEL_TEXTURE_BORDER = 10;
@@ -175,7 +193,6 @@ public class OverhaulQuestScreen extends Screen {
     private final QuestViewState viewState;
     private final List<ClickTarget> clickTargets = new ArrayList<>();
     private final List<TooltipTarget> modalTooltipTargets = new ArrayList<>();
-    private final Set<Long> collapsedChapterGroups = new HashSet<>();
     private final Set<ResourceLocation> missingModalTextures = new HashSet<>();
 
     private final Map<Long, NodeLayout> visibleQuestNodes = new HashMap<>();
@@ -532,6 +549,7 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderChapterSelector(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, boolean interactive) {
+        renderChapterSelectorHeader(graphics);
         Rect viewportRect = chapterSelectorViewportRect();
         clampChapterScroll(snapshot);
         int y = viewportRect.y() - Mth.floor(chapterScroll);
@@ -541,15 +559,15 @@ public class OverhaulQuestScreen extends Screen {
         for (QuestDataSnapshot.ChapterSnapshot chapter : snapshot.chapters()) {
             if (chapter.firstInGroup()) {
                 boolean collapsed = isChapterGroupCollapsed(chapter.groupId());
-                Rect headerRect = new Rect(viewportRect.x(), y, viewportRect.width(), CHAPTER_GROUP_HEADER_HEIGHT);
+                Rect headerRect = new Rect(viewportRect.x(), y, CHAPTER_BUTTON_REGULAR_WIDTH, CHAPTER_GROUP_HEADER_HEIGHT);
                 boolean headerHovered = interactive && headerRect.contains(mouseX, mouseY);
                 if (headerRect.intersects(viewportRect)) {
                     graphics.fill(headerRect.x(), headerRect.y() + 1, headerRect.maxX() - 4, headerRect.maxY() - 1,
                             headerHovered ? 0x99221712 : 0x77140E0C);
                     drawScaledString(graphics, Component.literal(collapsed ? ">" : "v"),
-                            headerRect.x() + 4, headerRect.y() + 3, 0xFFF0E4CB, CHAPTER_GROUP_TEXT_SCALE);
+                            headerRect.x() + 4, headerRect.y() + CHAPTER_GROUP_TEXT_Y_OFFSET, 0xFFF0E4CB, CHAPTER_GROUP_TEXT_SCALE);
                     drawScaledString(graphics, trim(chapter.groupTitle(), headerRect.width() - 17, CHAPTER_GROUP_TEXT_SCALE),
-                            headerRect.x() + 13, headerRect.y() + 3, 0xFFF0E4CB, CHAPTER_GROUP_TEXT_SCALE);
+                            headerRect.x() + 13, headerRect.y() + CHAPTER_GROUP_TEXT_Y_OFFSET, 0xFFF0E4CB, CHAPTER_GROUP_TEXT_SCALE);
                 }
                 if (interactive) {
                     addClippedClickTarget(headerRect, viewportRect, () -> toggleChapterGroup(chapter.groupId()));
@@ -583,7 +601,7 @@ public class OverhaulQuestScreen extends Screen {
 
                 float scaledTextHeight = font.lineHeight * CHAPTER_SELECTOR_TEXT_SCALE;
                 int textLeft = buttonRect.x() + CHAPTER_SELECTOR_TEXT_X_OFFSET;
-                int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + 2;
+                int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + CHAPTER_SELECTOR_TEXT_Y_OFFSET;
                 int availableWidth = buttonRect.maxX() - textLeft - CHAPTER_SELECTOR_TEXT_RIGHT_PADDING;
                 int textColor = selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
                 renderScrollingChapterLabel(graphics, chapter.title(), buttonRect, textLeft, textY, availableWidth, textColor, hovered || selected);
@@ -599,6 +617,12 @@ public class OverhaulQuestScreen extends Screen {
         renderChapterSelectorBottomShadow(graphics, viewportRect, snapshot);
         graphics.disableScissor();
         renderChapterScrollbar(graphics, snapshot);
+    }
+
+    private void renderChapterSelectorHeader(GuiGraphics graphics) {
+        Rect headerRect = chapterSelectorHeaderRect();
+        int titleY = headerRect.y() + Math.max(0, (headerRect.height() - Math.round(font.lineHeight * CHAPTER_SELECTOR_TITLE_SCALE)) / 2);
+        drawCenteredScaledString(graphics, CHAPTER_SELECTOR_TITLE, headerRect.centerX(), titleY, 0xFFF2E8D6, CHAPTER_SELECTOR_TITLE_SCALE);
     }
 
     private void renderChapterSelectorBottomShadow(GuiGraphics graphics, Rect viewportRect, QuestDataSnapshot snapshot) {
@@ -633,9 +657,10 @@ public class OverhaulQuestScreen extends Screen {
 
         int scaledTextHeight = Math.max(1, Math.round(font.lineHeight * CHAPTER_SELECTOR_TEXT_SCALE));
         int rowTextOffset = Mth.floor((CHAPTER_BUTTON_HEIGHT - scaledTextHeight) * 0.5F) + 2;
-        int rowY = frame.y() + ACTIVE_CHAPTER_TITLE_TOP_PADDING - rowTextOffset;
-        int textY = rowY + rowTextOffset;
-        float iconY = rowY + Math.max(0, (CHAPTER_BUTTON_HEIGHT - ACTIVE_CHAPTER_TITLE_ICON_SIZE) / 2) + ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET;
+        int rowY = frame.y() + ACTIVE_CHAPTER_TITLE_TOP_PADDING - rowTextOffset + ACTIVE_CHAPTER_TITLE_Y_OFFSET;
+        float textY = rowY + rowTextOffset + ACTIVE_CHAPTER_TITLE_TEXT_Y_OFFSET;
+        float iconY = rowY + Math.max(0, (CHAPTER_BUTTON_HEIGHT - ACTIVE_CHAPTER_TITLE_ICON_SIZE) / 2)
+                + ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET + ACTIVE_CHAPTER_TITLE_ICON_EXTRA_Y_OFFSET;
         int separatorWidth = Math.round(font.width(separator) * CHAPTER_SELECTOR_TEXT_SCALE);
         int titleWidth = Math.round(font.width(title) * CHAPTER_SELECTOR_TEXT_SCALE);
         int totalWidth = ACTIVE_CHAPTER_TITLE_ICON_SIZE
@@ -680,11 +705,13 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         Rect frame = frameRect();
-        Rect freePanButton = new Rect(frame.x() + TREE_X + 1, frame.y() + TREE_Y + 2, 72, 11);
-        Rect titleButton = new Rect(frame.x() + TREE_X + TREE_WIDTH - 72, frame.y() + TREE_Y + 2, 68, 11);
-        renderSmallOverlayButton(graphics, freePanButton, isCurrentChapterFreePan() ? "Free Pan: On" : "Free Pan: Off",
-                interactive && freePanButton.contains(mouseX, mouseY), isCurrentChapterFreePan() ? 0xFFE6D176 : 0xFFE68E7C);
-        renderSmallOverlayButton(graphics, titleButton, "Change Tile", interactive && titleButton.contains(mouseX, mouseY), 0xFFF2E8D6);
+        Component freePanLabel = Component.literal(isCurrentChapterFreePan() ? "Free Pan: On" : "Free Pan: Off");
+        Component titleLabel = Component.literal("Change Tile");
+        int buttonY = frame.y() + TREE_Y + 1;
+        Rect freePanButton = creativeTreeButtonRect(frame.x() + TREE_X + 1, buttonY, freePanLabel);
+        Rect titleButton = creativeTreeButtonRectRight(frame.x() + TREE_X + TREE_WIDTH - 4, buttonY, titleLabel);
+        renderCreativeTreeButton(graphics, freePanButton, freePanLabel, interactive && freePanButton.contains(mouseX, mouseY));
+        renderCreativeTreeButton(graphics, titleButton, titleLabel, interactive && titleButton.contains(mouseX, mouseY));
 
         if (interactive) {
             clickTargets.add(new ClickTarget(freePanButton, this::toggleCurrentChapterFreePan));
@@ -692,10 +719,25 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
-    private void renderSmallOverlayButton(GuiGraphics graphics, Rect rect, String label, boolean hovered, int textColor) {
-        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), hovered ? 0xCC3A2B1C : 0x99201510);
-        drawInsetBorder(graphics, rect, hovered ? 0xE0C8A15C : 0xAA6F5535, 0xAA120D09);
-        drawCenteredScaledString(graphics, Component.literal(label), rect.centerX(), rect.y() + 3, textColor, 0.45F);
+    private Rect creativeTreeButtonRect(int x, int y, Component label) {
+        int width = Math.max(CREATIVE_TREE_BUTTON_MIN_WIDTH,
+                Math.round(font.width(label) * CREATIVE_TREE_BUTTON_TEXT_SCALE) + CREATIVE_TREE_BUTTON_PADDING_X * 2);
+        return new Rect(x, y, width, CREATIVE_TREE_BUTTON_HEIGHT);
+    }
+
+    private Rect creativeTreeButtonRectRight(int rightX, int y, Component label) {
+        int width = Math.max(CREATIVE_TREE_BUTTON_MIN_WIDTH,
+                Math.round(font.width(label) * CREATIVE_TREE_BUTTON_TEXT_SCALE) + CREATIVE_TREE_BUTTON_PADDING_X * 2);
+        return new Rect(rightX - width, y, width, CREATIVE_TREE_BUTTON_HEIGHT);
+    }
+
+    private void renderCreativeTreeButton(GuiGraphics graphics, Rect rect, Component label, boolean hovered) {
+        drawVanillaButton(graphics, rect, true, hovered);
+        float scaledTextWidth = font.width(label) * CREATIVE_TREE_BUTTON_TEXT_SCALE;
+        float scaledTextHeight = font.lineHeight * CREATIVE_TREE_BUTTON_TEXT_SCALE;
+        float textX = rect.x() + (rect.width() - scaledTextWidth) * 0.5F;
+        float textY = rect.y() + (rect.height() - scaledTextHeight) * 0.5F;
+        drawScaledString(graphics, label, textX, textY, hovered ? 0xFFFFA0 : 0xE0E0E0, CREATIVE_TREE_BUTTON_TEXT_SCALE);
     }
 
     private void openChapterTitleTextureSelector() {
@@ -1458,14 +1500,17 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderDefaultViewButton(GuiGraphics graphics, int mouseX, int mouseY) {
-        Rect rect = new Rect(width - 92, height - 18, 84, 12);
+        Component label = Component.literal("Editing Mode");
+        int buttonWidth = Math.max(MODE_SWITCH_BUTTON_MIN_WIDTH, font.width(label) + MODE_SWITCH_BUTTON_PADDING_X * 2);
+        Rect rect = new Rect(width - buttonWidth - MODE_SWITCH_BUTTON_MARGIN,
+                height - MODE_SWITCH_BUTTON_HEIGHT - 4, buttonWidth, MODE_SWITCH_BUTTON_HEIGHT);
         boolean hovered = rect.contains(mouseX, mouseY);
 
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, 260.0F);
-        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), hovered ? 0xAA2A2118 : 0x88201812);
-        drawInsetBorder(graphics, rect, hovered ? 0xAA8C734E : 0x885B4630, 0xAA120D09);
-        drawCenteredScaledString(graphics, Component.literal("Editing Mode"), rect.centerX(), rect.y() + 3, 0xFFD9C6A4, MODAL_TEXT_SCALE);
+        drawVanillaButton(graphics, rect, true, hovered);
+        int textY = rect.y() + Math.max(0, (rect.height() - 8) / 2);
+        graphics.drawCenteredString(font, label, rect.centerX(), textY, hovered ? 0xFFFFA0 : 0xE0E0E0);
         graphics.pose().popPose();
 
         clickTargets.add(new ClickTarget(rect, this::openEditingMode));
@@ -1495,7 +1540,7 @@ public class OverhaulQuestScreen extends Screen {
             renderSectionIconSlot(graphics, iconRect, task.canInteract() || task.completed());
             task.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
             if (task.completed()) {
-                renderSmallCheck(graphics, iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y());
+                renderSmallCheck(graphics, iconRect);
             } else if (task.canInteract() && task.interactionMode() == TaskInteractionMode.SUBMIT) {
                 renderRequirementMarker(graphics, iconRect, true);
             }
@@ -1531,17 +1576,27 @@ public class OverhaulQuestScreen extends Screen {
 
             renderSectionIconSlot(graphics, iconRect, reward.canClaim() || reward.claimed());
             reward.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
-            if (reward.claimed()) {
-                renderSmallCheck(graphics, iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y());
-            } else if (reward.canClaim()) {
-                renderRequirementMarker(graphics, iconRect, true);
-            }
 
             if (reward.canClaim()) {
                 clickTargets.add(new ClickTarget(expand(iconRect, 1), () -> handleRewardClick(reward)));
             }
 
             modalTooltipTargets.add(new TooltipTarget(expand(iconRect, 1), buildRewardTooltip(reward)));
+        }
+
+        for (int i = 0; i < rewards.size(); i++) {
+            QuestDataSnapshot.RewardSnapshot reward = rewards.get(i);
+            int col = i % sectionLayout.columns();
+            int row = i / sectionLayout.columns();
+            int iconX = contentX + col * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_X);
+            int iconY = contentY + row * (MODAL_SECTION_ICON_SIZE + MODAL_SECTION_ICON_GAP_Y);
+            Rect iconRect = new Rect(iconX, iconY, MODAL_SECTION_ICON_SIZE, MODAL_SECTION_ICON_SIZE);
+
+            if (reward.claimed()) {
+                renderSmallCheck(graphics, iconRect);
+            } else if (reward.canClaim()) {
+                renderRequirementMarker(graphics, iconRect, true);
+            }
         }
 
         return y + sectionLayout.height();
@@ -1559,8 +1614,9 @@ public class OverhaulQuestScreen extends Screen {
         drawInsetBorder(graphics, slot, active ? 0xD3A67A43 : 0xAA5E4630, 0xAA120D09);
     }
 
-    private void renderSmallCheck(GuiGraphics graphics, int x, int y) {
-        renderCheckTexture(graphics, x, y, CHECK_BADGE_SIZE);
+    private void renderSmallCheck(GuiGraphics graphics, Rect iconRect) {
+        Rect badge = itemBadgeRect(iconRect);
+        renderCheckTexture(graphics, badge.x(), badge.y(), CHECK_BADGE_SIZE);
     }
 
     private void renderScrollArrow(GuiGraphics graphics, int x, int y, boolean up, boolean active) {
@@ -1570,21 +1626,20 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderRequirementMarker(GuiGraphics graphics, Rect iconRect, boolean active) {
-        Rect badge = new Rect(iconRect.centerX() - 3, iconRect.y() - 4, 6, 6);
-        graphics.fill(badge.x(), badge.y(), badge.maxX(), badge.maxY(), active ? 0xFFD2A63B : 0xAA705C3D);
-        drawInsetBorder(graphics, badge, active ? 0xFFFFE1A3 : 0xCC9B8764, 0xAA24180F);
-        drawCenteredScaledString(graphics, Component.literal("!"), badge.centerX(), badge.y(), active ? 0xFF2B1706 : 0xFF24180F, 0.55F);
+        Rect badge = itemBadgeRect(iconRect);
+        renderBadgeTexture(graphics, FTB_QUEST_ALERT_TEXTURE, badge.x(), badge.y(), CHECK_BADGE_SIZE);
     }
 
     private void drawVanillaButton(GuiGraphics graphics, Rect rect, boolean enabled, boolean hovered) {
         int textureY = !enabled ? 46 : hovered ? 86 : 66;
-        int halfWidth = rect.width() / 2;
-        float yScale = rect.height() / 20F;
+        float scale = rect.height() / 20F;
+        int logicalWidth = Math.max(2, Math.round(rect.width() / scale));
+        int halfWidth = logicalWidth / 2;
         graphics.pose().pushPose();
         graphics.pose().translate(rect.x(), rect.y(), 0F);
-        graphics.pose().scale(1F, yScale, 1F);
+        graphics.pose().scale(scale, scale, 1F);
         graphics.blit(BUTTONS_LOCATION, 0, 0, 0, textureY, halfWidth, 20, 256, 256);
-        graphics.blit(BUTTONS_LOCATION, halfWidth, 0, 200 - (rect.width() - halfWidth), textureY, rect.width() - halfWidth, 20, 256, 256);
+        graphics.blit(BUTTONS_LOCATION, halfWidth, 0, 200 - (logicalWidth - halfWidth), textureY, logicalWidth - halfWidth, 20, 256, 256);
         graphics.pose().popPose();
     }
 
@@ -1612,9 +1667,23 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderCheckTexture(GuiGraphics graphics, int x, int y, int size) {
+        renderBadgeTexture(graphics, FTB_QUEST_CHECK_TEXTURE, x, y, size);
+    }
+
+    private void renderBadgeTexture(GuiGraphics graphics, ResourceLocation texture, int x, int y, int size) {
         RenderSystem.enableBlend();
-        graphics.blit(FTB_QUEST_CHECK_TEXTURE, x, y, 0.0F, 0.0F, size, size, 16, 16);
+        RenderSystem.disableDepthTest();
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 200.0F);
+        graphics.pose().scale(size / 16F, size / 16F, 1.0F);
+        graphics.blit(texture, 0, 0, 0.0F, 0.0F, 16, 16, 16, 16);
+        graphics.pose().popPose();
+        RenderSystem.enableDepthTest();
         RenderSystem.disableBlend();
+    }
+
+    private Rect itemBadgeRect(Rect iconRect) {
+        return new Rect(iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y(), CHECK_BADGE_SIZE, CHECK_BADGE_SIZE);
     }
 
     private Rect footerButtonRect(int x, int y, int width, int containerHeight) {
@@ -1777,6 +1846,7 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         boolean openedChoiceScreen = false;
+        boolean startedClaimFlow = false;
         for (QuestDataSnapshot.RewardSnapshot rewardSnapshot : questSnapshot.rewards()) {
             if (!rewardSnapshot.canClaim()) {
                 continue;
@@ -1789,9 +1859,11 @@ public class OverhaulQuestScreen extends Screen {
 
             if (rewardSnapshot.interactionMode() == RewardInteractionMode.CLAIM) {
                 actionRouter.claimReward(liveReward, true);
+                startedClaimFlow = true;
             } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.CHOICE && !openedChoiceScreen && liveReward instanceof ChoiceReward choiceReward) {
                 minecraft.setScreen(new ChoiceRewardSelectScreen(this, choiceReward, actionRouter));
                 openedChoiceScreen = true;
+                startedClaimFlow = true;
             } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.VANILLA_FALLBACK) {
                 Quest liveQuest = resolveQuest(questSnapshot.id());
                 if (liveQuest != null) {
@@ -1799,6 +1871,10 @@ public class OverhaulQuestScreen extends Screen {
                     return;
                 }
             }
+        }
+
+        if (startedClaimFlow) {
+            unpinQuestIfPinned(questSnapshot);
         }
     }
 
@@ -1821,10 +1897,30 @@ public class OverhaulQuestScreen extends Screen {
 
         if (rewardSnapshot.interactionMode() == RewardInteractionMode.CLAIM) {
             actionRouter.claimReward(liveReward, true);
+            QuestDataSnapshot.QuestSnapshot questSnapshot = QuestDataController.getSnapshot().findQuest(viewState.getViewedQuestId());
+            if (questSnapshot != null) {
+                unpinQuestIfPinned(questSnapshot);
+            }
         } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.CHOICE && liveReward instanceof ChoiceReward choiceReward) {
             minecraft.setScreen(new ChoiceRewardSelectScreen(this, choiceReward, actionRouter));
+            QuestDataSnapshot.QuestSnapshot questSnapshot = QuestDataController.getSnapshot().findQuest(viewState.getViewedQuestId());
+            if (questSnapshot != null) {
+                unpinQuestIfPinned(questSnapshot);
+            }
         } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.VANILLA_FALLBACK) {
             openVanillaSelected();
+        }
+    }
+
+    private void unpinQuestIfPinned(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        if (!questSnapshot.pinned()) {
+            return;
+        }
+
+        Quest liveQuest = resolveQuest(questSnapshot.id());
+        if (liveQuest != null) {
+            actionRouter.togglePin(liveQuest);
+            QuestDataController.markDirty();
         }
     }
 
@@ -2055,12 +2151,22 @@ public class OverhaulQuestScreen extends Screen {
 
     private Rect chapterSelectorViewportRect() {
         Rect frame = frameRect();
-        return new Rect(frame.x() + CHAPTER_SELECTOR_X, frame.y() + CHAPTER_SELECTOR_Y,
+        return new Rect(frame.x() + CHAPTER_SELECTOR_X, frame.y() + CHAPTER_SELECTOR_Y + chapterSelectorHeaderReservedHeight(),
                 CHAPTER_BUTTON_ACTIVE_WIDTH, chapterSelectorViewportHeight());
     }
 
     private int chapterSelectorViewportHeight() {
-        return BACKGROUND_HEIGHT - CHAPTER_SELECTOR_Y - CHAPTER_SELECTOR_BOTTOM_PADDING;
+        return BACKGROUND_HEIGHT - CHAPTER_SELECTOR_Y - chapterSelectorHeaderReservedHeight() - CHAPTER_SELECTOR_BOTTOM_PADDING;
+    }
+
+    private Rect chapterSelectorHeaderRect() {
+        Rect frame = frameRect();
+        return new Rect(frame.x() + CHAPTER_SELECTOR_X, frame.y() + CHAPTER_SELECTOR_Y,
+                CHAPTER_BUTTON_ACTIVE_WIDTH, CHAPTER_SELECTOR_TITLE_HEIGHT);
+    }
+
+    private int chapterSelectorHeaderReservedHeight() {
+        return CHAPTER_SELECTOR_TITLE_HEIGHT + CHAPTER_SELECTOR_TITLE_BOTTOM_GAP;
     }
 
     private Rect chapterScrollbarTrackRect() {
@@ -2114,13 +2220,12 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private boolean isChapterGroupCollapsed(long groupId) {
-        return collapsedChapterGroups.contains(groupId);
+        return !viewState.isChapterGroupExpanded(groupId);
     }
 
     private void toggleChapterGroup(long groupId) {
-        if (!collapsedChapterGroups.remove(groupId)) {
-            collapsedChapterGroups.add(groupId);
-        }
+        viewState.setChapterGroupExpanded(groupId, isChapterGroupCollapsed(groupId));
+        QuestDataController.saveViewState(viewState);
         clampChapterScroll(QuestDataController.getSnapshot());
     }
 
@@ -2221,7 +2326,19 @@ public class OverhaulQuestScreen extends Screen {
         drawScaledString(graphics, component, x, y, color, scale, false);
     }
 
+    private void drawScaledString(GuiGraphics graphics, Component component, float x, float y, int color, float scale) {
+        drawScaledString(graphics, component, x, y, color, scale, false);
+    }
+
     private void drawScaledString(GuiGraphics graphics, Component component, int x, int y, int color, float scale, boolean shadow) {
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0F);
+        graphics.pose().scale(scale, scale, 1F);
+        graphics.drawString(font, component, 0, 0, color, shadow);
+        graphics.pose().popPose();
+    }
+
+    private void drawScaledString(GuiGraphics graphics, Component component, float x, float y, int color, float scale, boolean shadow) {
         graphics.pose().pushPose();
         graphics.pose().translate(x, y, 0F);
         graphics.pose().scale(scale, scale, 1F);

@@ -10,14 +10,22 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.GameType;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import org.lwjgl.glfw.GLFW;
 
 public class CleanUiModeOverlay {
-    private static final int BUTTON_WIDTH = 92;
-    private static final int BUTTON_HEIGHT = 14;
-    private static final int BUTTON_MARGIN = 8;
+    private static final int BUTTON_HEIGHT = 10;
+    private static final int BUTTON_MIN_WIDTH = 32;
+    private static final int BUTTON_PADDING_X = 4;
+    private static final float BUTTON_TEXT_SCALE = 0.5F;
+    private static final double BUTTON_LEFT_SHIFT_RATIO = 0.16D;
+    private static final ResourceLocation BUTTONS_LOCATION = new ResourceLocation("textures/gui/widgets.png");
+    private static final Component BUTTON_LABEL = Component.literal("Clean UI Mode");
+    private static long handCursor;
+    private static boolean handCursorActive;
 
     private CleanUiModeOverlay() {
     }
@@ -26,20 +34,22 @@ public class CleanUiModeOverlay {
     public static void onScreenRender(ScreenEvent.Render.Post event) {
         QuestScreen questScreen = getDefaultQuestScreen(event.getScreen());
         if (questScreen == null || !shouldShow()) {
+            setHandCursor(false);
             return;
         }
 
         Rect rect = buttonRect(event.getScreen());
         boolean hovered = rect.contains(event.getMouseX(), event.getMouseY());
+        setHandCursor(hovered);
         GuiGraphics graphics = event.getGuiGraphics();
         graphics.pose().pushPose();
         graphics.pose().translate(0F, 0F, 500F);
-        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), hovered ? 0xCC2A2118 : 0xAA201812);
-        graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.y() + 1, hovered ? 0xFFE2C98E : 0xCC9A7C50);
-        graphics.fill(rect.x(), rect.maxY() - 1, rect.maxX(), rect.maxY(), 0xCC120D09);
-        graphics.fill(rect.x(), rect.y(), rect.x() + 1, rect.maxY(), hovered ? 0xFFE2C98E : 0xCC9A7C50);
-        graphics.fill(rect.maxX() - 1, rect.y(), rect.maxX(), rect.maxY(), 0xCC120D09);
-        graphics.drawCenteredString(Minecraft.getInstance().font, Component.literal("Clean UI Mode"), rect.centerX(), rect.y() + 3, 0xFFEFE1C1);
+        drawVanillaButton(graphics, rect, hovered);
+        float scaledTextWidth = Minecraft.getInstance().font.width(BUTTON_LABEL) * BUTTON_TEXT_SCALE;
+        float scaledTextHeight = Minecraft.getInstance().font.lineHeight * BUTTON_TEXT_SCALE;
+        float textX = rect.x() + (rect.width() - scaledTextWidth) * 0.5F;
+        float textY = rect.y() + (rect.height() - scaledTextHeight) * 0.5F;
+        drawScaledString(graphics, BUTTON_LABEL, textX, textY, hovered ? 0xFFFFA0 : 0xE0E0E0, BUTTON_TEXT_SCALE);
         graphics.pose().popPose();
     }
 
@@ -76,7 +86,54 @@ public class CleanUiModeOverlay {
     }
 
     private static Rect buttonRect(Screen screen) {
-        return new Rect(screen.width - BUTTON_WIDTH - BUTTON_MARGIN, BUTTON_MARGIN, BUTTON_WIDTH, BUTTON_HEIGHT);
+        int scaledTextWidth = Math.round(Minecraft.getInstance().font.width(BUTTON_LABEL) * BUTTON_TEXT_SCALE);
+        int width = Math.max(BUTTON_MIN_WIDTH, scaledTextWidth + BUTTON_PADDING_X * 2);
+        int x = screen.width - width - (int) Math.round(screen.width * BUTTON_LEFT_SHIFT_RATIO);
+        int y = screen.height - BUTTON_HEIGHT;
+        return new Rect(x, y, width, BUTTON_HEIGHT);
+    }
+
+    private static void drawVanillaButton(GuiGraphics graphics, Rect rect, boolean hovered) {
+        int textureY = hovered ? 86 : 66;
+        float scale = rect.height() / 20F;
+        int logicalWidth = Math.max(2, Math.round(rect.width() / scale));
+        int halfWidth = logicalWidth / 2;
+        graphics.pose().pushPose();
+        graphics.pose().translate(rect.x(), rect.y(), 0F);
+        graphics.pose().scale(scale, scale, 1F);
+        graphics.blit(BUTTONS_LOCATION, 0, 0, 0, textureY, halfWidth, 20, 256, 256);
+        graphics.blit(BUTTONS_LOCATION, halfWidth, 0, 200 - (logicalWidth - halfWidth), textureY, logicalWidth - halfWidth, 20, 256, 256);
+        graphics.pose().popPose();
+    }
+
+    private static void drawScaledString(GuiGraphics graphics, Component component, float x, float y, int color, float scale) {
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0F);
+        graphics.pose().scale(scale, scale, 1F);
+        graphics.drawString(Minecraft.getInstance().font, component, 0, 0, color, false);
+        graphics.pose().popPose();
+    }
+
+    private static void setHandCursor(boolean hovered) {
+        if (handCursorActive == hovered) {
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.getWindow() == null) {
+            return;
+        }
+
+        long window = minecraft.getWindow().getWindow();
+        if (hovered) {
+            if (handCursor == 0L) {
+                handCursor = GLFW.glfwCreateStandardCursor(GLFW.GLFW_HAND_CURSOR);
+            }
+            GLFW.glfwSetCursor(window, handCursor);
+        } else {
+            GLFW.glfwSetCursor(window, 0L);
+        }
+        handCursorActive = hovered;
     }
 
     private record Rect(int x, int y, int width, int height) {

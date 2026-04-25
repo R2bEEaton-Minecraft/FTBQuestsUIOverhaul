@@ -4,7 +4,9 @@ import dev.ftb.mods.ftbquestsvisualoverhaul.client.config.ModClientConfig;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class QuestViewState {
     private long selectedChapterId;
@@ -20,6 +22,7 @@ public class QuestViewState {
     private QuestSortMode sortMode;
     private Map<Long, ResourceLocation> chapterTitleTextures;
     private Map<Long, Boolean> chapterFreePanStates;
+    private Set<Long> expandedChapterGroups;
 
     public QuestViewState() {
         selectedChapterId = 0L;
@@ -35,6 +38,7 @@ public class QuestViewState {
         sortMode = QuestSortMode.PROGRESSION;
         chapterTitleTextures = new HashMap<>();
         chapterFreePanStates = new HashMap<>();
+        expandedChapterGroups = new HashSet<>();
     }
 
     public QuestViewState copy() {
@@ -52,6 +56,7 @@ public class QuestViewState {
         copy.sortMode = sortMode;
         copy.chapterTitleTextures = new HashMap<>(chapterTitleTextures);
         copy.chapterFreePanStates = new HashMap<>(chapterFreePanStates);
+        copy.expandedChapterGroups = new HashSet<>(expandedChapterGroups);
         return copy;
     }
 
@@ -165,6 +170,26 @@ public class QuestViewState {
 
     public void setChapterFreePanStates(Map<Long, Boolean> chapterFreePanStates) {
         this.chapterFreePanStates = new HashMap<>(chapterFreePanStates);
+    }
+
+    public boolean isChapterGroupExpanded(long groupId) {
+        return expandedChapterGroups.contains(groupId);
+    }
+
+    public void setChapterGroupExpanded(long groupId, boolean expanded) {
+        if (expanded) {
+            expandedChapterGroups.add(groupId);
+        } else {
+            expandedChapterGroups.remove(groupId);
+        }
+    }
+
+    public Set<Long> getExpandedChapterGroups() {
+        return new HashSet<>(expandedChapterGroups);
+    }
+
+    public void setExpandedChapterGroups(Set<Long> expandedChapterGroups) {
+        this.expandedChapterGroups = new HashSet<>(expandedChapterGroups);
     }
 
     public LayoutMode getLayoutMode() {

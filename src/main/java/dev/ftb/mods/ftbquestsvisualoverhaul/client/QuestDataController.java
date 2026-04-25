@@ -13,8 +13,10 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 public class QuestDataController {
     private static final QuestDataSnapshotBuilder SNAPSHOT_BUILDER = new QuestDataSnapshotBuilder();
@@ -26,6 +28,10 @@ public class QuestDataController {
             .resolve("ftbquests")
             .resolve("quests")
             .resolve("ftbquestsvisualoverhaul_free_pan.properties");
+    private static final Path CHAPTER_GROUPS_FILE = FMLPaths.CONFIGDIR.get()
+            .resolve("ftbquests")
+            .resolve("quests")
+            .resolve("ftbquestsvisualoverhaul_chapter_groups.properties");
     private static final Path LEGACY_TILE_TEXTURES_FILE = FMLPaths.CONFIGDIR.get().resolve("ftbquestsvisualoverhaul_tiles.properties");
 
     private static QuestViewState persistedViewState = new QuestViewState();
@@ -35,6 +41,7 @@ public class QuestDataController {
     static {
         loadPersistentTileTextures();
         loadPersistentFreePanStates();
+        loadPersistentChapterGroups();
     }
 
     private QuestDataController() {
@@ -60,6 +67,7 @@ public class QuestDataController {
         persistedViewState = state.copy();
         savePersistentTileTextures();
         savePersistentFreePanStates();
+        savePersistentChapterGroups();
     }
 
     private static void loadPersistentTileTextures() {
@@ -142,6 +150,48 @@ public class QuestDataController {
             Files.createDirectories(FREE_PAN_FILE.getParent());
             try (OutputStream stream = Files.newOutputStream(FREE_PAN_FILE)) {
                 properties.store(stream, "FTB Quests UI Overhaul chapter free-pan preferences");
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    private static void loadPersistentChapterGroups() {
+        if (!Files.isRegularFile(CHAPTER_GROUPS_FILE)) {
+            return;
+        }
+
+        Properties properties = new Properties();
+        try (InputStream stream = Files.newInputStream(CHAPTER_GROUPS_FILE)) {
+            properties.load(stream);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            return;
+        }
+
+        Set<Long> expandedGroups = new LinkedHashSet<>();
+        for (String key : properties.stringPropertyNames()) {
+            try {
+                if (Boolean.parseBoolean(properties.getProperty(key))) {
+                    expandedGroups.add(Long.parseUnsignedLong(key));
+                }
+            } catch (Exception ex) {
+                System.err.println("Ignoring invalid FTB Quests UI Overhaul chapter-group entry: " + key + "=" + properties.getProperty(key));
+            }
+        }
+        persistedViewState.setExpandedChapterGroups(expandedGroups);
+    }
+
+    private static void savePersistentChapterGroups() {
+        Properties properties = new Properties();
+        for (Long groupId : persistedViewState.getExpandedChapterGroups()) {
+            properties.setProperty(Long.toUnsignedString(groupId), "true");
+        }
+
+        try {
+            Files.createDirectories(CHAPTER_GROUPS_FILE.getParent());
+            try (OutputStream stream = Files.newOutputStream(CHAPTER_GROUPS_FILE)) {
+                properties.store(stream, "FTB Quests UI Overhaul expanded chapter groups");
             }
         } catch (IOException ex) {
             ex.printStackTrace();

@@ -30,25 +30,26 @@ public class QuestLauncherButtonInjector {
 
         Screen screen = event.getScreen();
         if (screen instanceof InventoryScreen inventoryScreen) {
-            int leftPos = (inventoryScreen.width - 176) / 2;
-            int topPos = (inventoryScreen.height - 166) / 2;
-            int x = leftPos + 126;
-            int y = topPos + 61;
-
-            event.addListener(new QuestLogIconButton(x, y));
+            event.addListener(new QuestLogIconButton(inventoryScreen));
         }
     }
 
     private static class QuestLogIconButton extends Button {
         private static final ItemStack ICON = new ItemStack(FTBQuestsItems.BOOK.get());
+        private static final int INVENTORY_X_OFFSET = 126;
+        private static final int INVENTORY_Y_OFFSET = 61;
+        private final InventoryScreen inventoryScreen;
 
-        private QuestLogIconButton(int x, int y) {
-            super(x, y, 20, 18, Component.empty(), button -> FTBQuestsClient.openGui(), DEFAULT_NARRATION);
+        private QuestLogIconButton(InventoryScreen inventoryScreen) {
+            super(0, 0, 20, 18, Component.empty(), button -> FTBQuestsClient.openGui(), DEFAULT_NARRATION);
+            this.inventoryScreen = inventoryScreen;
+            syncPosition();
             setTooltip(Tooltip.create(QUEST_LOG));
         }
 
         @Override
         public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            syncPosition();
             int textureY = isHoveredOrFocused() ? 19 : 0;
             graphics.blit(RECIPE_BUTTON_TEXTURE, getX(), getY(), 0, textureY, width, height, 256, 256);
             graphics.renderFakeItem(ICON, getX() + 2, getY() + 1);
@@ -92,6 +93,10 @@ public class QuestLauncherButtonInjector {
             int markerY = getY() + 1;
             graphics.fill(markerX - 1, markerY - 1, markerX + markerWidth, markerY + 8, 0xFFE04B4B);
             graphics.drawString(Minecraft.getInstance().font, marker, markerX, markerY, 0xFFFFFFFF, false);
+        }
+
+        private void syncPosition() {
+            setPosition(inventoryScreen.getGuiLeft() + INVENTORY_X_OFFSET, inventoryScreen.getGuiTop() + INVENTORY_Y_OFFSET);
         }
     }
 }
