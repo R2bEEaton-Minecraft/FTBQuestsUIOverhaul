@@ -134,6 +134,8 @@ public class OverhaulQuestScreen extends Screen {
     // Use one shared scale for both axes so custom layouts keep their original
     // proportions instead of being distorted by per-axis normalization.
     private static final double NODE_POSITION_SCALE = 14.0D;
+    private static final int NODE_MIN_TILE_GAP = 6;
+    private static final int NODE_LAYOUT_RELAXATION_PASSES = 24;
     private static final int WIDGET_WIDTH = 26;
     private static final int WIDGET_HEIGHT = 26;
     private static final int WIDGET_ICON_X = 8;
@@ -142,6 +144,13 @@ public class OverhaulQuestScreen extends Screen {
     private static final int QUEST_TILE_SHADOW_OFFSET = 2;
     private static final int QUEST_TILE_SHADOW_COLOR = 0x26000000;
     private static final int QUEST_TILE_SHADOW_EDGE_COLOR = 0x33000000;
+    private static final int LOCK_OVERLAY_SIZE = 8;
+    private static final int LOCK_OVERLAY_FRAME_X_OFFSET = 3;
+    private static final int LOCK_OVERLAY_RIGHT_INSET = 1;
+    private static final int LOCK_OVERLAY_TOP_INSET = -1;
+    private static final int ALERT_OVERLAY_SIZE = 8;
+    private static final int ALERT_OVERLAY_LEFT_INSET = -1;
+    private static final int ALERT_OVERLAY_TOP_INSET = -1;
     private static final int TREE_PAN_BOUND_PADDING = 12;
     private static final double TREE_ZOOM_MIN = 0.5D;
     private static final double TREE_ZOOM_MAX = 1.75D;
@@ -196,12 +205,14 @@ public class OverhaulQuestScreen extends Screen {
     private final Set<ResourceLocation> missingModalTextures = new HashSet<>();
 
     private final Map<Long, NodeLayout> visibleQuestNodes = new HashMap<>();
+    private final Map<Long, Rect> adjustedNodeWorldRects = new HashMap<>();
     private QuestDataSnapshot.QuestSnapshot hoveredQuest;
     private boolean isScrolling;
     private boolean chapterScrollbarDragging;
     private long focusedChapterId = Long.MIN_VALUE;
     private float fade;
     private boolean centered;
+    private boolean openingQuestSnapPending;
     private int tabPage;
     private int maxPages;
     private double chapterScroll;
@@ -216,12 +227,15 @@ public class OverhaulQuestScreen extends Screen {
         super(Component.literal("Quests"));
         this.openContext = openContext;
         this.viewState = openContext.previousState().copy();
+        this.openingQuestSnapPending = openContext.requestedQuestId() == 0L;
 
         if (openContext.requestedChapterId() != 0L) {
             viewState.setSelectedChapterId(openContext.requestedChapterId());
         }
         if (openContext.requestedQuestId() != 0L) {
             viewState.setViewedQuestId(openContext.requestedQuestId());
+        } else {
+            viewState.setViewedQuestId(0L);
         }
     }
 
@@ -622,7 +636,8 @@ public class OverhaulQuestScreen extends Screen {
     private void renderChapterSelectorHeader(GuiGraphics graphics) {
         Rect headerRect = chapterSelectorHeaderRect();
         int titleY = headerRect.y() + Math.max(0, (headerRect.height() - Math.round(font.lineHeight * CHAPTER_SELECTOR_TITLE_SCALE)) / 2);
-        drawCenteredScaledString(graphics, CHAPTER_SELECTOR_TITLE, headerRect.centerX(), titleY, 0xFFF2E8D6, CHAPTER_SELECTOR_TITLE_SCALE);
+        int titleCenterX = headerRect.x() + CHAPTER_BUTTON_REGULAR_WIDTH / 2;
+        drawCenteredScaledString(graphics, CHAPTER_SELECTOR_TITLE, titleCenterX, titleY, 0xFFF2E8D6, CHAPTER_SELECTOR_TITLE_SCALE);
     }
 
     private void renderChapterSelectorBottomShadow(GuiGraphics graphics, Rect viewportRect, QuestDataSnapshot snapshot) {
@@ -632,7 +647,7 @@ public class OverhaulQuestScreen extends Screen {
 
         int shadowTop = Math.max(viewportRect.y(), viewportRect.maxY() - CHAPTER_SELECTOR_BOTTOM_SHADOW_HEIGHT);
         RenderSystem.enableBlend();
-        graphics.fillGradient(viewportRect.x(), shadowTop, viewportRect.maxX() - 10, viewportRect.maxY(), 0x00120D09, 0xD0120D09);
+        graphics.fillGradient(viewportRect.x(), shadowTop, viewportRect.maxX(), viewportRect.maxY(), 0x00120D09, 0xD0120D09);
         RenderSystem.disableBlend();
     }
 
@@ -641,7 +656,7 @@ public class OverhaulQuestScreen extends Screen {
         if (chapter == null) {
             return;
         }
-        Component title = chapter.title().copy();
+        Component title = Component.literal(chapter.title().getString().toUpperCase(Locale.ROOT));
         Component separator = Component.literal("-");
 
         Rect frame = frameRect();
@@ -655,14 +670,14 @@ public class OverhaulQuestScreen extends Screen {
             return;
         }
 
-        int scaledTextHeight = Math.max(1, Math.round(font.lineHeight * CHAPTER_SELECTOR_TEXT_SCALE));
+        int scaledTextHeight = Math.max(1, Math.round(font.lineHeight * CHAPTER_SELECTOR_TITLE_SCALE));
         int rowTextOffset = Mth.floor((CHAPTER_BUTTON_HEIGHT - scaledTextHeight) * 0.5F) + 2;
         int rowY = frame.y() + ACTIVE_CHAPTER_TITLE_TOP_PADDING - rowTextOffset + ACTIVE_CHAPTER_TITLE_Y_OFFSET;
         float textY = rowY + rowTextOffset + ACTIVE_CHAPTER_TITLE_TEXT_Y_OFFSET;
         float iconY = rowY + Math.max(0, (CHAPTER_BUTTON_HEIGHT - ACTIVE_CHAPTER_TITLE_ICON_SIZE) / 2)
                 + ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET + ACTIVE_CHAPTER_TITLE_ICON_EXTRA_Y_OFFSET;
-        int separatorWidth = Math.round(font.width(separator) * CHAPTER_SELECTOR_TEXT_SCALE);
-        int titleWidth = Math.round(font.width(title) * CHAPTER_SELECTOR_TEXT_SCALE);
+        int separatorWidth = Math.round(font.width(separator) * CHAPTER_SELECTOR_TITLE_SCALE);
+        int titleWidth = Math.round(font.width(title) * CHAPTER_SELECTOR_TITLE_SCALE);
         int totalWidth = ACTIVE_CHAPTER_TITLE_ICON_SIZE
                 + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING
                 + separatorWidth
@@ -686,11 +701,11 @@ public class OverhaulQuestScreen extends Screen {
         chapter.icon().draw(graphics, 0, 0, ACTIVE_CHAPTER_TITLE_ICON_SIZE, ACTIVE_CHAPTER_TITLE_ICON_SIZE);
         graphics.pose().popPose();
         cursorX += ACTIVE_CHAPTER_TITLE_ICON_SIZE + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING;
-        drawScaledString(graphics, separator, cursorX, textY, color, CHAPTER_SELECTOR_TEXT_SCALE);
+        drawScaledString(graphics, separator, cursorX, textY, color, CHAPTER_SELECTOR_TITLE_SCALE, true);
         cursorX += separatorWidth + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING;
-        drawScaledString(graphics, title, cursorX, textY, color, CHAPTER_SELECTOR_TEXT_SCALE);
+        drawScaledString(graphics, title, cursorX, textY, color, CHAPTER_SELECTOR_TITLE_SCALE, true);
         cursorX += titleWidth + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING;
-        drawScaledString(graphics, separator, cursorX, textY, color, CHAPTER_SELECTOR_TEXT_SCALE);
+        drawScaledString(graphics, separator, cursorX, textY, color, CHAPTER_SELECTOR_TITLE_SCALE, true);
         cursorX += separatorWidth + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING;
         graphics.pose().pushPose();
         graphics.pose().translate(cursorX, iconY, 0F);
@@ -831,15 +846,13 @@ public class OverhaulQuestScreen extends Screen {
             graphics.pose().translate(0.0F, 0.0F, -200.0F);
             graphics.fill(0, 0, TREE_WIDTH, TREE_HEIGHT, Mth.floor(this.fade * 255.0F) << 24);
             boolean foundHovered = false;
+            Rect viewportRect = localTreeViewportRect();
 
             if (relMouseX > 0 && relMouseX < TREE_WIDTH && relMouseY > 0 && relMouseY < TREE_HEIGHT) {
                 for (QuestDataSnapshot.QuestSnapshot quest : chapter.quests()) {
                     Rect nodeRect = getNodeScreenRect(quest);
-                    int widgetX = nodeRect.x();
-                    int widgetY = nodeRect.y();
-
-                    if (relMouseX >= widgetX && relMouseX <= widgetX + nodeRect.width()
-                            && relMouseY >= widgetY && relMouseY <= widgetY + nodeRect.height()) {
+                    Rect visibleRect = clipRect(nodeRect, viewportRect);
+                    if (visibleRect != null && visibleRect.contains(relMouseX, relMouseY)) {
                         foundHovered = true;
                         drawWidgetHover(graphics, quest, this.fade, treeLeft, treeTop);
                         break;
@@ -876,19 +889,22 @@ public class OverhaulQuestScreen extends Screen {
         return Mth.floor(quest.y() * NODE_POSITION_SCALE - WIDGET_HEIGHT / 2F);
     }
 
-    private Rect getNodeWorldRect(QuestDataSnapshot.QuestSnapshot quest) {
+    private Rect getAuthoredNodeWorldRect(QuestDataSnapshot.QuestSnapshot quest) {
         int nodeX = getNodeX(quest);
         int nodeY = getNodeY(quest);
         return new Rect(nodeX, nodeY, WIDGET_WIDTH, WIDGET_HEIGHT);
     }
 
+    private Rect getNodeWorldRect(QuestDataSnapshot.QuestSnapshot quest) {
+        return adjustedNodeWorldRects.getOrDefault(quest.id(), getAuthoredNodeWorldRect(quest));
+    }
+
     private Rect getNodeScreenRect(QuestDataSnapshot.QuestSnapshot quest) {
-        int nodeX = getNodeX(quest);
-        int nodeY = getNodeY(quest);
-        int x = projectTreeX(nodeX);
-        int y = projectTreeY(nodeY);
-        int maxX = projectTreeMaxX(nodeX + WIDGET_WIDTH);
-        int maxY = projectTreeMaxY(nodeY + WIDGET_HEIGHT);
+        Rect nodeRect = getNodeWorldRect(quest);
+        int x = projectTreeX(nodeRect.x());
+        int y = projectTreeY(nodeRect.y());
+        int maxX = projectTreeMaxX(nodeRect.x() + nodeRect.width());
+        int maxY = projectTreeMaxY(nodeRect.y() + nodeRect.height());
         return new Rect(x, y, maxX - x, maxY - y);
     }
 
@@ -897,18 +913,89 @@ public class OverhaulQuestScreen extends Screen {
      * from the authored quest positions after mapping them into widget space.
      */
     private void computeNodeBounds(List<QuestDataSnapshot.QuestSnapshot> quests) {
+        adjustedNodeWorldRects.clear();
         minNodeX = Integer.MAX_VALUE;
         minNodeY = Integer.MAX_VALUE;
         maxNodeX = Integer.MIN_VALUE;
         maxNodeY = Integer.MIN_VALUE;
 
+        if (quests.isEmpty()) {
+            return;
+        }
+
+        List<MutableNodePosition> nodes = new ArrayList<>(quests.size());
         for (QuestDataSnapshot.QuestSnapshot quest : quests) {
-            Rect rect = getNodeWorldRect(quest);
+            Rect rect = getAuthoredNodeWorldRect(quest);
+            nodes.add(new MutableNodePosition(quest.id(), rect.x(), rect.y()));
+        }
+
+        relaxNodeOverlaps(nodes);
+
+        for (MutableNodePosition node : nodes) {
+            Rect rect = node.toRect();
+            adjustedNodeWorldRects.put(node.id(), rect);
             minNodeX = Math.min(minNodeX, rect.x());
             maxNodeX = Math.max(maxNodeX, rect.maxX());
             minNodeY = Math.min(minNodeY, rect.y());
             maxNodeY = Math.max(maxNodeY, rect.maxY());
         }
+    }
+
+    private void relaxNodeOverlaps(List<MutableNodePosition> nodes) {
+        int minHorizontalSpacing = WIDGET_WIDTH + NODE_MIN_TILE_GAP;
+        int minVerticalSpacing = WIDGET_HEIGHT + NODE_MIN_TILE_GAP;
+
+        for (int pass = 0; pass < NODE_LAYOUT_RELAXATION_PASSES; pass++) {
+            boolean moved = false;
+
+            for (int i = 0; i < nodes.size(); i++) {
+                MutableNodePosition first = nodes.get(i);
+                for (int j = i + 1; j < nodes.size(); j++) {
+                    MutableNodePosition second = nodes.get(j);
+                    int deltaX = second.x() - first.x();
+                    int deltaY = second.y() - first.y();
+                    int overlapX = minHorizontalSpacing - Math.abs(deltaX);
+                    int overlapY = minVerticalSpacing - Math.abs(deltaY);
+                    if (overlapX <= 0 || overlapY <= 0) {
+                        continue;
+                    }
+
+                    boolean separateOnX = overlapX < overlapY
+                            || overlapX == overlapY && (Math.abs(deltaX) > Math.abs(deltaY)
+                            || Math.abs(deltaX) == Math.abs(deltaY) && ((i + j) & 1) == 0);
+
+                    if (separateOnX) {
+                        int direction = separationDirection(deltaX, i, j);
+                        int firstPush = overlapX / 2;
+                        int secondPush = overlapX - firstPush;
+                        first.moveX(-direction * firstPush);
+                        second.moveX(direction * secondPush);
+                    } else {
+                        int direction = separationDirection(deltaY, i, j);
+                        int firstPush = overlapY / 2;
+                        int secondPush = overlapY - firstPush;
+                        first.moveY(-direction * firstPush);
+                        second.moveY(direction * secondPush);
+                    }
+
+                    moved = true;
+                }
+            }
+
+            if (!moved) {
+                return;
+            }
+        }
+    }
+
+    private int separationDirection(int delta, int firstIndex, int secondIndex) {
+        if (delta < 0) {
+            return -1;
+        }
+        if (delta > 0) {
+            return 1;
+        }
+        return ((firstIndex + secondIndex) & 1) == 0 ? 1 : -1;
     }
 
     private void clampTreePanToQuestBounds() {
@@ -917,11 +1004,12 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private double clampTreePanAxis(double pan, int minNode, int maxNode, int viewportSize) {
+        if (isCurrentChapterFreePan()) {
+            return pan;
+        }
+
         double zoom = viewState.getTreeZoom();
         int padding = TREE_PAN_BOUND_PADDING;
-        if (isCurrentChapterFreePan()) {
-            padding = Math.max(TREE_PAN_BOUND_PADDING, Mth.ceil(viewportSize / zoom));
-        }
         double minContent = (minNode - padding) * zoom;
         double maxContent = (maxNode + padding) * zoom;
         double contentSize = maxContent - minContent;
@@ -1032,10 +1120,11 @@ public class OverhaulQuestScreen extends Screen {
             return null;
         }
 
+        Rect viewportRect = localTreeViewportRect();
         for (QuestDataSnapshot.QuestSnapshot quest : quests) {
             Rect screenRect = getNodeScreenRect(quest);
-            if (relMouseX >= screenRect.x() && relMouseX <= screenRect.x() + screenRect.width()
-                    && relMouseY >= screenRect.y() && relMouseY <= screenRect.y() + screenRect.height()) {
+            Rect visibleRect = clipRect(screenRect, viewportRect);
+            if (visibleRect != null && visibleRect.contains(relMouseX, relMouseY)) {
                 return quest;
             }
         }
@@ -1054,6 +1143,7 @@ public class OverhaulQuestScreen extends Screen {
      * - Then render item icon at (scrollX + x + 8, scrollY + y + 5)
      */
     private void drawAllWidgets(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests, int relMouseX, int relMouseY) {
+        Rect viewportRect = localTreeViewportRect();
         for (QuestDataSnapshot.QuestSnapshot quest : quests) {
             Rect worldRect = getNodeWorldRect(quest);
             Rect screenRect = getNodeScreenRect(quest);
@@ -1081,24 +1171,31 @@ public class OverhaulQuestScreen extends Screen {
             if (!obtained && !isQuestAvailable(quest)) {
                 renderLockOverlay(graphics, worldRect);
             }
-
-            // Hit detection for click targets (in screen coordinates)
-            Rect frame = frameRect();
-            int screenX = screenRect.x() + frame.x() + TREE_X;
-            int screenY = screenRect.y() + frame.y() + TREE_Y;
-            if (viewState.getViewedQuestId() == 0L) {
-                clickTargets.add(new ClickTarget(new Rect(screenX, screenY, screenRect.width(), screenRect.height()), () -> {
-                    viewState.setViewedQuestId(quest.id());
-                    viewState.setDetailScroll(0D);
-                }));
+            if (questNeedsAttention(quest)) {
+                renderAlertOverlay(graphics, worldRect);
             }
 
-            visibleQuestNodes.put(quest.id(), new NodeLayout(quest, new Rect(screenX, screenY, screenRect.width(), screenRect.height())));
+            // Hit detection for click targets (in screen coordinates)
+            Rect visibleScreenRect = clipRect(screenRect, viewportRect);
+            if (visibleScreenRect != null) {
+                Rect frame = frameRect();
+                Rect absoluteRect = new Rect(
+                        visibleScreenRect.x() + frame.x() + TREE_X,
+                        visibleScreenRect.y() + frame.y() + TREE_Y,
+                        visibleScreenRect.width(),
+                        visibleScreenRect.height());
+                if (viewState.getViewedQuestId() == 0L) {
+                    clickTargets.add(new ClickTarget(absoluteRect, () -> {
+                        viewState.setViewedQuestId(quest.id());
+                        viewState.setDetailScroll(0D);
+                    }));
+                }
 
-            // Check hover (in content-relative coordinates)
-            if (relMouseX >= screenRect.x() && relMouseX <= screenRect.x() + screenRect.width()
-                    && relMouseY >= screenRect.y() && relMouseY <= screenRect.y() + screenRect.height()) {
-                hoveredQuest = quest;
+                visibleQuestNodes.put(quest.id(), new NodeLayout(quest, absoluteRect));
+
+                if (visibleScreenRect.contains(relMouseX, relMouseY)) {
+                    hoveredQuest = quest;
+                }
             }
         }
     }
@@ -1122,13 +1219,21 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderLockOverlay(GuiGraphics graphics, Rect nodeRect) {
-        int size = (int) (WIDGET_WIDTH / 8F * 3F);
-        float scale = size / 16F;
+        float scale = LOCK_OVERLAY_SIZE / 16F;
+        int lockX = nodeRect.x() + LOCK_OVERLAY_FRAME_X_OFFSET + WIDGET_WIDTH - LOCK_OVERLAY_SIZE - LOCK_OVERLAY_RIGHT_INSET;
+        int lockY = nodeRect.y() + LOCK_OVERLAY_TOP_INSET;
         graphics.pose().pushPose();
-        graphics.pose().translate(nodeRect.x() + WIDGET_ICON_X + WIDGET_ICON_SIZE - size + 6, nodeRect.y() + WIDGET_ICON_Y - 9, 0.0F);
+        graphics.pose().translate(lockX, lockY, 0.0F);
         graphics.pose().scale(scale, scale, 1.0F);
         graphics.blit(FTB_QUEST_LOCKED_TEXTURE, 0, 0, 0.0F, 0.0F, 16, 16, 16, 16);
         graphics.pose().popPose();
+    }
+
+    private void renderAlertOverlay(GuiGraphics graphics, Rect nodeRect) {
+        renderBadgeTexture(graphics, FTB_QUEST_ALERT_TEXTURE,
+                nodeRect.x() + ALERT_OVERLAY_LEFT_INSET,
+                nodeRect.y() + ALERT_OVERLAY_TOP_INSET,
+                ALERT_OVERLAY_SIZE);
     }
 
     // ---- Hover tooltip (matching AdvancementWidget.drawHover) ----
@@ -1278,6 +1383,9 @@ public class OverhaulQuestScreen extends Screen {
         if (locked) {
             renderLockOverlay(graphics, new Rect(contentX, contentY, WIDGET_WIDTH, WIDGET_HEIGHT));
         }
+        if (questNeedsAttention(quest)) {
+            renderAlertOverlay(graphics, new Rect(contentX, contentY, WIDGET_WIDTH, WIDGET_HEIGHT));
+        }
     }
 
     /**
@@ -1420,6 +1528,9 @@ public class OverhaulQuestScreen extends Screen {
                 frameRect.x() + (frameRect.width() - WIDGET_ICON_SIZE) / 2,
                 frameRect.y() + (frameRect.height() - WIDGET_ICON_SIZE) / 2,
                 WIDGET_ICON_SIZE, WIDGET_ICON_SIZE);
+        if (questNeedsAttention(quest)) {
+            renderBadgeTexture(graphics, FTB_QUEST_ALERT_TEXTURE, frameRect.x() - 2, frameRect.y() - 2, ALERT_OVERLAY_SIZE);
+        }
         drawScaledString(graphics,
                 trim(quest.title(), (int) ((header.width() - TITLE_X - 26) / MODAL_TEXT_SCALE)),
                 header.x() + TITLE_X, headerTextY, 0xFFF6EDDB, MODAL_TEXT_SCALE, true);
@@ -1481,14 +1592,18 @@ public class OverhaulQuestScreen extends Screen {
         Rect acceptButton = footerButtonRect(buttonRowLeft, footer.y(), MODAL_BUTTON_WIDTH, footer.height());
         Rect completeButton = footerButtonRect(buttonRowLeft + MODAL_BUTTON_WIDTH + MODAL_BUTTON_GAP, footer.y(), MODAL_BUTTON_WIDTH, footer.height());
 
-        renderFooterButton(graphics, acceptButton, quest.pinned() ? "Unaccept" : "Accept", true, acceptButton.contains(mouseX, mouseY), quest.pinned());
+        boolean acceptEnabled = canToggleQuestAcceptance(quest);
+        renderFooterButton(graphics, acceptButton, quest.pinned() ? "Unaccept" : "Accept",
+                acceptEnabled, acceptEnabled && acceptButton.contains(mouseX, mouseY), quest.pinned());
         boolean claimEnabled = canClaimAnyReward(quest);
         renderFooterButton(graphics, completeButton, "Complete", claimEnabled, completeButton.contains(mouseX, mouseY), false);
         if (quest.hasUnclaimedRewards() || claimEnabled) {
             renderNotificationMarker(graphics, completeButton.maxX() - 4, completeButton.y() - 3, quest.completed() && !claimEnabled);
         }
 
-        clickTargets.add(new ClickTarget(acceptButton, () -> acceptOrUnacceptQuest(quest)));
+        if (acceptEnabled) {
+            clickTargets.add(new ClickTarget(acceptButton, () -> acceptOrUnacceptQuest(quest)));
+        }
         if (claimEnabled) {
             clickTargets.add(new ClickTarget(completeButton, this::claimCurrentQuestRewards));
         }
@@ -1660,9 +1775,7 @@ public class OverhaulQuestScreen extends Screen {
         if (completed) {
             renderCheckTexture(graphics, x - 1, y - 1, CHECK_NOTIFICATION_SIZE);
         } else {
-            graphics.fill(x, y, x + 7, y + 7, 0xFFE92C2C);
-            graphics.fill(x + 3, y + 1, x + 4, y + 5, 0xFFFFFFFF);
-            graphics.fill(x + 3, y + 6, x + 4, y + 7, 0xFFFFFFFF);
+            renderBadgeTexture(graphics, FTB_QUEST_ALERT_TEXTURE, x - 1, y - 1, CHECK_NOTIFICATION_SIZE);
         }
     }
 
@@ -1807,6 +1920,10 @@ public class OverhaulQuestScreen extends Screen {
         return quest.rewards().stream().anyMatch(QuestDataSnapshot.RewardSnapshot::canClaim);
     }
 
+    private boolean questNeedsAttention(QuestDataSnapshot.QuestSnapshot quest) {
+        return quest.hasUnclaimedRewards() || canClaimAnyReward(quest);
+    }
+
     private List<QuestDataSnapshot.TaskSnapshot> visibleRequirementTasks(QuestDataSnapshot.QuestSnapshot quest) {
         if (quest.checkmarkOnly()) {
             return List.of();
@@ -1814,7 +1931,43 @@ public class OverhaulQuestScreen extends Screen {
         return quest.tasks();
     }
 
+    private boolean canToggleQuestAcceptance(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        if (questSnapshot.completed() || questSnapshot.hasUnclaimedRewards()) {
+            return false;
+        }
+
+        return questSnapshot.pinned() || questSnapshot.canStart();
+    }
+
+    private void snapToInitialQuest(QuestDataSnapshot snapshot) {
+        QuestDataSnapshot.QuestSnapshot rememberedQuest = snapshot.findQuest(QuestDataController.getLastAcceptedQuestId());
+        if (rememberedQuest != null && rememberedQuest.pinned()) {
+            viewState.setSelectedChapterId(rememberedQuest.chapterId());
+            QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(rememberedQuest.chapterId());
+            if (chapter != null) {
+                centerTreeOnQuest(chapter, rememberedQuest);
+            }
+            return;
+        }
+
+        viewState.setViewedQuestId(0L);
+    }
+
+    private void centerTreeOnQuest(QuestDataSnapshot.ChapterSnapshot chapter, QuestDataSnapshot.QuestSnapshot quest) {
+        computeNodeBounds(chapter.quests());
+        Rect nodeRect = getNodeWorldRect(quest);
+        double zoom = viewState.getTreeZoom();
+        viewState.setTreePanX(TREE_WIDTH / 2.0D - nodeRect.centerX() * zoom);
+        viewState.setTreePanY(TREE_HEIGHT / 2.0D - nodeRect.centerY() * zoom);
+        clampTreePanToQuestBounds();
+        centered = true;
+    }
+
     private void acceptOrUnacceptQuest(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        if (!canToggleQuestAcceptance(questSnapshot)) {
+            return;
+        }
+
         Quest quest = resolveQuest(questSnapshot.id());
         if (quest == null) {
             return;
@@ -1822,6 +1975,10 @@ public class OverhaulQuestScreen extends Screen {
 
         if (questSnapshot.pinned()) {
             actionRouter.togglePin(quest);
+            if (QuestDataController.getLastAcceptedQuestId() == questSnapshot.id()) {
+                viewState.setLastAcceptedQuestId(0L);
+                QuestDataController.setLastAcceptedQuestId(0L);
+            }
             QuestDataController.markDirty();
             return;
         }
@@ -1835,6 +1992,8 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         actionRouter.togglePin(quest);
+        viewState.setLastAcceptedQuestId(questSnapshot.id());
+        QuestDataController.setLastAcceptedQuestId(questSnapshot.id());
         QuestDataController.markDirty();
     }
 
@@ -1920,6 +2079,10 @@ public class OverhaulQuestScreen extends Screen {
         Quest liveQuest = resolveQuest(questSnapshot.id());
         if (liveQuest != null) {
             actionRouter.togglePin(liveQuest);
+            if (QuestDataController.getLastAcceptedQuestId() == questSnapshot.id()) {
+                viewState.setLastAcceptedQuestId(0L);
+                QuestDataController.setLastAcceptedQuestId(0L);
+            }
             QuestDataController.markDirty();
         }
     }
@@ -1983,6 +2146,16 @@ public class OverhaulQuestScreen extends Screen {
 
         if (viewState.getViewedQuestId() != 0L && snapshot.findQuest(viewState.getViewedQuestId()) == null) {
             closeViewedQuest();
+        }
+
+        if (openingQuestSnapPending) {
+            openingQuestSnapPending = false;
+            snapToInitialQuest(snapshot);
+            chapter = snapshot.findChapter(viewState.getSelectedChapterId());
+            if (chapter == null) {
+                chapter = snapshot.chapters().get(0);
+                viewState.setSelectedChapterId(chapter.id());
+            }
         }
 
         if (focusedChapterId != chapter.id()) {
@@ -2266,9 +2439,24 @@ public class OverhaulQuestScreen extends Screen {
         return new Rect((width - BACKGROUND_WIDTH) / 2, (height - BACKGROUND_HEIGHT) / 2, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
     }
 
+    private Rect localTreeViewportRect() {
+        return new Rect(0, 0, TREE_WIDTH, TREE_HEIGHT);
+    }
+
     private Rect treeViewportRect() {
         Rect frame = frameRect();
         return new Rect(frame.x() + TREE_X, frame.y() + TREE_Y, TREE_WIDTH, TREE_HEIGHT);
+    }
+
+    private Rect clipRect(Rect rect, Rect clipBounds) {
+        int clippedX = Math.max(rect.x(), clipBounds.x());
+        int clippedY = Math.max(rect.y(), clipBounds.y());
+        int clippedWidth = Math.min(rect.maxX(), clipBounds.maxX()) - clippedX;
+        int clippedHeight = Math.min(rect.maxY(), clipBounds.maxY()) - clippedY;
+        if (clippedWidth <= 0 || clippedHeight <= 0) {
+            return null;
+        }
+        return new Rect(clippedX, clippedY, clippedWidth, clippedHeight);
     }
 
     private int projectTreeX(double worldX) {
@@ -2559,6 +2747,42 @@ public class OverhaulQuestScreen extends Screen {
             return quest.started() ? "In Progress" : "Available";
         }
         return "Locked";
+    }
+
+    private static final class MutableNodePosition {
+        private final long id;
+        private int x;
+        private int y;
+
+        private MutableNodePosition(long id, int x, int y) {
+            this.id = id;
+            this.x = x;
+            this.y = y;
+        }
+
+        private long id() {
+            return id;
+        }
+
+        private int x() {
+            return x;
+        }
+
+        private int y() {
+            return y;
+        }
+
+        private void moveX(int delta) {
+            x += delta;
+        }
+
+        private void moveY(int delta) {
+            y += delta;
+        }
+
+        private Rect toRect() {
+            return new Rect(x, y, WIDGET_WIDTH, WIDGET_HEIGHT);
+        }
     }
 
     // ---- Records ----

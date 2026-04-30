@@ -1,0 +1,196 @@
+{
+	default_hide_dependency_lines: false
+	default_quest_shape: ""
+	filename: "minimum_spacing_demo"
+	group: "4000000000000003"
+	icon: "minecraft:pink_glazed_terracotta"
+	id: "3000000000001001"
+	order_index: 1
+	quest_links: [ ]
+	quests: [
+		{
+			description: [
+				"This chapter intentionally places quests too close together for the default authored spacing."
+				"Use it to verify that the overhaul applies a minimum on-screen gap so quest tiles cannot overlap."
+			]
+			icon: "minecraft:lodestone"
+			id: "3000000000001101"
+			rewards: [{
+				id: "3000000000001301"
+				item: "minecraft:paper"
+				type: "item"
+			}]
+			subtitle: "Cramped origin"
+			tasks: [{
+				id: "3000000000001201"
+				type: "checkmark"
+			}]
+			title: "Spacing Anchor"
+			x: 0.0d
+			y: 0.0d
+		}
+		{
+			dependencies: ["3000000000001101"]
+			description: ["This quest sits almost directly above the anchor and should be pushed away if the tiles would crowd."]
+			icon: "minecraft:feather"
+			id: "3000000000001102"
+			rewards: [{
+				id: "3000000000001302"
+				item: "minecraft:feather"
+				type: "item"
+			}]
+			subtitle: "Near vertical"
+			tasks: [{
+				id: "3000000000001202"
+				type: "checkmark"
+			}]
+			title: "Upper Tight"
+			x: 0.0d
+			y: -0.75d
+		}
+		{
+			dependencies: ["3000000000001101"]
+			description: ["This quest is offset just slightly to the right to force a diagonal spacing decision."]
+			icon: "minecraft:redstone"
+			id: "3000000000001103"
+			rewards: [{
+				id: "3000000000001303"
+				item: "minecraft:redstone"
+				type: "item"
+			}]
+			subtitle: "Near diagonal"
+			tasks: [{
+				id: "3000000000001203"
+				type: "checkmark"
+			}]
+			title: "Right Tight"
+			x: 0.9d
+			y: 0.15d
+		}
+		{
+			dependencies: ["3000000000001101"]
+			description: ["This quest is almost on top of the anchor from below."]
+			icon: "minecraft:amethyst_shard"
+			id: "3000000000001104"
+			rewards: [{
+				id: "3000000000001304"
+				item: "minecraft:amethyst_shard"
+				type: "item"
+			}]
+			subtitle: "Near below"
+			tasks: [{
+				id: "3000000000001204"
+				type: "checkmark"
+			}]
+			title: "Lower Tight"
+			x: 0.2d
+			y: 0.95d
+		}
+		{
+			dependencies: ["3000000000001101"]
+			description: ["This quest crowds the anchor from the left and helps test chain reactions in the spacing pass."]
+			icon: "minecraft:slime_ball"
+			id: "3000000000001105"
+			rewards: [{
+				id: "3000000000001305"
+				item: "minecraft:slime_ball"
+				type: "item"
+			}]
+			subtitle: "Near left"
+			tasks: [{
+				id: "3000000000001205"
+				type: "checkmark"
+			}]
+			title: "Left Tight"
+			x: -0.8d
+			y: 0.35d
+		}
+		{
+			dependencies: [
+				"3000000000001102"
+				"3000000000001103"
+			]
+			description: ["This merge sits in an intentionally crowded corner of the cluster."]
+			icon: "minecraft:clock"
+			id: "3000000000001106"
+			rewards: [{
+				id: "3000000000001306"
+				item: "minecraft:clock"
+				type: "item"
+			}]
+			subtitle: "Crowded merge"
+			tasks: [{
+				id: "3000000000001206"
+				type: "checkmark"
+			}]
+			title: "Upper Merge"
+			x: 1.05d
+			y: -0.95d
+		}
+		{
+			dependencies: [
+				"3000000000001104"
+				"3000000000001105"
+			]
+			description: ["This lower merge overlaps the lower half of the cluster in the raw authored layout."]
+			icon: "minecraft:map"
+			id: "3000000000001107"
+			rewards: [{
+				id: "3000000000001307"
+				item: "minecraft:filled_map"
+				type: "item"
+			}]
+			subtitle: "Lower merge"
+			tasks: [{
+				id: "3000000000001207"
+				type: "checkmark"
+			}]
+			title: "Lower Merge"
+			x: -0.45d
+			y: 1.2d
+		}
+		{
+			dependencies: [
+				"3000000000001106"
+				"3000000000001107"
+			]
+			description: ["This quest lands back near the middle so the layout pass has to resolve a dense multi-node knot."]
+			icon: "minecraft:spyglass"
+			id: "3000000000001108"
+			rewards: [{
+				id: "3000000000001308"
+				item: "minecraft:spyglass"
+				type: "item"
+			}]
+			subtitle: "Dense center"
+			tasks: [{
+				id: "3000000000001208"
+				type: "checkmark"
+			}]
+			title: "Center Knot"
+			x: 0.45d
+			y: 0.4d
+		}
+		{
+			dependencies: ["3000000000001108"]
+			description: ["This final quest gives the relaxed layout somewhere obvious to branch out to after the crowded cluster."]
+			icon: "minecraft:recovery_compass"
+			id: "3000000000001109"
+			rewards: [{
+				id: "3000000000001309"
+				item: "minecraft:compass"
+				type: "item"
+			}]
+			subtitle: "Wider follow-up"
+			tasks: [{
+				id: "3000000000001209"
+				type: "checkmark"
+			}]
+			title: "Breathing Room"
+			x: 2.2d
+			y: 0.55d
+		}
+	]
+	subtitle: ["An intentionally cramped chapter for testing minimum quest spacing"]
+	title: "Minimum Spacing Demo"
+}
