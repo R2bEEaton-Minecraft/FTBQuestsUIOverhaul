@@ -102,7 +102,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final int ACTIVE_CHAPTER_TITLE_TOP_PADDING = 12;
     private static final int ACTIVE_CHAPTER_TITLE_BOTTOM_PADDING = 4;
     private static final int ACTIVE_CHAPTER_TITLE_SIDE_PADDING = 5;
-    private static final int ACTIVE_CHAPTER_TITLE_ICON_SIZE = 11;
+    private static final int ACTIVE_CHAPTER_TITLE_ICON_SIZE = 10;
     private static final int ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING = 4;
     private static final int ACTIVE_CHAPTER_TITLE_Y_OFFSET = -1;
     private static final float ACTIVE_CHAPTER_TITLE_TEXT_Y_OFFSET = 0.5F;
@@ -567,6 +567,7 @@ public class OverhaulQuestScreen extends Screen {
         Rect viewportRect = chapterSelectorViewportRect();
         clampChapterScroll(snapshot);
         int y = viewportRect.y() - Mth.floor(chapterScroll);
+        List<ChapterRowLayout> selectedRows = new ArrayList<>();
 
         graphics.enableScissor(viewportRect.x(), viewportRect.y(), viewportRect.maxX(), viewportRect.maxY());
 
@@ -602,23 +603,13 @@ public class OverhaulQuestScreen extends Screen {
             Rect textureRect = new Rect(viewportRect.x(), y - CHAPTER_BUTTON_TEXTURE_Y_OFFSET, textureWidth, CHAPTER_BUTTON_TEXTURE_HEIGHT);
             boolean visible = textureRect.intersects(viewportRect);
             boolean hovered = visible && buttonRect.contains(mouseX, mouseY);
-            ResourceLocation texture = selected ? CHAPTER_BUTTON_ACTIVE_TEXTURE : hovered ? CHAPTER_BUTTON_HOVER_TEXTURE : CHAPTER_BUTTON_INACTIVE_TEXTURE;
 
             if (visible) {
-                RenderSystem.enableBlend();
-                graphics.blit(texture, textureRect.x(), textureRect.y(), 0, 0, textureRect.width(), textureRect.height(), textureWidth, CHAPTER_BUTTON_TEXTURE_HEIGHT);
-                RenderSystem.disableBlend();
-
-                int iconX = buttonRect.x() + CHAPTER_SELECTOR_ICON_X_OFFSET;
-                int iconY = buttonRect.y() + Math.max(0, (buttonRect.height() - CHAPTER_SELECTOR_ICON_SIZE) / 2);
-                chapter.icon().draw(graphics, iconX, iconY, CHAPTER_SELECTOR_ICON_SIZE, CHAPTER_SELECTOR_ICON_SIZE);
-
-                float scaledTextHeight = font.lineHeight * CHAPTER_SELECTOR_TEXT_SCALE;
-                int textLeft = buttonRect.x() + CHAPTER_SELECTOR_TEXT_X_OFFSET;
-                int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + CHAPTER_SELECTOR_TEXT_Y_OFFSET;
-                int availableWidth = buttonRect.maxX() - textLeft - CHAPTER_SELECTOR_TEXT_RIGHT_PADDING;
-                int textColor = selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
-                renderScrollingChapterLabel(graphics, chapter.title(), buttonRect, textLeft, textY, availableWidth, textColor, hovered || selected);
+                if (selected) {
+                    selectedRows.add(new ChapterRowLayout(chapter, buttonRect, textureRect, hovered));
+                } else {
+                    renderChapterSelectorRow(graphics, chapter, buttonRect, textureRect, hovered, false);
+                }
             }
 
             if (interactive && buttonRect.intersects(viewportRect)) {
@@ -629,8 +620,31 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         renderChapterSelectorBottomShadow(graphics, viewportRect, snapshot);
+        for (ChapterRowLayout selectedRow : selectedRows) {
+            renderChapterSelectorRow(graphics, selectedRow.chapter(), selectedRow.buttonRect(), selectedRow.textureRect(), selectedRow.hovered(), true);
+        }
         graphics.disableScissor();
         renderChapterScrollbar(graphics, snapshot);
+    }
+
+    private void renderChapterSelectorRow(GuiGraphics graphics, QuestDataSnapshot.ChapterSnapshot chapter, Rect buttonRect,
+                                          Rect textureRect, boolean hovered, boolean selected) {
+        ResourceLocation texture = selected ? CHAPTER_BUTTON_ACTIVE_TEXTURE : hovered ? CHAPTER_BUTTON_HOVER_TEXTURE : CHAPTER_BUTTON_INACTIVE_TEXTURE;
+        RenderSystem.enableBlend();
+        graphics.blit(texture, textureRect.x(), textureRect.y(), 0, 0, textureRect.width(), textureRect.height(),
+                CHAPTER_BUTTON_TEXTURE_WIDTH, CHAPTER_BUTTON_TEXTURE_HEIGHT);
+        RenderSystem.disableBlend();
+
+        int iconX = buttonRect.x() + CHAPTER_SELECTOR_ICON_X_OFFSET;
+        int iconY = buttonRect.y() + Math.max(0, (buttonRect.height() - CHAPTER_SELECTOR_ICON_SIZE) / 2);
+        chapter.icon().draw(graphics, iconX, iconY, CHAPTER_SELECTOR_ICON_SIZE, CHAPTER_SELECTOR_ICON_SIZE);
+
+        float scaledTextHeight = font.lineHeight * CHAPTER_SELECTOR_TEXT_SCALE;
+        int textLeft = buttonRect.x() + CHAPTER_SELECTOR_TEXT_X_OFFSET;
+        int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + CHAPTER_SELECTOR_TEXT_Y_OFFSET;
+        int availableWidth = buttonRect.maxX() - textLeft - CHAPTER_SELECTOR_TEXT_RIGHT_PADDING;
+        int textColor = selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
+        renderScrollingChapterLabel(graphics, chapter.title(), buttonRect, textLeft, textY, availableWidth, textColor, hovered || selected);
     }
 
     private void renderChapterSelectorHeader(GuiGraphics graphics) {
@@ -647,7 +661,7 @@ public class OverhaulQuestScreen extends Screen {
 
         int shadowTop = Math.max(viewportRect.y(), viewportRect.maxY() - CHAPTER_SELECTOR_BOTTOM_SHADOW_HEIGHT);
         RenderSystem.enableBlend();
-        graphics.fillGradient(viewportRect.x(), shadowTop, viewportRect.maxX(), viewportRect.maxY(), 0x00120D09, 0xD0120D09);
+        graphics.fillGradient(viewportRect.x(), shadowTop, viewportRect.maxX() - 10, viewportRect.maxY(), 0x00120D09, 0xD0120D09);
         RenderSystem.disableBlend();
     }
 
@@ -1230,10 +1244,9 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderAlertOverlay(GuiGraphics graphics, Rect nodeRect) {
-        renderBadgeTexture(graphics, FTB_QUEST_ALERT_TEXTURE,
-                nodeRect.x() + ALERT_OVERLAY_LEFT_INSET,
-                nodeRect.y() + ALERT_OVERLAY_TOP_INSET,
-                ALERT_OVERLAY_SIZE);
+        int alertX = nodeRect.x() + LOCK_OVERLAY_FRAME_X_OFFSET + WIDGET_WIDTH - ALERT_OVERLAY_SIZE - LOCK_OVERLAY_RIGHT_INSET;
+        int alertY = nodeRect.y() + ALERT_OVERLAY_TOP_INSET;
+        renderBadgeTexture(graphics, FTB_QUEST_ALERT_TEXTURE, alertX, alertY, ALERT_OVERLAY_SIZE);
     }
 
     // ---- Hover tooltip (matching AdvancementWidget.drawHover) ----
@@ -2786,6 +2799,9 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     // ---- Records ----
+
+    private record ChapterRowLayout(QuestDataSnapshot.ChapterSnapshot chapter, Rect buttonRect, Rect textureRect, boolean hovered) {
+    }
 
     private record ClickTarget(Rect rect, Runnable action) {
         boolean contains(double mouseX, double mouseY) {
