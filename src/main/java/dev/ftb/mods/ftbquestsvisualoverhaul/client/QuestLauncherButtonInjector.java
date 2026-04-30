@@ -21,6 +21,7 @@ import java.util.UUID;
 public class QuestLauncherButtonInjector {
     private static final Component QUEST_LOG = Component.literal("Quest Log");
     private static final ResourceLocation RECIPE_BUTTON_TEXTURE = new ResourceLocation("minecraft", "textures/gui/recipe_button.png");
+    private static final ResourceLocation ALERT_TEXTURE = new ResourceLocation("ftbquests", "textures/gui/alert.png");
 
     @SubscribeEvent
     public static void onScreenInit(ScreenEvent.Init.Post event) {
@@ -87,12 +88,11 @@ public class QuestLauncherButtonInjector {
         }
 
         private void renderNotificationMarker(GuiGraphics graphics) {
-            Component marker = Component.literal("[!]");
-            int markerWidth = Minecraft.getInstance().font.width(marker);
-            int markerX = getX() + width - markerWidth - 1;
-            int markerY = getY() + 1;
-            graphics.fill(markerX - 1, markerY - 1, markerX + markerWidth, markerY + 8, 0xFFE04B4B);
-            graphics.drawString(Minecraft.getInstance().font, marker, markerX, markerY, 0xFFFFFFFF, false);
+            graphics.pose().pushPose();
+            graphics.pose().translate(getX() + width - 8, getY() - 1, 0.0F);
+            graphics.pose().scale(0.5F, 0.5F, 1.0F);
+            graphics.blit(ALERT_TEXTURE, 0, 0, 0.0F, 0.0F, 16, 16, 16, 16);
+            graphics.pose().popPose();
         }
 
         private void syncPosition() {

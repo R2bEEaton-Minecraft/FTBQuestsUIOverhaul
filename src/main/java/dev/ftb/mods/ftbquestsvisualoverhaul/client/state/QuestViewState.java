@@ -11,6 +11,9 @@ import java.util.Set;
 public class QuestViewState {
     private long selectedChapterId;
     private long viewedQuestId;
+    private long lastAcceptedQuestId;
+    private boolean hideAcceptedQuests;
+    private Set<Long> hiddenAcceptedQuestIds;
     private String searchText;
     private double chapterScroll;
     private double detailScroll;
@@ -27,6 +30,9 @@ public class QuestViewState {
     public QuestViewState() {
         selectedChapterId = 0L;
         viewedQuestId = 0L;
+        lastAcceptedQuestId = 0L;
+        hideAcceptedQuests = false;
+        hiddenAcceptedQuestIds = new HashSet<>();
         searchText = "";
         chapterScroll = 0D;
         detailScroll = 0D;
@@ -45,6 +51,9 @@ public class QuestViewState {
         QuestViewState copy = new QuestViewState();
         copy.selectedChapterId = selectedChapterId;
         copy.viewedQuestId = viewedQuestId;
+        copy.lastAcceptedQuestId = lastAcceptedQuestId;
+        copy.hideAcceptedQuests = hideAcceptedQuests;
+        copy.hiddenAcceptedQuestIds = new HashSet<>(hiddenAcceptedQuestIds);
         copy.searchText = searchText;
         copy.chapterScroll = chapterScroll;
         copy.detailScroll = detailScroll;
@@ -74,6 +83,30 @@ public class QuestViewState {
 
     public void setViewedQuestId(long viewedQuestId) {
         this.viewedQuestId = viewedQuestId;
+    }
+
+    public long getLastAcceptedQuestId() {
+        return lastAcceptedQuestId;
+    }
+
+    public void setLastAcceptedQuestId(long lastAcceptedQuestId) {
+        this.lastAcceptedQuestId = lastAcceptedQuestId;
+    }
+
+    public boolean isHideAcceptedQuests() {
+        return hideAcceptedQuests;
+    }
+
+    public void setHideAcceptedQuests(boolean hideAcceptedQuests) {
+        this.hideAcceptedQuests = hideAcceptedQuests;
+    }
+
+    public Set<Long> getHiddenAcceptedQuestIds() {
+        return new HashSet<>(hiddenAcceptedQuestIds);
+    }
+
+    public void setHiddenAcceptedQuestIds(Set<Long> hiddenAcceptedQuestIds) {
+        this.hiddenAcceptedQuestIds = new HashSet<>(hiddenAcceptedQuestIds);
     }
 
     public String getSearchText() {

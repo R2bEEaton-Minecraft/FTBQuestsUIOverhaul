@@ -64,10 +64,35 @@ public class QuestDataController {
     }
 
     public static void saveViewState(QuestViewState state) {
-        persistedViewState = state.copy();
+        QuestViewState copy = state.copy();
+        copy.setLastAcceptedQuestId(persistedViewState.getLastAcceptedQuestId());
+        copy.setHideAcceptedQuests(persistedViewState.isHideAcceptedQuests());
+        copy.setHiddenAcceptedQuestIds(persistedViewState.getHiddenAcceptedQuestIds());
+        persistedViewState = copy;
         savePersistentTileTextures();
         savePersistentFreePanStates();
         savePersistentChapterGroups();
+    }
+
+    public static long getLastAcceptedQuestId() {
+        return persistedViewState.getLastAcceptedQuestId();
+    }
+
+    public static void setLastAcceptedQuestId(long questId) {
+        persistedViewState.setLastAcceptedQuestId(questId);
+    }
+
+    public static boolean isHideAcceptedQuests() {
+        return persistedViewState.isHideAcceptedQuests();
+    }
+
+    public static Set<Long> getHiddenAcceptedQuestIds() {
+        return persistedViewState.getHiddenAcceptedQuestIds();
+    }
+
+    public static void setHiddenAcceptedQuestState(boolean hidden, Set<Long> questIds) {
+        persistedViewState.setHideAcceptedQuests(hidden);
+        persistedViewState.setHiddenAcceptedQuestIds(questIds);
     }
 
     private static void loadPersistentTileTextures() {
