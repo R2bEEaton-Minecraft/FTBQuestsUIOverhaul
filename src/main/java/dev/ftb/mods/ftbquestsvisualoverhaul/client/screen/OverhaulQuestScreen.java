@@ -121,9 +121,9 @@ public class OverhaulQuestScreen extends Screen {
     private static final ResourceLocation ADVANCEMENT_TASK_FRAME_UNOBTAINED_TEXTURE = new ResourceLocation("minecraft", "textures/gui/sprites/advancements/task_frame_unobtained.png");
     private static final ResourceLocation BUTTONS_LOCATION = new ResourceLocation("textures/gui/widgets.png");
     private static final ResourceLocation OAK_PLANKS_TEXTURE = new ResourceLocation("minecraft", "textures/block/oak_planks.png");
-    private static final ResourceLocation FTB_QUEST_LOCKED_TEXTURE = new ResourceLocation("ftbquests", "textures/gui/quest_locked.png");
-    private static final ResourceLocation FTB_QUEST_CHECK_TEXTURE = new ResourceLocation("ftblibrary", "textures/icons/accept.png");
-    private static final ResourceLocation FTB_QUEST_ALERT_TEXTURE = new ResourceLocation("ftbquests", "textures/gui/alert.png");
+    private static final ResourceLocation OVERHAUL_LOCK_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/lock.png");
+    private static final ResourceLocation OVERHAUL_CHECK_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/checked.png");
+    private static final ResourceLocation OVERHAUL_NOTIFICATION_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/notification.png");
     private static final int ADVANCEMENT_PANEL_TEXTURE_WIDTH = 200;
     private static final int ADVANCEMENT_PANEL_TEXTURE_HEIGHT = 26;
     private static final int ADVANCEMENT_PANEL_TEXTURE_BORDER = 10;
@@ -141,16 +141,17 @@ public class OverhaulQuestScreen extends Screen {
     private static final int WIDGET_ICON_X = 8;
     private static final int WIDGET_ICON_Y = 5;
     private static final int WIDGET_ICON_SIZE = 16;
+    private static final int WIDGET_FRAME_X_OFFSET = 3;
     private static final int QUEST_TILE_SHADOW_OFFSET = 2;
     private static final int QUEST_TILE_SHADOW_COLOR = 0x26000000;
     private static final int QUEST_TILE_SHADOW_EDGE_COLOR = 0x33000000;
-    private static final int LOCK_OVERLAY_SIZE = 8;
-    private static final int LOCK_OVERLAY_FRAME_X_OFFSET = 3;
-    private static final int LOCK_OVERLAY_RIGHT_INSET = 1;
-    private static final int LOCK_OVERLAY_TOP_INSET = -1;
-    private static final int ALERT_OVERLAY_SIZE = 8;
-    private static final int ALERT_OVERLAY_LEFT_INSET = -1;
-    private static final int ALERT_OVERLAY_TOP_INSET = -1;
+    private static final int STATUS_CHECK_ICON_WIDTH = 9;
+    private static final int STATUS_CHECK_ICON_HEIGHT = 9;
+    private static final int STATUS_LOCK_ICON_WIDTH = 9;
+    private static final int STATUS_LOCK_ICON_HEIGHT = 12;
+    private static final int STATUS_NOTIFICATION_ICON_WIDTH = 9;
+    private static final int STATUS_NOTIFICATION_ICON_HEIGHT = 9;
+    private static final int STATUS_OVERLAY_RIGHT_INSET = -1;
     private static final int TREE_PAN_BOUND_PADDING = 12;
     private static final double TREE_ZOOM_MIN = 0.5D;
     private static final double TREE_ZOOM_MAX = 1.75D;
@@ -177,9 +178,6 @@ public class OverhaulQuestScreen extends Screen {
     private static final int MODAL_FOOTER_HEIGHT = 30;
     private static final int MODAL_MARGIN = 28;
     private static final int FOOTER_BUTTON_HEIGHT = 15;
-    private static final int CHECK_BADGE_SIZE = 7;
-    private static final int CHECK_BUTTON_SIZE = 8;
-    private static final int CHECK_NOTIFICATION_SIZE = 8;
     private static final int MODAL_CONTENT_SIDE_PADDING = 14;
     private static final int MODAL_CONTENT_TOP_PADDING = 10;
     private static final int MODAL_CONTENT_BOTTOM_PADDING = 10;
@@ -1175,7 +1173,7 @@ public class OverhaulQuestScreen extends Screen {
 
             // Matching vanilla: blit at (scrollX + x + 3, scrollY + y)
             graphics.blit(WIDGETS_LOCATION,
-                    nodeX + 3, nodeY,
+                    nodeX + WIDGET_FRAME_X_OFFSET, nodeY,
                     frameU, 128 + widgetTypeIndex * 26,
                     WIDGET_WIDTH, WIDGET_HEIGHT);
 
@@ -1215,7 +1213,7 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderQuestWidgetShadow(GuiGraphics graphics, Rect nodeRect) {
-        int x = nodeRect.x() + 3;
+        int x = nodeRect.x() + WIDGET_FRAME_X_OFFSET;
         int y = nodeRect.y();
         int right = x + nodeRect.width();
         int bottom = y + nodeRect.height();
@@ -1233,20 +1231,13 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderLockOverlay(GuiGraphics graphics, Rect nodeRect) {
-        float scale = LOCK_OVERLAY_SIZE / 16F;
-        int lockX = nodeRect.x() + LOCK_OVERLAY_FRAME_X_OFFSET + WIDGET_WIDTH - LOCK_OVERLAY_SIZE - LOCK_OVERLAY_RIGHT_INSET;
-        int lockY = nodeRect.y() + LOCK_OVERLAY_TOP_INSET;
-        graphics.pose().pushPose();
-        graphics.pose().translate(lockX, lockY, 0.0F);
-        graphics.pose().scale(scale, scale, 1.0F);
-        graphics.blit(FTB_QUEST_LOCKED_TEXTURE, 0, 0, 0.0F, 0.0F, 16, 16, 16, 16);
-        graphics.pose().popPose();
+        Rect lockRect = widgetStatusRect(nodeRect, STATUS_LOCK_ICON_WIDTH, STATUS_LOCK_ICON_HEIGHT, -3);
+        renderStatusTexture(graphics, OVERHAUL_LOCK_TEXTURE, lockRect);
     }
 
     private void renderAlertOverlay(GuiGraphics graphics, Rect nodeRect) {
-        int alertX = nodeRect.x() + LOCK_OVERLAY_FRAME_X_OFFSET + WIDGET_WIDTH - ALERT_OVERLAY_SIZE - LOCK_OVERLAY_RIGHT_INSET;
-        int alertY = nodeRect.y() + ALERT_OVERLAY_TOP_INSET;
-        renderBadgeTexture(graphics, FTB_QUEST_ALERT_TEXTURE, alertX, alertY, ALERT_OVERLAY_SIZE);
+        Rect notificationRect = widgetStatusRect(nodeRect, STATUS_NOTIFICATION_ICON_WIDTH, STATUS_NOTIFICATION_ICON_HEIGHT, -1);
+        renderStatusTexture(graphics, OVERHAUL_NOTIFICATION_TEXTURE, notificationRect);
     }
 
     // ---- Hover tooltip (matching AdvancementWidget.drawHover) ----
@@ -1536,13 +1527,20 @@ public class OverhaulQuestScreen extends Screen {
         Rect frameRect = new Rect(header.x() + 3, header.y(), ADVANCEMENT_FRAME_TEXTURE_SIZE, ADVANCEMENT_FRAME_TEXTURE_SIZE);
         boolean frameTexturePresent = blitAdvancementFrame(graphics, selectedFrameTexture(quest), frameRect);
         int headerTextY = header.y() + Math.max(0, (header.height() - Math.round(font.lineHeight * MODAL_TEXT_SCALE)) / 2);
+        boolean obtained = quest.completed() || quest.hasUnclaimedRewards();
+        boolean locked = !obtained && !isQuestAvailable(quest);
 
         quest.icon().draw(graphics,
                 frameRect.x() + (frameRect.width() - WIDGET_ICON_SIZE) / 2,
                 frameRect.y() + (frameRect.height() - WIDGET_ICON_SIZE) / 2,
                 WIDGET_ICON_SIZE, WIDGET_ICON_SIZE);
+        if (locked) {
+            Rect lockRect = topRightRect(frameRect, STATUS_LOCK_ICON_WIDTH, STATUS_LOCK_ICON_HEIGHT, STATUS_OVERLAY_RIGHT_INSET, -3);
+            renderStatusTexture(graphics, OVERHAUL_LOCK_TEXTURE, lockRect);
+        }
         if (questNeedsAttention(quest)) {
-            renderBadgeTexture(graphics, FTB_QUEST_ALERT_TEXTURE, frameRect.x() - 2, frameRect.y() - 2, ALERT_OVERLAY_SIZE);
+            Rect notificationRect = topRightRect(frameRect, STATUS_NOTIFICATION_ICON_WIDTH, STATUS_NOTIFICATION_ICON_HEIGHT, -1, -1);
+            renderStatusTexture(graphics, OVERHAUL_NOTIFICATION_TEXTURE, notificationRect);
         }
         drawScaledString(graphics,
                 trim(quest.title(), (int) ((header.width() - TITLE_X - 26) / MODAL_TEXT_SCALE)),
@@ -1611,7 +1609,7 @@ public class OverhaulQuestScreen extends Screen {
         boolean claimEnabled = canClaimAnyReward(quest);
         renderFooterButton(graphics, completeButton, "Complete", claimEnabled, completeButton.contains(mouseX, mouseY), false);
         if (quest.hasUnclaimedRewards() || claimEnabled) {
-            renderNotificationMarker(graphics, completeButton.maxX() - 4, completeButton.y() - 3, quest.completed() && !claimEnabled);
+            renderNotificationMarker(graphics, completeButton, quest.completed() && !claimEnabled);
         }
 
         if (acceptEnabled) {
@@ -1744,7 +1742,7 @@ public class OverhaulQuestScreen extends Screen {
 
     private void renderSmallCheck(GuiGraphics graphics, Rect iconRect) {
         Rect badge = itemBadgeRect(iconRect);
-        renderCheckTexture(graphics, badge.x(), badge.y(), CHECK_BADGE_SIZE);
+        renderCheckTexture(graphics, badge.x(), badge.y());
     }
 
     private void renderScrollArrow(GuiGraphics graphics, int x, int y, boolean up, boolean active) {
@@ -1755,7 +1753,7 @@ public class OverhaulQuestScreen extends Screen {
 
     private void renderRequirementMarker(GuiGraphics graphics, Rect iconRect, boolean active) {
         Rect badge = itemBadgeRect(iconRect);
-        renderBadgeTexture(graphics, FTB_QUEST_ALERT_TEXTURE, badge.x(), badge.y(), CHECK_BADGE_SIZE);
+        renderStatusTexture(graphics, OVERHAUL_NOTIFICATION_TEXTURE, badge);
     }
 
     private void drawVanillaButton(GuiGraphics graphics, Rect rect, boolean enabled, boolean hovered) {
@@ -1780,36 +1778,49 @@ public class OverhaulQuestScreen extends Screen {
         int textY = rect.y() + Math.max(0, (rect.height() - textHeight) / 2);
         drawCenteredScaledString(graphics, Component.literal(label), rect.centerX(), textY, enabled ? 0xFFE0E0E0 : 0xFFA0A0A0, MODAL_TEXT_SCALE);
         if (pressed) {
-            renderCheckTexture(graphics, rect.maxX() - CHECK_BUTTON_SIZE - 3, rect.y() + 3, CHECK_BUTTON_SIZE);
+            Rect checkRect = topRightRect(rect, STATUS_CHECK_ICON_WIDTH, STATUS_CHECK_ICON_HEIGHT, 3, 3);
+            renderCheckTexture(graphics, checkRect.x(), checkRect.y());
         }
     }
 
-    private void renderNotificationMarker(GuiGraphics graphics, int x, int y, boolean completed) {
+    private void renderNotificationMarker(GuiGraphics graphics, Rect ownerRect, boolean completed) {
+        Rect badge = topRightRect(ownerRect,
+                completed ? STATUS_CHECK_ICON_WIDTH : STATUS_NOTIFICATION_ICON_WIDTH,
+                completed ? STATUS_CHECK_ICON_HEIGHT : STATUS_NOTIFICATION_ICON_HEIGHT,
+                -4, -3);
         if (completed) {
-            renderCheckTexture(graphics, x - 1, y - 1, CHECK_NOTIFICATION_SIZE);
-        } else {
-            renderBadgeTexture(graphics, FTB_QUEST_ALERT_TEXTURE, x - 1, y - 1, CHECK_NOTIFICATION_SIZE);
+            renderCheckTexture(graphics, badge.x(), badge.y());
+            return;
         }
+        renderStatusTexture(graphics, OVERHAUL_NOTIFICATION_TEXTURE, badge);
     }
 
-    private void renderCheckTexture(GuiGraphics graphics, int x, int y, int size) {
-        renderBadgeTexture(graphics, FTB_QUEST_CHECK_TEXTURE, x, y, size);
+    private void renderCheckTexture(GuiGraphics graphics, int x, int y) {
+        renderStatusTexture(graphics, OVERHAUL_CHECK_TEXTURE, new Rect(x, y, STATUS_CHECK_ICON_WIDTH, STATUS_CHECK_ICON_HEIGHT));
     }
 
-    private void renderBadgeTexture(GuiGraphics graphics, ResourceLocation texture, int x, int y, int size) {
+    private void renderStatusTexture(GuiGraphics graphics, ResourceLocation texture, Rect rect) {
         RenderSystem.enableBlend();
         RenderSystem.disableDepthTest();
         graphics.pose().pushPose();
-        graphics.pose().translate(x, y, 200.0F);
-        graphics.pose().scale(size / 16F, size / 16F, 1.0F);
-        graphics.blit(texture, 0, 0, 0.0F, 0.0F, 16, 16, 16, 16);
+        graphics.pose().translate(rect.x(), rect.y(), 200.0F);
+        graphics.blit(texture, 0, 0, 0.0F, 0.0F, rect.width(), rect.height(), rect.width(), rect.height());
         graphics.pose().popPose();
         RenderSystem.enableDepthTest();
         RenderSystem.disableBlend();
     }
 
     private Rect itemBadgeRect(Rect iconRect) {
-        return new Rect(iconRect.maxX() - CHECK_BADGE_SIZE + 1, iconRect.y(), CHECK_BADGE_SIZE, CHECK_BADGE_SIZE);
+        return topRightRect(iconRect, STATUS_CHECK_ICON_WIDTH, STATUS_CHECK_ICON_HEIGHT, -4, -4);
+    }
+
+    private Rect widgetStatusRect(Rect nodeRect, int overlayWidth, int overlayHeight, int topInset) {
+        Rect widgetFrameRect = new Rect(nodeRect.x() + WIDGET_FRAME_X_OFFSET, nodeRect.y(), WIDGET_WIDTH, WIDGET_HEIGHT);
+        return topRightRect(widgetFrameRect, overlayWidth, overlayHeight, STATUS_OVERLAY_RIGHT_INSET, topInset);
+    }
+
+    private Rect topRightRect(Rect ownerRect, int overlayWidth, int overlayHeight, int rightInset, int topInset) {
+        return new Rect(ownerRect.maxX() - overlayWidth - rightInset, ownerRect.y() + topInset, overlayWidth, overlayHeight);
     }
 
     private Rect footerButtonRect(int x, int y, int width, int containerHeight) {
@@ -2120,7 +2131,10 @@ public class OverhaulQuestScreen extends Screen {
     private List<Component> buildRewardTooltip(QuestDataSnapshot.RewardSnapshot reward) {
         List<Component> tooltip = new ArrayList<>();
         tooltip.add(reward.title());
-        tooltip.add(reward.statusText());
+        String rewardStatus = reward.statusText().getString().trim().toLowerCase(Locale.ROOT);
+        if (!rewardStatus.equals("cant claim") && !rewardStatus.equals("claimed") && !rewardStatus.equals("can claim")) {
+            tooltip.add(reward.statusText());
+        }
 
         String state = switch (reward.interactionMode()) {
             case CLAIM -> reward.canClaim() ? "Click to claim" : reward.claimed() ? "Claimed" : "Locked";
