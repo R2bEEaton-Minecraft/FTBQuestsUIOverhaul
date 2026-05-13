@@ -93,6 +93,7 @@ public class QuestDataSnapshot {
             Component countLabel,
             Icon icon,
             boolean completed,
+            boolean checkmarkTask,
             boolean optional,
             boolean canInteract,
             boolean consumesResources,

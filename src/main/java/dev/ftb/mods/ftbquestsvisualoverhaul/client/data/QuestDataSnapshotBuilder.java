@@ -62,6 +62,7 @@ public class QuestDataSnapshotBuilder {
                                     taskCountLabel(task),
                                     task.getIcon(),
                                     teamData.isCompleted(task),
+                                    task instanceof CheckmarkTask,
                                     task.isOptionalForProgression(teamData),
                                     canTaskInteract(task, teamData),
                                     task.consumesResources(),

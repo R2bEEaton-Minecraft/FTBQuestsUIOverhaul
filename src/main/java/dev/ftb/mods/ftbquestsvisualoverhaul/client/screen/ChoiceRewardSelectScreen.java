@@ -3,6 +3,7 @@ package dev.ftb.mods.ftbquestsvisualoverhaul.client.screen;
 import dev.ftb.mods.ftbquests.quest.loot.WeightedReward;
 import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestActionRouter;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestUiFeedback;
 import dev.ftb.mods.ftblibrary.ui.CursorType;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -112,6 +113,7 @@ public class ChoiceRewardSelectScreen extends Screen {
                 if (target.contains(mouseX, mouseY)) {
                     if (target.index() >= 0) {
                         router.claimChoiceReward(reward, target.index());
+                        QuestUiFeedback.playRewardConfirmSound();
                     }
                     onClose();
                     return true;

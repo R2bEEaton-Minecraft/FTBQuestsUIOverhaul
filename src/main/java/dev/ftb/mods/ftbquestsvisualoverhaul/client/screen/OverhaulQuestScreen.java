@@ -10,9 +10,11 @@ import dev.ftb.mods.ftbquests.quest.Quest;
 import dev.ftb.mods.ftbquests.quest.TeamData;
 import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
 import dev.ftb.mods.ftbquests.quest.reward.Reward;
+import dev.ftb.mods.ftbquests.quest.task.CheckmarkTask;
 import dev.ftb.mods.ftbquests.quest.task.Task;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestActionRouter;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestDataController;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestUiFeedback;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.QuestDataSnapshot;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.RewardInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.TaskInteractionMode;
@@ -184,7 +186,6 @@ public class OverhaulQuestScreen extends Screen {
     private static final int MODAL_CONTENT_BOTTOM_PADDING = 10;
     private static final int MODAL_SECTION_DIVIDER_INSET = 8;
     private static final int MODAL_BUTTON_WIDTH = 86;
-    private static final int MODAL_BUTTON_GAP = 26;
     private static final float MODAL_TEXT_SCALE = 0.8F;
     private static final float MODAL_SECTION_LABEL_SCALE = 0.65F;
     private static final float MODAL_SECTION_NOTE_SCALE = 0.58F;
@@ -198,6 +199,12 @@ public class OverhaulQuestScreen extends Screen {
     private static final int MODAL_SECTION_ICON_GAP_X = 2;
     private static final int MODAL_SECTION_ICON_GAP_Y = 4;
     private static final int MODAL_SECTION_MAX_COLUMNS = 4;
+    private static final ResourceLocation IN_PROGRESS_WHEEL_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/in_progress_wheel_strip.png");
+    private static final int IN_PROGRESS_WHEEL_FRAME_SIZE = 9;
+    private static final int IN_PROGRESS_WHEEL_FRAME_COUNT = 48;
+    private static final int IN_PROGRESS_WHEEL_FRAME_TIME_MS = 40;
+    private static final int BUTTON_PRESS_OFFSET = 1;
+    private static final long BUTTON_PRESS_DURATION_MS = 120L;
 
     private final QuestOpenContext openContext;
     private final QuestActionRouter actionRouter = new QuestActionRouter();
@@ -218,6 +225,7 @@ public class OverhaulQuestScreen extends Screen {
     private int tabPage;
     private int maxPages;
     private double chapterScroll;
+    private long primaryButtonPressedUntilMs;
 
     // Scroll bounds tracking (from AdvancementTab)
     private int minNodeX = Integer.MAX_VALUE;
@@ -1187,9 +1195,7 @@ public class OverhaulQuestScreen extends Screen {
             if (!obtained && !isQuestAvailable(quest)) {
                 renderLockOverlay(graphics, worldRect);
             }
-            if (questNeedsAttention(quest)) {
-                renderAlertOverlay(graphics, worldRect);
-            }
+            renderQuestStatusOverlayOnWidget(graphics, worldRect, quest);
 
             // Hit detection for click targets (in screen coordinates)
             Rect visibleScreenRect = clipRect(screenRect, viewportRect);
@@ -1239,9 +1245,19 @@ public class OverhaulQuestScreen extends Screen {
         renderStatusTexture(graphics, OVERHAUL_LOCK_TEXTURE, lockRect);
     }
 
-    private void renderAlertOverlay(GuiGraphics graphics, Rect nodeRect) {
-        Rect notificationRect = widgetStatusRect(nodeRect, STATUS_NOTIFICATION_ICON_WIDTH, STATUS_NOTIFICATION_ICON_HEIGHT, -1);
-        renderStatusTexture(graphics, OVERHAUL_NOTIFICATION_TEXTURE, notificationRect);
+    private void renderQuestStatusOverlayOnWidget(GuiGraphics graphics, Rect nodeRect, QuestDataSnapshot.QuestSnapshot quest) {
+        Rect overlayRect = widgetStatusRect(nodeRect, STATUS_NOTIFICATION_ICON_WIDTH, STATUS_NOTIFICATION_ICON_HEIGHT, -1);
+        renderQuestStatusOverlay(graphics, quest, overlayRect);
+    }
+
+    private void renderQuestStatusOverlay(GuiGraphics graphics, QuestDataSnapshot.QuestSnapshot quest, Rect overlayRect) {
+        switch (resolvePrimaryActionButtonState(quest).type()) {
+            case IN_PROGRESS -> renderInProgressSpinner(graphics, overlayRect.x(), overlayRect.y());
+            case COMPLETE -> renderStatusTexture(graphics, OVERHAUL_NOTIFICATION_TEXTURE, overlayRect);
+            case COMPLETED -> renderCheckTexture(graphics, overlayRect.x(), overlayRect.y());
+            case ACCEPT -> {
+            }
+        }
     }
 
     // ---- Hover tooltip (matching AdvancementWidget.drawHover) ----
@@ -1391,9 +1407,7 @@ public class OverhaulQuestScreen extends Screen {
         if (locked) {
             renderLockOverlay(graphics, new Rect(contentX, contentY, WIDGET_WIDTH, WIDGET_HEIGHT));
         }
-        if (questNeedsAttention(quest)) {
-            renderAlertOverlay(graphics, new Rect(contentX, contentY, WIDGET_WIDTH, WIDGET_HEIGHT));
-        }
+        renderQuestStatusOverlayOnWidget(graphics, new Rect(contentX, contentY, WIDGET_WIDTH, WIDGET_HEIGHT), quest);
     }
 
     /**
@@ -1542,10 +1556,9 @@ public class OverhaulQuestScreen extends Screen {
             Rect lockRect = topRightRect(frameRect, STATUS_LOCK_ICON_WIDTH, STATUS_LOCK_ICON_HEIGHT, STATUS_OVERLAY_RIGHT_INSET, -3);
             renderStatusTexture(graphics, OVERHAUL_LOCK_TEXTURE, lockRect);
         }
-        if (questNeedsAttention(quest)) {
-            Rect notificationRect = topRightRect(frameRect, STATUS_NOTIFICATION_ICON_WIDTH, STATUS_NOTIFICATION_ICON_HEIGHT, -1, -1);
-            renderStatusTexture(graphics, OVERHAUL_NOTIFICATION_TEXTURE, notificationRect);
-        }
+        renderQuestStatusOverlay(graphics,
+                quest,
+                topRightRect(frameRect, STATUS_NOTIFICATION_ICON_WIDTH, STATUS_NOTIFICATION_ICON_HEIGHT, -1, -1));
         drawScaledString(graphics,
                 trim(quest.title(), (int) ((header.width() - TITLE_X - 26) / MODAL_TEXT_SCALE)),
                 header.x() + TITLE_X, headerTextY, 0xFFF6EDDB, MODAL_TEXT_SCALE, true);
@@ -1602,25 +1615,22 @@ public class OverhaulQuestScreen extends Screen {
             }
         }
 
-        int buttonRowWidth = MODAL_BUTTON_WIDTH * 2 + MODAL_BUTTON_GAP;
-        int buttonRowLeft = footer.x() + Math.max(0, (footer.width() - buttonRowWidth) / 2);
-        Rect acceptButton = footerButtonRect(buttonRowLeft, footer.y(), MODAL_BUTTON_WIDTH, footer.height());
-        Rect completeButton = footerButtonRect(buttonRowLeft + MODAL_BUTTON_WIDTH + MODAL_BUTTON_GAP, footer.y(), MODAL_BUTTON_WIDTH, footer.height());
+        Rect primaryButton = footerButtonRect(footer.x() + Math.max(0, (footer.width() - MODAL_BUTTON_WIDTH) / 2), footer.y(), MODAL_BUTTON_WIDTH, footer.height());
+        PrimaryActionButtonState buttonState = resolvePrimaryActionButtonState(quest);
+        boolean primaryHovered = primaryButton.contains(mouseX, mouseY);
+        boolean primaryPressed = Util.getMillis() < primaryButtonPressedUntilMs;
 
-        boolean acceptEnabled = canToggleQuestAcceptance(quest);
-        renderFooterButton(graphics, acceptButton, quest.pinned() ? "Unaccept" : "Accept",
-                acceptEnabled, acceptEnabled && acceptButton.contains(mouseX, mouseY), quest.pinned());
-        boolean claimEnabled = canClaimAnyReward(quest);
-        renderFooterButton(graphics, completeButton, "Complete", claimEnabled, completeButton.contains(mouseX, mouseY), false);
-        if (quest.hasUnclaimedRewards() || claimEnabled) {
-            renderNotificationMarker(graphics, completeButton, quest.completed() && !claimEnabled);
-        }
-
-        if (acceptEnabled) {
-            clickTargets.add(new ClickTarget(acceptButton, () -> acceptOrUnacceptQuest(quest)));
-        }
-        if (claimEnabled) {
-            clickTargets.add(new ClickTarget(completeButton, this::claimCurrentQuestRewards));
+        renderFooterButton(graphics,
+                primaryButton,
+                buttonState.label(primaryHovered),
+                buttonState.enabled(),
+                primaryHovered,
+                primaryPressed,
+                buttonState.showSpinner(primaryHovered),
+                buttonState.showsNotificationBadge(),
+                buttonState.showsCompletedBadge());
+        if (buttonState.enabled()) {
+            clickTargets.add(new ClickTarget(primaryButton, () -> activatePrimaryActionButton(quest, buttonState)));
         }
 
         if (!headerTexturePresent || !panelTexturePresent || !frameTexturePresent) {
@@ -1744,30 +1754,65 @@ public class OverhaulQuestScreen extends Screen {
         graphics.pose().popPose();
     }
 
-    private void renderFooterButton(GuiGraphics graphics, Rect rect, String label, boolean enabled, boolean hovered, boolean pressed) {
-        drawVanillaButton(graphics, rect, enabled, hovered);
+    private void renderFooterButton(
+            GuiGraphics graphics,
+            Rect rect,
+            String label,
+            boolean enabled,
+            boolean hovered,
+            boolean pressed,
+            boolean showSpinner,
+            boolean showNotificationBadge,
+            boolean showCompletedBadge
+    ) {
+        int contentOffset = pressed ? BUTTON_PRESS_OFFSET : 0;
+        Rect visualRect = pressed ? new Rect(rect.x(), rect.y() + BUTTON_PRESS_OFFSET, rect.width(), rect.height()) : rect;
+        drawVanillaButton(graphics, visualRect, enabled, hovered);
         if (pressed) {
-            graphics.fill(rect.x() + 2, rect.y() + 2, rect.maxX() - 2, rect.maxY() - 2, 0x55201018);
+            graphics.fill(visualRect.x() + 2, visualRect.y() + 2, visualRect.maxX() - 2, visualRect.maxY() - 2, 0x55201018);
         }
         int textHeight = Math.round(font.lineHeight * MODAL_TEXT_SCALE);
-        int textY = rect.y() + Math.max(0, (rect.height() - textHeight) / 2);
-        drawCenteredScaledString(graphics, Component.literal(label), rect.centerX(), textY, enabled ? 0xFFE0E0E0 : 0xFFA0A0A0, MODAL_TEXT_SCALE);
-        if (pressed) {
-            Rect checkRect = topRightRect(rect, STATUS_CHECK_ICON_WIDTH, STATUS_CHECK_ICON_HEIGHT, 3, 3);
-            renderCheckTexture(graphics, checkRect.x(), checkRect.y());
-        }
+        int textY = visualRect.y() + Math.max(0, (visualRect.height() - textHeight) / 2);
+        int textColor = enabled ? 0xFFE0E0E0 : 0xFFA0A0A0;
+        drawCenteredScaledString(graphics, Component.literal(label), visualRect.centerX(), textY, textColor, MODAL_TEXT_SCALE);
+        renderFooterButtonBadge(graphics, visualRect, showSpinner, showNotificationBadge, showCompletedBadge);
     }
 
-    private void renderNotificationMarker(GuiGraphics graphics, Rect ownerRect, boolean completed) {
-        Rect badge = topRightRect(ownerRect,
-                completed ? STATUS_CHECK_ICON_WIDTH : STATUS_NOTIFICATION_ICON_WIDTH,
-                completed ? STATUS_CHECK_ICON_HEIGHT : STATUS_NOTIFICATION_ICON_HEIGHT,
+    private void renderFooterButtonBadge(
+            GuiGraphics graphics,
+            Rect buttonRect,
+            boolean showSpinner,
+            boolean showNotificationBadge,
+            boolean showCompletedBadge
+    ) {
+        if (!showSpinner && !showNotificationBadge && !showCompletedBadge) {
+            return;
+        }
+
+        Rect badge = topRightRect(buttonRect,
+                showCompletedBadge ? STATUS_CHECK_ICON_WIDTH : STATUS_NOTIFICATION_ICON_WIDTH,
+                showCompletedBadge ? STATUS_CHECK_ICON_HEIGHT : STATUS_NOTIFICATION_ICON_HEIGHT,
                 -4, -3);
-        if (completed) {
+        if (showSpinner) {
+            renderInProgressSpinner(graphics, badge.x(), badge.y());
+            return;
+        }
+        if (showCompletedBadge) {
             renderCheckTexture(graphics, badge.x(), badge.y());
             return;
         }
+
         renderStatusTexture(graphics, OVERHAUL_NOTIFICATION_TEXTURE, badge);
+    }
+
+    private void renderInProgressSpinner(GuiGraphics graphics, int x, int y) {
+        int frame = (int) ((Util.getMillis() / IN_PROGRESS_WHEEL_FRAME_TIME_MS) % IN_PROGRESS_WHEEL_FRAME_COUNT);
+        RenderSystem.enableBlend();
+        graphics.blit(IN_PROGRESS_WHEEL_TEXTURE, x, y, IN_PROGRESS_WHEEL_FRAME_SIZE, IN_PROGRESS_WHEEL_FRAME_SIZE,
+                0.0F, frame * (float) IN_PROGRESS_WHEEL_FRAME_SIZE,
+                IN_PROGRESS_WHEEL_FRAME_SIZE, IN_PROGRESS_WHEEL_FRAME_SIZE,
+                IN_PROGRESS_WHEEL_FRAME_SIZE, IN_PROGRESS_WHEEL_FRAME_SIZE * IN_PROGRESS_WHEEL_FRAME_COUNT);
+        RenderSystem.disableBlend();
     }
 
     private void renderCheckTexture(GuiGraphics graphics, int x, int y) {
@@ -1927,8 +1972,51 @@ public class OverhaulQuestScreen extends Screen {
         return quest.rewards().stream().anyMatch(QuestDataSnapshot.RewardSnapshot::canClaim);
     }
 
-    private boolean questNeedsAttention(QuestDataSnapshot.QuestSnapshot quest) {
-        return quest.hasUnclaimedRewards() || canClaimAnyReward(quest);
+    private boolean hasPendingRequiredCheckmarkTask(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        return questSnapshot.tasks().stream()
+                .anyMatch(task -> task.checkmarkTask() && !task.optional() && !task.completed());
+    }
+
+    private boolean hasIncompleteRequiredNonCheckmarkTask(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        return questSnapshot.tasks().stream()
+                .anyMatch(task -> !task.checkmarkTask() && !task.optional() && !task.completed());
+    }
+
+    private boolean isReadyForManualCompletion(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        return questSnapshot.pinned()
+                && hasPendingRequiredCheckmarkTask(questSnapshot)
+                && !hasIncompleteRequiredNonCheckmarkTask(questSnapshot);
+    }
+
+    private PrimaryActionButtonState resolvePrimaryActionButtonState(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        if (canClaimAnyReward(questSnapshot)) {
+            return PrimaryActionButtonState.complete();
+        }
+        if (isReadyForManualCompletion(questSnapshot)) {
+            return PrimaryActionButtonState.complete();
+        }
+        if (questSnapshot.completed()) {
+            return PrimaryActionButtonState.completed();
+        }
+        if (questSnapshot.pinned()) {
+            return PrimaryActionButtonState.inProgress();
+        }
+        return PrimaryActionButtonState.accept(questSnapshot.canStart());
+    }
+
+    private void activatePrimaryActionButton(QuestDataSnapshot.QuestSnapshot questSnapshot, PrimaryActionButtonState buttonState) {
+        if (!buttonState.enabled()) {
+            return;
+        }
+
+        primaryButtonPressedUntilMs = Util.getMillis() + BUTTON_PRESS_DURATION_MS;
+        switch (buttonState.type()) {
+            case ACCEPT -> acceptQuest(questSnapshot);
+            case IN_PROGRESS -> cancelAcceptedQuest(questSnapshot);
+            case COMPLETE -> completeQuest(questSnapshot);
+            case COMPLETED -> {
+            }
+        }
     }
 
     private List<QuestDataSnapshot.TaskSnapshot> visibleRequirementTasks(QuestDataSnapshot.QuestSnapshot quest) {
@@ -1938,26 +2026,56 @@ public class OverhaulQuestScreen extends Screen {
         return quest.tasks();
     }
 
-    private boolean canToggleQuestAcceptance(QuestDataSnapshot.QuestSnapshot questSnapshot) {
-        if (questSnapshot.completed() || questSnapshot.hasUnclaimedRewards()) {
-            return false;
+    private void snapToInitialQuest(QuestDataSnapshot snapshot) {
+        QuestDataSnapshot.QuestSnapshot selectedChapterQuest = findPreferredInProgressQuest(snapshot, viewState.getSelectedChapterId());
+        if (selectedChapterQuest != null) {
+            QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(selectedChapterQuest.chapterId());
+            if (chapter != null) {
+                centerTreeOnQuest(chapter, selectedChapterQuest);
+                return;
+            }
         }
 
-        return questSnapshot.pinned() || questSnapshot.canStart();
-    }
+        if (viewState.getSelectedChapterId() != 0L && snapshot.findChapter(viewState.getSelectedChapterId()) != null) {
+            return;
+        }
 
-    private void snapToInitialQuest(QuestDataSnapshot snapshot) {
-        QuestDataSnapshot.QuestSnapshot rememberedQuest = snapshot.findQuest(QuestDataController.getLastAcceptedQuestId());
-        if (rememberedQuest != null && rememberedQuest.pinned()) {
-            viewState.setSelectedChapterId(rememberedQuest.chapterId());
-            QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(rememberedQuest.chapterId());
+        QuestDataSnapshot.QuestSnapshot preferredQuest = findPreferredInProgressQuest(snapshot, 0L);
+        if (preferredQuest != null) {
+            viewState.setSelectedChapterId(preferredQuest.chapterId());
+            QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(preferredQuest.chapterId());
             if (chapter != null) {
-                centerTreeOnQuest(chapter, rememberedQuest);
+                centerTreeOnQuest(chapter, preferredQuest);
             }
             return;
         }
 
         viewState.setViewedQuestId(0L);
+    }
+
+    private QuestDataSnapshot.QuestSnapshot findPreferredInProgressQuest(QuestDataSnapshot snapshot, long chapterId) {
+        QuestDataSnapshot.QuestSnapshot rememberedQuest = snapshot.findQuest(QuestDataController.getLastAcceptedQuestId());
+        if (rememberedQuest != null && rememberedQuest.pinned() && (chapterId == 0L || rememberedQuest.chapterId() == chapterId)) {
+            return rememberedQuest;
+        }
+
+        if (chapterId != 0L) {
+            QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(chapterId);
+            if (chapter == null) {
+                return null;
+            }
+
+            return chapter.quests().stream()
+                    .filter(QuestDataSnapshot.QuestSnapshot::pinned)
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        return snapshot.chapters().stream()
+                .flatMap(chapter -> chapter.quests().stream())
+                .filter(QuestDataSnapshot.QuestSnapshot::pinned)
+                .findFirst()
+                .orElse(null);
     }
 
     private void centerTreeOnQuest(QuestDataSnapshot.ChapterSnapshot chapter, QuestDataSnapshot.QuestSnapshot quest) {
@@ -1970,8 +2088,23 @@ public class OverhaulQuestScreen extends Screen {
         centered = true;
     }
 
-    private void acceptOrUnacceptQuest(QuestDataSnapshot.QuestSnapshot questSnapshot) {
-        if (!canToggleQuestAcceptance(questSnapshot)) {
+    private void acceptQuest(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        if (!questSnapshot.canStart()) {
+            return;
+        }
+        Quest quest = resolveQuest(questSnapshot.id());
+        if (quest == null) {
+            return;
+        }
+
+        actionRouter.togglePin(quest);
+        viewState.setLastAcceptedQuestId(questSnapshot.id());
+        QuestDataController.setLastAcceptedQuestId(questSnapshot.id());
+        QuestDataController.markDirty();
+    }
+
+    private void cancelAcceptedQuest(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        if (!questSnapshot.pinned()) {
             return;
         }
 
@@ -1980,28 +2113,76 @@ public class OverhaulQuestScreen extends Screen {
             return;
         }
 
-        if (questSnapshot.pinned()) {
-            actionRouter.togglePin(quest);
-            if (QuestDataController.getLastAcceptedQuestId() == questSnapshot.id()) {
-                viewState.setLastAcceptedQuestId(0L);
-                QuestDataController.setLastAcceptedQuestId(0L);
-            }
-            QuestDataController.markDirty();
+        actionRouter.togglePin(quest);
+        if (QuestDataController.getLastAcceptedQuestId() == questSnapshot.id()) {
+            viewState.setLastAcceptedQuestId(0L);
+            QuestDataController.setLastAcceptedQuestId(0L);
+        }
+        QuestDataController.markDirty();
+    }
+
+    private void completeQuest(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        if (submitPendingCheckmarkTasks(questSnapshot)) {
+            claimRewardsAfterManualCompletion(questSnapshot);
+            unpinQuestIfPinned(questSnapshot);
             return;
         }
 
-        if (questSnapshot.checkmarkOnly()) {
-            questSnapshot.tasks().stream()
-                    .filter(task -> !task.completed() && task.canInteract() && task.interactionMode() == TaskInteractionMode.SUBMIT)
-                    .findFirst()
-                    .map(task -> resolveTask(task.id()))
-                    .ifPresent(actionRouter::submitTask);
+        claimCurrentQuestRewards();
+    }
+
+    private boolean submitPendingCheckmarkTasks(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        boolean submitted = false;
+        for (QuestDataSnapshot.TaskSnapshot taskSnapshot : questSnapshot.tasks()) {
+            if (!taskSnapshot.checkmarkTask() || taskSnapshot.optional() || taskSnapshot.completed()) {
+                continue;
+            }
+
+            Task liveTask = resolveTask(taskSnapshot.id());
+            if (liveTask instanceof CheckmarkTask) {
+                actionRouter.submitTask(liveTask);
+                submitted = true;
+            }
         }
 
-        actionRouter.togglePin(quest);
-        viewState.setLastAcceptedQuestId(questSnapshot.id());
-        QuestDataController.setLastAcceptedQuestId(questSnapshot.id());
-        QuestDataController.markDirty();
+        if (submitted) {
+            QuestDataController.markDirty();
+        }
+        return submitted;
+    }
+
+    private void claimRewardsAfterManualCompletion(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        boolean openedChoiceScreen = false;
+        boolean claimedImmediateReward = false;
+
+        for (QuestDataSnapshot.RewardSnapshot rewardSnapshot : questSnapshot.rewards()) {
+            if (rewardSnapshot.claimed()) {
+                continue;
+            }
+
+            Reward liveReward = resolveReward(rewardSnapshot.id());
+            if (liveReward == null) {
+                continue;
+            }
+
+            if (rewardSnapshot.interactionMode() == RewardInteractionMode.CLAIM) {
+                actionRouter.claimReward(liveReward, true);
+                claimedImmediateReward = true;
+            } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.CHOICE && !openedChoiceScreen && liveReward instanceof ChoiceReward choiceReward) {
+                minecraft.setScreen(new ChoiceRewardSelectScreen(this, choiceReward, actionRouter));
+                openedChoiceScreen = true;
+            } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.VANILLA_FALLBACK) {
+                Quest liveQuest = resolveQuest(questSnapshot.id());
+                if (liveQuest != null) {
+                    actionRouter.openVanillaForQuest(liveQuest);
+                    return;
+                }
+            }
+        }
+
+        if (claimedImmediateReward) {
+            QuestUiFeedback.playRewardConfirmSound();
+        }
     }
 
     private void claimCurrentQuestRewards() {
@@ -2013,6 +2194,7 @@ public class OverhaulQuestScreen extends Screen {
 
         boolean openedChoiceScreen = false;
         boolean startedClaimFlow = false;
+        boolean claimedImmediateReward = false;
         for (QuestDataSnapshot.RewardSnapshot rewardSnapshot : questSnapshot.rewards()) {
             if (!rewardSnapshot.canClaim()) {
                 continue;
@@ -2026,6 +2208,7 @@ public class OverhaulQuestScreen extends Screen {
             if (rewardSnapshot.interactionMode() == RewardInteractionMode.CLAIM) {
                 actionRouter.claimReward(liveReward, true);
                 startedClaimFlow = true;
+                claimedImmediateReward = true;
             } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.CHOICE && !openedChoiceScreen && liveReward instanceof ChoiceReward choiceReward) {
                 minecraft.setScreen(new ChoiceRewardSelectScreen(this, choiceReward, actionRouter));
                 openedChoiceScreen = true;
@@ -2039,6 +2222,9 @@ public class OverhaulQuestScreen extends Screen {
             }
         }
 
+        if (claimedImmediateReward) {
+            QuestUiFeedback.playRewardConfirmSound();
+        }
         if (startedClaimFlow) {
             unpinQuestIfPinned(questSnapshot);
         }
@@ -2172,6 +2358,10 @@ public class OverhaulQuestScreen extends Screen {
             focusedChapterId = chapter.id();
             centered = false;
             ensureSelectedChapterVisible(snapshot.chapters(), chapter.id());
+            QuestDataSnapshot.QuestSnapshot inProgressQuest = findPreferredInProgressQuest(snapshot, chapter.id());
+            if (inProgressQuest != null) {
+                centerTreeOnQuest(chapter, inProgressQuest);
+            }
         }
 
         clampChapterScroll(snapshot);
@@ -2836,6 +3026,52 @@ public class OverhaulQuestScreen extends Screen {
             int width,
             int height
     ) {
+    }
+
+    private enum PrimaryActionType {
+        ACCEPT,
+        IN_PROGRESS,
+        COMPLETE,
+        COMPLETED
+    }
+
+    private record PrimaryActionButtonState(PrimaryActionType type, boolean enabled) {
+        private static PrimaryActionButtonState accept(boolean enabled) {
+            return new PrimaryActionButtonState(PrimaryActionType.ACCEPT, enabled);
+        }
+
+        private static PrimaryActionButtonState inProgress() {
+            return new PrimaryActionButtonState(PrimaryActionType.IN_PROGRESS, true);
+        }
+
+        private static PrimaryActionButtonState complete() {
+            return new PrimaryActionButtonState(PrimaryActionType.COMPLETE, true);
+        }
+
+        private static PrimaryActionButtonState completed() {
+            return new PrimaryActionButtonState(PrimaryActionType.COMPLETED, false);
+        }
+
+        private String label(boolean hovered) {
+            return switch (type) {
+                case ACCEPT -> "Accept";
+                case IN_PROGRESS -> hovered ? "Cancel" : "In progress";
+                case COMPLETE -> "Complete";
+                case COMPLETED -> "Completed";
+            };
+        }
+
+        private boolean showSpinner(boolean hovered) {
+            return type == PrimaryActionType.IN_PROGRESS && !hovered;
+        }
+
+        private boolean showsNotificationBadge() {
+            return type == PrimaryActionType.COMPLETE;
+        }
+
+        private boolean showsCompletedBadge() {
+            return type == PrimaryActionType.COMPLETED;
+        }
     }
 
     private record IconSectionLayout(
