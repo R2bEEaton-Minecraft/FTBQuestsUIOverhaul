@@ -7,6 +7,7 @@ import dev.ftb.mods.ftbquests.client.ClientQuestFile;
 import dev.ftb.mods.ftbquests.client.FTBQuestsClient;
 import dev.ftb.mods.ftbquests.client.gui.quests.QuestScreen;
 import dev.ftb.mods.ftbquests.quest.Quest;
+import dev.ftb.mods.ftbquests.quest.TeamData;
 import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
 import dev.ftb.mods.ftbquests.quest.reward.Reward;
 import dev.ftb.mods.ftbquests.quest.task.Task;
@@ -187,6 +188,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final float MODAL_TEXT_SCALE = 0.8F;
     private static final float MODAL_SECTION_LABEL_SCALE = 0.65F;
     private static final float MODAL_SECTION_NOTE_SCALE = 0.58F;
+    private static final float MODAL_DESCRIPTION_SCALE = MODAL_SECTION_LABEL_SCALE;
     private static final float MODAL_SECTION_COUNT_SCALE = 0.34F;
     private static final int MODAL_SECTION_ITEM_GAP = 4;
     private static final int MODAL_SECTION_GROUP_GAP = 12;
@@ -1560,8 +1562,8 @@ public class OverhaulQuestScreen extends Screen {
         contentY += 10;
 
         for (FormattedCharSequence line : layout.descriptionLines()) {
-            drawCenteredScaledString(graphics, line, body.centerX(), contentY, 0xFFF0E2C5, MODAL_TEXT_SCALE);
-            contentY += 8;
+            drawCenteredScaledString(graphics, line, body.centerX(), contentY, 0xFFF0E2C5, MODAL_DESCRIPTION_SCALE);
+            contentY += Math.max(7, Math.round(font.lineHeight * MODAL_DESCRIPTION_SCALE));
         }
         contentY += 8;
         drawSectionDivider(graphics, body.x() + MODAL_SECTION_DIVIDER_INSET, body.width() - MODAL_SECTION_DIVIDER_INSET * 2, contentY);
@@ -1667,7 +1669,7 @@ public class OverhaulQuestScreen extends Screen {
             int iconY = cellY;
             Rect iconRect = new Rect(iconX, iconY, MODAL_SECTION_ICON_SIZE, MODAL_SECTION_ICON_SIZE);
             Rect hoverRect = new Rect(cellX, cellY, sectionLayout.cellWidth(), sectionLayout.cellHeight());
-            task.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
+            renderTaskIcon(graphics, task, iconRect);
             int countY = iconRect.maxY() + MODAL_SECTION_COUNT_GAP;
             int countColor = task.completed() ? 0xFF6FE142 : 0xFFF6ECD6;
             drawCenteredScaledString(graphics, task.countLabel(), cellX + sectionLayout.cellWidth() / 2, countY, countColor, MODAL_SECTION_COUNT_SCALE);
@@ -1675,6 +1677,17 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         return y + sectionLayout.height();
+    }
+
+    private void renderTaskIcon(GuiGraphics graphics, QuestDataSnapshot.TaskSnapshot taskSnapshot, Rect iconRect) {
+        TeamData teamData = ClientQuestFile.exists() ? ClientQuestFile.INSTANCE.selfTeamData : null;
+        Task liveTask = resolveTask(taskSnapshot.id());
+        if (teamData != null && liveTask != null) {
+            liveTask.drawGUI(teamData, graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
+            return;
+        }
+
+        taskSnapshot.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
     }
 
     private int renderRewardSection(GuiGraphics graphics, int x, int y, IconSectionLayout sectionLayout, List<QuestDataSnapshot.RewardSnapshot> rewards) {
@@ -1794,14 +1807,14 @@ public class OverhaulQuestScreen extends Screen {
         int modalWidth = Mth.clamp(desiredWidth, MODAL_MIN_WIDTH, maxModalWidth);
 
         int textWidth = Math.max(8, Math.round(
-                (modalWidth - 64) / MODAL_TEXT_SCALE
+                (modalWidth - 64) / MODAL_DESCRIPTION_SCALE
         ));
         List<FormattedCharSequence> objectiveLines = font.split(resolveObjectiveText(quest), textWidth);
         List<FormattedCharSequence> descriptionLines = flattenDescription(resolveDescription(quest), textWidth);
         SectionPairLayout sectionLayout = buildRequirementRewardLayout(quest, modalWidth - 48);
 
         int objectiveHeight = 10 + objectiveLines.size() * 8;
-        int descriptionHeight = descriptionLines.size() * 8;
+        int descriptionHeight = descriptionLines.size() * Math.max(7, Math.round(font.lineHeight * MODAL_DESCRIPTION_SCALE));
         int contentHeight = objectiveHeight + 10 + descriptionHeight + 10 + sectionLayout.height() + MODAL_CONTENT_BOTTOM_PADDING;
 
         int maxHeight = height - MODAL_MARGIN;
