@@ -14,6 +14,7 @@ import dev.ftb.mods.ftbquests.quest.task.CheckmarkTask;
 import dev.ftb.mods.ftbquests.quest.task.ItemTask;
 import dev.ftb.mods.ftbquests.quest.task.Task;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.ArrayList;
@@ -58,6 +59,7 @@ public class QuestDataSnapshotBuilder {
                                     task.getId(),
                                     task.getTitle(),
                                     Component.literal(task.formatProgress(teamData, teamData.getProgress(task)) + "/" + task.formatMaxProgress()),
+                                    taskCountLabel(task),
                                     task.getIcon(),
                                     teamData.isCompleted(task),
                                     task.isOptionalForProgression(teamData),
@@ -78,6 +80,7 @@ public class QuestDataSnapshotBuilder {
                                     reward.getId(),
                                     reward.getTitle(),
                                     Component.literal(claimType.name().replace('_', ' ').toLowerCase(Locale.ROOT)),
+                                    rewardCountLabel(reward),
                                     reward.getIcon(),
                                     claimType == RewardClaimType.CLAIMED,
                                     claimType == RewardClaimType.CAN_CLAIM,
@@ -168,5 +171,19 @@ public class QuestDataSnapshotBuilder {
             return RewardInteractionMode.VANILLA_FALLBACK;
         }
         return RewardInteractionMode.CLAIM;
+    }
+
+    private static Component taskCountLabel(Task task) {
+        if (task instanceof CheckmarkTask) {
+            return Component.empty();
+        }
+        MutableComponent buttonText = task.getButtonText();
+        String text = buttonText.getString().trim();
+        return Component.literal(text.isEmpty() ? "x1" : "x" + text);
+    }
+
+    private static Component rewardCountLabel(Reward reward) {
+        String text = reward.getButtonText().trim();
+        return Component.literal(text.isEmpty() ? "x1" : "x" + text);
     }
 }
