@@ -1,0 +1,37 @@
+{
+	default_hide_dependency_lines: false
+	default_quest_shape: ""
+	filename: "advancement_requirement_demo"
+	group: "4000000000000003"
+	icon: "minecraft:ender_eye"
+	id: "5000000000000001"
+	order_index: 5
+	quest_links: [ ]
+	quests: [
+		{
+			description: [
+				"This local demo quest exists only to reproduce the advancement requirement icon bug in the overhaul modal."
+				"Open this quest in the overhauled UI and inspect the Requirements row."
+				"It should represent the vanilla advancement minecraft:story/follow_ender_eye, whose real icon is an Eye of Ender."
+			]
+			icon: "minecraft:ender_eye"
+			id: "5000000000000101"
+			rewards: [ {
+				id: "5000000000000301"
+				item: "minecraft:book"
+				type: "item"
+			} ]
+			subtitle: "Repro case for advancement task icon"
+			tasks: [ {
+				advancement: "minecraft:story/follow_ender_eye"
+				id: "5000000000000201"
+				type: "advancement"
+			} ]
+			title: "Follow the Eye"
+			x: 0.0d
+			y: 0.0d
+		}
+	]
+	subtitle: [ "A single quest for reproducing the advancement requirement icon bug" ]
+	title: "Advancement Requirement Demo"
+}

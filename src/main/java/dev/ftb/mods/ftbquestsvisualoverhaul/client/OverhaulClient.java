@@ -15,6 +15,7 @@ public class OverhaulClient {
         }
         initialized = true;
 
+        FtbQuestTypeIconOverrides.apply();
         QuestHotkeys.init();
         MinecraftForge.EVENT_BUS.register(QuestScreenInterceptor.class);
         MinecraftForge.EVENT_BUS.register(QuestLauncherButtonInjector.class);
