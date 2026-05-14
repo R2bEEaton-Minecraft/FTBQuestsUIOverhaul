@@ -1,7 +1,10 @@
 package dev.ftb.mods.ftbquestsvisualoverhaul.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.architectury.event.events.client.ClientGuiEvent;
+import dev.architectury.event.events.client.ClientTickEvent;
 import dev.ftb.mods.ftbquests.client.ClientQuestFile;
+import dev.ftb.mods.ftbquests.client.FTBQuestsClientEventHandler;
 import dev.ftb.mods.ftbquests.quest.Quest;
 import dev.ftb.mods.ftbquests.quest.TeamData;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -13,7 +16,9 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.lwjgl.glfw.GLFW;
 
+import java.lang.reflect.Field;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 public final class QuestHotkeys {
@@ -31,12 +36,15 @@ public final class QuestHotkeys {
             KEY_CATEGORY
     );
     private static final QuestActionRouter ACTION_ROUTER = new QuestActionRouter();
+    private static FTBQuestsClientEventHandler pinnedQuestHudHandler;
+    private static Field pinnedQuestTextField;
 
     private QuestHotkeys() {
     }
 
     public static void init() {
         FMLJavaModLoadingContext.get().getModEventBus().addListener(QuestHotkeys::registerKeyMappings);
+        ClientTickEvent.CLIENT_POST.register(client -> hidePinnedQuestHudIfNeeded());
     }
 
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
@@ -62,6 +70,8 @@ public final class QuestHotkeys {
         while (TOGGLE_HIDE_ACCEPTED_KEY.consumeClick()) {
             toggleHideAcceptedQuests();
         }
+
+        QuestUiFeedback.onClientTick();
     }
 
     private static void unacceptAllAcceptedQuests() {
@@ -72,41 +82,12 @@ public final class QuestHotkeys {
     }
 
     private static void toggleHideAcceptedQuests() {
-        if (QuestDataController.isHideAcceptedQuests()) {
-            restoreHiddenAcceptedQuests();
-            return;
-        }
-
-        Set<Long> acceptedQuestIds = explicitAcceptedQuestIds();
-        if (acceptedQuestIds.isEmpty()) {
-            QuestDataController.setHiddenAcceptedQuestState(false, Set.of());
-            return;
-        }
-
-        toggleQuestPins(acceptedQuestIds);
-        QuestDataController.setHiddenAcceptedQuestState(true, acceptedQuestIds);
+        boolean hideAccepted = !QuestDataController.isHideAcceptedQuests();
+        QuestDataController.setHiddenAcceptedQuestState(hideAccepted, Set.of());
         QuestDataController.markDirty();
-    }
-
-    private static void restoreHiddenAcceptedQuests() {
-        Set<Long> hiddenQuestIds = new LinkedHashSet<>(QuestDataController.getHiddenAcceptedQuestIds());
-        if (hiddenQuestIds.isEmpty()) {
-            QuestDataController.setHiddenAcceptedQuestState(false, Set.of());
-            return;
+        if (hideAccepted) {
+            clearPinnedQuestHudText();
         }
-
-        Set<Long> currentlyAcceptedQuestIds = explicitAcceptedQuestIds();
-        Set<Long> restorableQuestIds = new LinkedHashSet<>();
-        for (Long questId : hiddenQuestIds) {
-            Quest quest = ClientQuestFile.INSTANCE.getQuest(questId);
-            if (quest != null && !currentlyAcceptedQuestIds.contains(questId)) {
-                restorableQuestIds.add(questId);
-            }
-        }
-
-        toggleQuestPins(restorableQuestIds);
-        QuestDataController.setHiddenAcceptedQuestState(false, Set.of());
-        QuestDataController.markDirty();
     }
 
     private static void toggleQuestPins(Set<Long> questIds) {
@@ -127,5 +108,76 @@ public final class QuestHotkeys {
             }
         }
         return acceptedQuestIds;
+    }
+
+    private static void hidePinnedQuestHudIfNeeded() {
+        if (QuestDataController.isHideAcceptedQuests()) {
+            clearPinnedQuestHudText();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void clearPinnedQuestHudText() {
+        if (!resolvePinnedQuestHudHandler()) {
+            return;
+        }
+
+        try {
+            List<Object> pinnedQuestText = (List<Object>) pinnedQuestTextField.get(pinnedQuestHudHandler);
+            pinnedQuestText.clear();
+        } catch (IllegalAccessException ignored) {
+        }
+    }
+
+    private static boolean resolvePinnedQuestHudHandler() {
+        if (pinnedQuestHudHandler != null && pinnedQuestTextField != null) {
+            return true;
+        }
+
+        try {
+            Field listenersField = ClientGuiEvent.RENDER_HUD.getClass().getDeclaredField("listeners");
+            listenersField.setAccessible(true);
+            Object listenersValue = listenersField.get(ClientGuiEvent.RENDER_HUD);
+            if (!(listenersValue instanceof Iterable<?> listeners)) {
+                return false;
+            }
+
+            for (Object listener : listeners) {
+                FTBQuestsClientEventHandler handler = extractPinnedQuestHudHandler(listener);
+                if (handler != null) {
+                    Field field = FTBQuestsClientEventHandler.class.getDeclaredField("pinnedQuestText");
+                    field.setAccessible(true);
+                    pinnedQuestHudHandler = handler;
+                    pinnedQuestTextField = field;
+                    return true;
+                }
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+
+        return false;
+    }
+
+    private static FTBQuestsClientEventHandler extractPinnedQuestHudHandler(Object listener) {
+        if (listener instanceof FTBQuestsClientEventHandler handler) {
+            return handler;
+        }
+
+        for (Field field : listener.getClass().getDeclaredFields()) {
+            if (!FTBQuestsClientEventHandler.class.isAssignableFrom(field.getType())) {
+                continue;
+            }
+
+            try {
+                field.setAccessible(true);
+                Object value = field.get(listener);
+                if (value instanceof FTBQuestsClientEventHandler handler) {
+                    return handler;
+                }
+            } catch (IllegalAccessException ignored) {
+            }
+        }
+
+        return null;
     }
 }

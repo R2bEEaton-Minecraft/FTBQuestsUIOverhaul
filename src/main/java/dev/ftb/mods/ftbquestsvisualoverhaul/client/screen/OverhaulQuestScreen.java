@@ -145,9 +145,6 @@ public class OverhaulQuestScreen extends Screen {
     private static final int WIDGET_ICON_Y = 5;
     private static final int WIDGET_ICON_SIZE = 16;
     private static final int WIDGET_FRAME_X_OFFSET = 3;
-    private static final int QUEST_TILE_SHADOW_OFFSET = 2;
-    private static final int QUEST_TILE_SHADOW_COLOR = 0x26000000;
-    private static final int QUEST_TILE_SHADOW_EDGE_COLOR = 0x33000000;
     private static final int STATUS_CHECK_ICON_WIDTH = 9;
     private static final int STATUS_CHECK_ICON_HEIGHT = 9;
     private static final int STATUS_LOCK_ICON_WIDTH = 9;
@@ -237,7 +234,7 @@ public class OverhaulQuestScreen extends Screen {
         super(Component.literal("Quests"));
         this.openContext = openContext;
         this.viewState = openContext.previousState().copy();
-        this.openingQuestSnapPending = openContext.requestedQuestId() == 0L;
+        this.openingQuestSnapPending = true;
 
         if (openContext.requestedChapterId() != 0L) {
             viewState.setSelectedChapterId(openContext.requestedChapterId());
@@ -653,7 +650,9 @@ public class OverhaulQuestScreen extends Screen {
         int textLeft = buttonRect.x() + CHAPTER_SELECTOR_TEXT_X_OFFSET;
         int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + CHAPTER_SELECTOR_TEXT_Y_OFFSET;
         int availableWidth = buttonRect.maxX() - textLeft - CHAPTER_SELECTOR_TEXT_RIGHT_PADDING;
-        int textColor = selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
+        int textColor = chapter.progress() >= 100
+                ? selected ? 0xFF9BF27B : hovered ? 0xFF92E574 : 0xFF7BD45F
+                : selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
         renderScrollingChapterLabel(graphics, chapter.title(), buttonRect, textLeft, textY, availableWidth, textColor, hovered || selected);
     }
 
@@ -711,7 +710,7 @@ public class OverhaulQuestScreen extends Screen {
                 + separatorWidth
                 + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING
                 + ACTIVE_CHAPTER_TITLE_ICON_SIZE;
-        int color = 0xFFF2E8D6;
+        int color = chapter.progress() >= 100 ? 0xFF9BF27B : 0xFFF2E8D6;
         int drawX = titleBandRect.x() + Math.max(0, (titleBandRect.width() - totalWidth) / 2);
 
         if (totalWidth > titleBandRect.width()) {
@@ -1065,7 +1064,7 @@ public class OverhaulQuestScreen extends Screen {
                 Rect parentRect = getNodeWorldRect(parent);
                 Rect childRect = getNodeWorldRect(quest);
 
-                int lineColor = outline ? 0xFF000000 : parent.completed() && isQuestAvailable(quest) ? 0xFF35E041 : 0xFFFFFFFF;
+                int lineColor = outline ? 0xFF000000 : isQuestVisuallyCompleted(parent) && isQuestAvailable(quest) ? 0xFF35E041 : 0xFFFFFFFF;
 
                 int startX = parentRect.centerX();
                 int startY = parentRect.centerY();
@@ -1174,14 +1173,12 @@ public class OverhaulQuestScreen extends Screen {
             int nodeX = worldRect.x();
             int nodeY = worldRect.y();
 
-            boolean obtained = quest.completed() || quest.hasUnclaimedRewards();
+            boolean obtained = isQuestObtained(quest);
             int widgetTypeIndex = obtained ? 0 : 1;
 
             // Frame texture U: 0=TASK, 26=CHALLENGE, 52=GOAL
             // We use TASK (0) as the default frame for all quests
             int frameU = 0;
-
-            renderQuestWidgetShadow(graphics, worldRect);
 
             // Matching vanilla: blit at (scrollX + x + 3, scrollY + y)
             graphics.blit(WIDGETS_LOCATION,
@@ -1222,24 +1219,6 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
-    private void renderQuestWidgetShadow(GuiGraphics graphics, Rect nodeRect) {
-        int x = nodeRect.x() + WIDGET_FRAME_X_OFFSET;
-        int y = nodeRect.y();
-        int right = x + nodeRect.width();
-        int bottom = y + nodeRect.height();
-        int shadowOffset = QUEST_TILE_SHADOW_OFFSET;
-
-        graphics.fill(x + shadowOffset, y + shadowOffset,
-                right + shadowOffset, bottom + shadowOffset,
-                QUEST_TILE_SHADOW_COLOR);
-        graphics.fill(x + shadowOffset + 1, bottom + 1,
-                right + shadowOffset, bottom + shadowOffset + 1,
-                QUEST_TILE_SHADOW_EDGE_COLOR);
-        graphics.fill(right + 1, y + shadowOffset + 1,
-                right + shadowOffset + 1, bottom + shadowOffset,
-                QUEST_TILE_SHADOW_EDGE_COLOR);
-    }
-
     private void renderLockOverlay(GuiGraphics graphics, Rect nodeRect) {
         Rect lockRect = widgetStatusRect(nodeRect, STATUS_LOCK_ICON_WIDTH, STATUS_LOCK_ICON_HEIGHT, -3);
         renderStatusTexture(graphics, OVERHAUL_LOCK_TEXTURE, lockRect);
@@ -1275,7 +1254,7 @@ public class OverhaulQuestScreen extends Screen {
      */
     private void drawWidgetHover(GuiGraphics graphics, QuestDataSnapshot.QuestSnapshot quest, float currentFade, int treeLeft, int treeTop) {
         Rect nodeRect = getNodeScreenRect(quest);
-        boolean obtained = quest.completed() || quest.hasUnclaimedRewards();
+        boolean obtained = isQuestObtained(quest);
         boolean locked = !obtained && !isQuestAvailable(quest);
         int widgetState = getQuestWidgetState(quest);
         int contentX = nodeRect.x();
@@ -1545,7 +1524,7 @@ public class OverhaulQuestScreen extends Screen {
         Rect frameRect = new Rect(header.x() + 3, header.y(), ADVANCEMENT_FRAME_TEXTURE_SIZE, ADVANCEMENT_FRAME_TEXTURE_SIZE);
         boolean frameTexturePresent = blitAdvancementFrame(graphics, selectedFrameTexture(quest), frameRect);
         int headerTextY = header.y() + Math.max(0, (header.height() - Math.round(font.lineHeight * MODAL_TEXT_SCALE)) / 2);
-        boolean obtained = quest.completed() || quest.hasUnclaimedRewards();
+        boolean obtained = isQuestObtained(quest);
         boolean locked = !obtained && !isQuestAvailable(quest);
 
         quest.icon().draw(graphics,
@@ -1682,7 +1661,7 @@ public class OverhaulQuestScreen extends Screen {
             renderTaskIcon(graphics, task, iconRect);
             int countY = iconRect.maxY() + MODAL_SECTION_COUNT_GAP;
             int countColor = task.completed() ? 0xFF6FE142 : 0xFFF6ECD6;
-            drawCenteredScaledString(graphics, task.countLabel(), cellX + sectionLayout.cellWidth() / 2, countY, countColor, MODAL_SECTION_COUNT_SCALE);
+            drawCenteredScaledString(graphics, requirementCountLabel(task), cellX + sectionLayout.cellWidth() / 2, countY, countColor, MODAL_SECTION_COUNT_SCALE);
             modalTooltipTargets.add(new TooltipTarget(hoverRect, buildTaskTooltip(task)));
         }
 
@@ -1879,7 +1858,7 @@ public class OverhaulQuestScreen extends Screen {
 
     private SectionPairLayout buildRequirementRewardLayout(QuestDataSnapshot.QuestSnapshot quest, int availableWidth) {
         List<QuestDataSnapshot.TaskSnapshot> tasks = visibleRequirementTasks(quest);
-        List<Component> taskCountLabels = tasks.stream().map(QuestDataSnapshot.TaskSnapshot::countLabel).toList();
+        List<Component> taskCountLabels = tasks.stream().map(this::requirementCountLabel).toList();
         List<Component> rewardCountLabels = quest.rewards().stream().map(QuestDataSnapshot.RewardSnapshot::countLabel).toList();
         int requirementColumns = Math.max(1, Math.min(MODAL_SECTION_MAX_COLUMNS, tasks.size()));
         int rewardColumns = Math.max(1, Math.min(MODAL_SECTION_MAX_COLUMNS, quest.rewards().size()));
@@ -1910,6 +1889,16 @@ public class OverhaulQuestScreen extends Screen {
         return new SectionPairLayout(requirements, rewards, gap,
                 requirements.width() + rewards.width() + gap,
                 Math.max(requirements.height(), rewards.height()));
+    }
+
+    private Component requirementCountLabel(QuestDataSnapshot.TaskSnapshot taskSnapshot) {
+        String staticCount = taskSnapshot.countLabel().getString().trim();
+        if (staticCount.startsWith("+")) {
+            return taskSnapshot.countLabel();
+        }
+
+        String progressText = taskSnapshot.progressText().getString().trim();
+        return progressText.isEmpty() ? taskSnapshot.countLabel() : taskSnapshot.progressText();
     }
 
     private IconSectionLayout measureSectionLayout(String label, List<Component> countLabels, int columns, String emptyText) {
@@ -1982,10 +1971,23 @@ public class OverhaulQuestScreen extends Screen {
                 .anyMatch(task -> !task.checkmarkTask() && !task.optional() && !task.completed());
     }
 
+    private boolean isPendingManualQuestCompletion(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        return questSnapshot.pinned() && questSnapshot.completed();
+    }
+
+    private boolean isQuestVisuallyCompleted(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        return questSnapshot.completed() && !isPendingManualQuestCompletion(questSnapshot);
+    }
+
+    private boolean isQuestObtained(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        return !isPendingManualQuestCompletion(questSnapshot) && (questSnapshot.completed() || questSnapshot.hasUnclaimedRewards());
+    }
+
     private boolean isReadyForManualCompletion(QuestDataSnapshot.QuestSnapshot questSnapshot) {
         return questSnapshot.pinned()
-                && hasPendingRequiredCheckmarkTask(questSnapshot)
-                && !hasIncompleteRequiredNonCheckmarkTask(questSnapshot);
+                && (questSnapshot.completed()
+                || hasPendingRequiredCheckmarkTask(questSnapshot)
+                && !hasIncompleteRequiredNonCheckmarkTask(questSnapshot));
     }
 
     private PrimaryActionButtonState resolvePrimaryActionButtonState(QuestDataSnapshot.QuestSnapshot questSnapshot) {
@@ -2001,7 +2003,7 @@ public class OverhaulQuestScreen extends Screen {
         if (questSnapshot.pinned()) {
             return PrimaryActionButtonState.inProgress();
         }
-        return PrimaryActionButtonState.accept(questSnapshot.canStart());
+        return PrimaryActionButtonState.accept(isQuestAvailable(questSnapshot));
     }
 
     private void activatePrimaryActionButton(QuestDataSnapshot.QuestSnapshot questSnapshot, PrimaryActionButtonState buttonState) {
@@ -2027,6 +2029,16 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void snapToInitialQuest(QuestDataSnapshot snapshot) {
+        QuestDataSnapshot.QuestSnapshot requestedQuest = snapshot.findQuest(viewState.getViewedQuestId());
+        if (requestedQuest != null) {
+            viewState.setSelectedChapterId(requestedQuest.chapterId());
+            QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(requestedQuest.chapterId());
+            if (chapter != null) {
+                centerTreeOnQuest(chapter, requestedQuest);
+            }
+            return;
+        }
+
         QuestDataSnapshot.QuestSnapshot selectedChapterQuest = findPreferredInProgressQuest(snapshot, viewState.getSelectedChapterId());
         if (selectedChapterQuest != null) {
             QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(selectedChapterQuest.chapterId());
@@ -2089,7 +2101,7 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void acceptQuest(QuestDataSnapshot.QuestSnapshot questSnapshot) {
-        if (!questSnapshot.canStart()) {
+        if (!isQuestAvailable(questSnapshot)) {
             return;
         }
         Quest quest = resolveQuest(questSnapshot.id());
@@ -2124,11 +2136,14 @@ public class OverhaulQuestScreen extends Screen {
     private void completeQuest(QuestDataSnapshot.QuestSnapshot questSnapshot) {
         if (submitPendingCheckmarkTasks(questSnapshot)) {
             claimRewardsAfterManualCompletion(questSnapshot);
-            unpinQuestIfPinned(questSnapshot);
+            acknowledgeQuestCompletion(questSnapshot);
             return;
         }
 
-        claimCurrentQuestRewards();
+        if (questSnapshot.completed() || canClaimAnyReward(questSnapshot)) {
+            claimCurrentQuestRewards(questSnapshot);
+            acknowledgeQuestCompletion(questSnapshot);
+        }
     }
 
     private boolean submitPendingCheckmarkTasks(QuestDataSnapshot.QuestSnapshot questSnapshot) {
@@ -2185,15 +2200,8 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
-    private void claimCurrentQuestRewards() {
-        QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
-        QuestDataSnapshot.QuestSnapshot questSnapshot = snapshot.findQuest(viewState.getViewedQuestId());
-        if (questSnapshot == null) {
-            return;
-        }
-
+    private void claimCurrentQuestRewards(QuestDataSnapshot.QuestSnapshot questSnapshot) {
         boolean openedChoiceScreen = false;
-        boolean startedClaimFlow = false;
         boolean claimedImmediateReward = false;
         for (QuestDataSnapshot.RewardSnapshot rewardSnapshot : questSnapshot.rewards()) {
             if (!rewardSnapshot.canClaim()) {
@@ -2207,12 +2215,10 @@ public class OverhaulQuestScreen extends Screen {
 
             if (rewardSnapshot.interactionMode() == RewardInteractionMode.CLAIM) {
                 actionRouter.claimReward(liveReward, true);
-                startedClaimFlow = true;
                 claimedImmediateReward = true;
             } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.CHOICE && !openedChoiceScreen && liveReward instanceof ChoiceReward choiceReward) {
                 minecraft.setScreen(new ChoiceRewardSelectScreen(this, choiceReward, actionRouter));
                 openedChoiceScreen = true;
-                startedClaimFlow = true;
             } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.VANILLA_FALLBACK) {
                 Quest liveQuest = resolveQuest(questSnapshot.id());
                 if (liveQuest != null) {
@@ -2225,9 +2231,6 @@ public class OverhaulQuestScreen extends Screen {
         if (claimedImmediateReward) {
             QuestUiFeedback.playRewardConfirmSound();
         }
-        if (startedClaimFlow) {
-            unpinQuestIfPinned(questSnapshot);
-        }
     }
 
     private void submitTask(QuestDataSnapshot.TaskSnapshot taskSnapshot) {
@@ -2238,6 +2241,11 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void handleRewardClick(QuestDataSnapshot.RewardSnapshot rewardSnapshot) {
+        QuestDataSnapshot.QuestSnapshot questSnapshot = QuestDataController.getSnapshot().findQuest(viewState.getViewedQuestId());
+        if (questSnapshot != null && questSnapshot.pinned() && questSnapshot.completed()) {
+            return;
+        }
+
         if (!rewardSnapshot.canClaim()) {
             return;
         }
@@ -2249,18 +2257,26 @@ public class OverhaulQuestScreen extends Screen {
 
         if (rewardSnapshot.interactionMode() == RewardInteractionMode.CLAIM) {
             actionRouter.claimReward(liveReward, true);
-            QuestDataSnapshot.QuestSnapshot questSnapshot = QuestDataController.getSnapshot().findQuest(viewState.getViewedQuestId());
             if (questSnapshot != null) {
                 unpinQuestIfPinned(questSnapshot);
             }
         } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.CHOICE && liveReward instanceof ChoiceReward choiceReward) {
             minecraft.setScreen(new ChoiceRewardSelectScreen(this, choiceReward, actionRouter));
-            QuestDataSnapshot.QuestSnapshot questSnapshot = QuestDataController.getSnapshot().findQuest(viewState.getViewedQuestId());
             if (questSnapshot != null) {
                 unpinQuestIfPinned(questSnapshot);
             }
         } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.VANILLA_FALLBACK) {
             openVanillaSelected();
+        }
+    }
+
+    private void acknowledgeQuestCompletion(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        Quest liveQuest = resolveQuest(questSnapshot.id());
+        if (questSnapshot.pinned()) {
+            unpinQuestIfPinned(questSnapshot);
+            if (liveQuest != null) {
+                QuestUiFeedback.playQuestCompletionToast(liveQuest);
+            }
         }
     }
 
@@ -2319,14 +2335,25 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private int getQuestWidgetState(QuestDataSnapshot.QuestSnapshot quest) {
-        if (quest.completed() || quest.hasUnclaimedRewards()) {
+        if (isQuestObtained(quest)) {
             return 0;
         }
         return isQuestAvailable(quest) ? 1 : 2;
     }
 
+    private boolean areQuestDependenciesVisuallyComplete(QuestDataSnapshot.QuestSnapshot quest) {
+        QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
+        for (Long dependencyQuestId : quest.dependencyQuestIds()) {
+            QuestDataSnapshot.QuestSnapshot dependencyQuest = snapshot.findQuest(dependencyQuestId);
+            if (dependencyQuest != null && !isQuestVisuallyCompleted(dependencyQuest)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private boolean isQuestAvailable(QuestDataSnapshot.QuestSnapshot quest) {
-        return quest.canStart() || quest.started();
+        return quest.started() || (quest.canStart() && areQuestDependenciesVisuallyComplete(quest));
     }
 
     private void refreshState(QuestDataSnapshot snapshot) {
@@ -2358,9 +2385,14 @@ public class OverhaulQuestScreen extends Screen {
             focusedChapterId = chapter.id();
             centered = false;
             ensureSelectedChapterVisible(snapshot.chapters(), chapter.id());
-            QuestDataSnapshot.QuestSnapshot inProgressQuest = findPreferredInProgressQuest(snapshot, chapter.id());
-            if (inProgressQuest != null) {
-                centerTreeOnQuest(chapter, inProgressQuest);
+            QuestDataSnapshot.QuestSnapshot focusedQuest = snapshot.findQuest(viewState.getViewedQuestId());
+            if (focusedQuest != null && focusedQuest.chapterId() == chapter.id()) {
+                centerTreeOnQuest(chapter, focusedQuest);
+            } else {
+                QuestDataSnapshot.QuestSnapshot inProgressQuest = findPreferredInProgressQuest(snapshot, chapter.id());
+                if (inProgressQuest != null) {
+                    centerTreeOnQuest(chapter, inProgressQuest);
+                }
             }
         }
 
@@ -2427,6 +2459,7 @@ public class OverhaulQuestScreen extends Screen {
         for (int i = clickTargets.size() - 1; i >= 0; i--) {
             ClickTarget target = clickTargets.get(i);
             if (target.contains(mouseX, mouseY)) {
+                QuestUiFeedback.playUiClickSound();
                 target.action().run();
                 return true;
             }
@@ -2783,11 +2816,11 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private ResourceLocation selectedHeaderTexture(QuestDataSnapshot.QuestSnapshot quest) {
-        return quest.completed() || quest.hasUnclaimedRewards() ? ADVANCEMENT_BOX_OBTAINED_TEXTURE : ADVANCEMENT_BOX_UNOBTAINED_TEXTURE;
+        return isQuestObtained(quest) ? ADVANCEMENT_BOX_OBTAINED_TEXTURE : ADVANCEMENT_BOX_UNOBTAINED_TEXTURE;
     }
 
     private ResourceLocation selectedFrameTexture(QuestDataSnapshot.QuestSnapshot quest) {
-        return quest.completed() || quest.hasUnclaimedRewards() ? ADVANCEMENT_TASK_FRAME_OBTAINED_TEXTURE : ADVANCEMENT_TASK_FRAME_UNOBTAINED_TEXTURE;
+        return isQuestObtained(quest) ? ADVANCEMENT_TASK_FRAME_OBTAINED_TEXTURE : ADVANCEMENT_TASK_FRAME_UNOBTAINED_TEXTURE;
     }
 
     private boolean blitAdvancementPanel(GuiGraphics graphics, ResourceLocation texture, Rect rect) {
@@ -2937,10 +2970,13 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private String statusLabel(QuestDataSnapshot.QuestSnapshot quest) {
+        if (isPendingManualQuestCompletion(quest)) {
+            return "Ready to Complete";
+        }
         if (quest.completed()) {
             return quest.hasUnclaimedRewards() ? "Completed - rewards waiting" : "Completed";
         }
-        if (quest.canStart()) {
+        if (isQuestAvailable(quest)) {
             return quest.started() ? "In Progress" : "Available";
         }
         return "Locked";

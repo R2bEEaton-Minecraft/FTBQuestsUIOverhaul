@@ -1,7 +1,7 @@
 package dev.ftb.mods.ftbquestsvisualoverhaul.client;
 
 import dev.ftb.mods.ftbquests.client.ClientQuestFile;
-import dev.ftb.mods.ftbquests.client.FTBQuestsClient;
+import dev.ftb.mods.ftbquests.quest.Quest;
 import dev.ftb.mods.ftbquests.item.FTBQuestsItems;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -15,13 +15,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-
-import java.util.UUID;
+import net.minecraftforge.event.TickEvent;
 
 public class QuestLauncherButtonInjector {
-    private static final Component QUEST_LOG = Component.literal("Quest Log");
+    private static final Component QUEST_BOOK = Component.literal("Quest Book");
     private static final ResourceLocation RECIPE_BUTTON_TEXTURE = new ResourceLocation("minecraft", "textures/gui/recipe_button.png");
-    private static final ResourceLocation ALERT_TEXTURE = new ResourceLocation("ftbquests", "textures/gui/alert.png");
+    private static final ResourceLocation NOTIFICATION_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/notification.png");
 
     @SubscribeEvent
     public static void onScreenInit(ScreenEvent.Init.Post event) {
@@ -31,21 +30,28 @@ public class QuestLauncherButtonInjector {
 
         Screen screen = event.getScreen();
         if (screen instanceof InventoryScreen inventoryScreen) {
-            event.addListener(new QuestLogIconButton(inventoryScreen));
+            event.addListener(new QuestBookIconButton(inventoryScreen));
         }
     }
 
-    private static class QuestLogIconButton extends Button {
+    @SubscribeEvent
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END) {
+            QuestDataController.hasUnclaimedRewards();
+        }
+    }
+
+    private static class QuestBookIconButton extends Button {
         private static final ItemStack ICON = new ItemStack(FTBQuestsItems.BOOK.get());
         private static final int INVENTORY_X_OFFSET = 126;
         private static final int INVENTORY_Y_OFFSET = 61;
         private final InventoryScreen inventoryScreen;
 
-        private QuestLogIconButton(InventoryScreen inventoryScreen) {
-            super(0, 0, 20, 18, Component.empty(), button -> FTBQuestsClient.openGui(), DEFAULT_NARRATION);
+        private QuestBookIconButton(InventoryScreen inventoryScreen) {
+            super(0, 0, 20, 18, QUEST_BOOK, button -> ((QuestBookIconButton) button).openQuestBook(), DEFAULT_NARRATION);
             this.inventoryScreen = inventoryScreen;
             syncPosition();
-            setTooltip(Tooltip.create(QUEST_LOG));
+            setTooltip(Tooltip.create(QUEST_BOOK));
         }
 
         @Override
@@ -61,6 +67,20 @@ public class QuestLauncherButtonInjector {
                 renderNotificationMarker(graphics);
                 graphics.pose().popPose();
             }
+        }
+
+        private void openQuestBook() {
+            Quest targetQuest = resolveReadyToClaimQuest();
+            if (targetQuest != null) {
+                if (QuestScreenInterceptor.openOverhaulForQuest(targetQuest)) {
+                    return;
+                }
+
+                ClientQuestFile.openGui();
+                return;
+            }
+
+            ClientQuestFile.openGui();
         }
 
         @Override
@@ -79,20 +99,20 @@ public class QuestLauncherButtonInjector {
         }
 
         private boolean hasUnclaimedRewards() {
-            if (!ClientQuestFile.exists() || Minecraft.getInstance().player == null) {
-                return false;
-            }
-
-            UUID playerId = Minecraft.getInstance().player.getUUID();
-            return ClientQuestFile.INSTANCE.selfTeamData.hasUnclaimedRewards(playerId, ClientQuestFile.INSTANCE);
+            return QuestDataController.hasUnclaimedRewards();
         }
 
         private void renderNotificationMarker(GuiGraphics graphics) {
-            graphics.pose().pushPose();
-            graphics.pose().translate(getX() + width - 8, getY() - 1, 0.0F);
-            graphics.pose().scale(0.5F, 0.5F, 1.0F);
-            graphics.blit(ALERT_TEXTURE, 0, 0, 0.0F, 0.0F, 16, 16, 16, 16);
-            graphics.pose().popPose();
+            graphics.blit(NOTIFICATION_TEXTURE, getX() + width - 6, getY() - 1, 0, 0, 9, 9, 9, 9);
+        }
+
+        private Quest resolveReadyToClaimQuest() {
+            if (!hasUnclaimedRewards()) {
+                return null;
+            }
+
+            long preferredQuestId = QuestDataController.getPreferredReadyToClaimQuestId();
+            return preferredQuestId == 0L ? null : ClientQuestFile.INSTANCE.getQuest(preferredQuestId);
         }
 
         private void syncPosition() {

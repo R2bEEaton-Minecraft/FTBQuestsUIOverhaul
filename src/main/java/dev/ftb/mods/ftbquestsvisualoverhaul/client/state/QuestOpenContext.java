@@ -12,6 +12,23 @@ public record QuestOpenContext(
         long requestedChapterId,
         QuestViewState previousState
 ) {
+    public static QuestOpenContext fromDirectRequest(@Nullable Quest requestedQuest, QuestViewState previousState) {
+        long questId = 0L;
+        long chapterId = previousState.getSelectedChapterId();
+
+        if (requestedQuest != null) {
+            questId = requestedQuest.getId();
+            chapterId = requestedQuest.getChapter().getId();
+        } else if (ClientQuestFile.exists()) {
+            Chapter firstVisible = ClientQuestFile.INSTANCE.getFirstVisibleChapter(ClientQuestFile.INSTANCE.selfTeamData);
+            if (chapterId == 0L && firstVisible != null) {
+                chapterId = firstVisible.getId();
+            }
+        }
+
+        return new QuestOpenContext(false, questId, chapterId, previousState.copy());
+    }
+
     public static QuestOpenContext fromVanilla(QuestScreen vanillaScreen, QuestViewState previousState) {
         long questId = 0L;
         long chapterId = previousState.getSelectedChapterId();

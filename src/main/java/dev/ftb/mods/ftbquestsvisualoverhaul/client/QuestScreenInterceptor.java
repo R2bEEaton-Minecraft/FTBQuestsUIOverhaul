@@ -2,6 +2,7 @@ package dev.ftb.mods.ftbquestsvisualoverhaul.client;
 
 import dev.ftb.mods.ftbquests.client.ClientQuestFile;
 import dev.ftb.mods.ftbquests.client.gui.quests.QuestScreen;
+import dev.ftb.mods.ftbquests.quest.Quest;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.config.ModClientConfig;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.screen.OverhaulQuestScreen;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestOpenContext;
@@ -13,6 +14,20 @@ import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 public class QuestScreenInterceptor {
+    public static boolean openOverhaulForQuest(Quest quest) {
+        if (!ModClientConfig.REPLACE_FTBQUESTS_SCREEN.get() || !ClientQuestFile.exists()) {
+            return false;
+        }
+
+        QuestViewState state = QuestDataController.copyPersistedViewState();
+        if (state.isDefaultFtbUiMode() && isCreativeOrEditorView()) {
+            return false;
+        }
+
+        Minecraft.getInstance().setScreen(new OverhaulQuestScreen(QuestOpenContext.fromDirectRequest(quest, state)));
+        return true;
+    }
+
     @SubscribeEvent
     public static void onScreenOpening(ScreenEvent.Opening event) {
         if (!ModClientConfig.REPLACE_FTBQUESTS_SCREEN.get()) {

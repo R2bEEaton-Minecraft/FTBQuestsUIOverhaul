@@ -111,6 +111,7 @@ public class ChoiceRewardSelectScreen extends Screen {
             for (int i = targets.size() - 1; i >= 0; i--) {
                 RowTarget target = targets.get(i);
                 if (target.contains(mouseX, mouseY)) {
+                    QuestUiFeedback.playUiClickSound();
                     if (target.index() >= 0) {
                         router.claimChoiceReward(reward, target.index());
                         QuestUiFeedback.playRewardConfirmSound();

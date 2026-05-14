@@ -10,9 +10,12 @@ import dev.ftb.mods.ftbquests.quest.TeamData;
 import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
 import dev.ftb.mods.ftbquests.quest.reward.Reward;
 import dev.ftb.mods.ftbquests.quest.reward.RewardClaimType;
+import dev.ftb.mods.ftbquests.quest.reward.XPLevelsReward;
+import dev.ftb.mods.ftbquests.quest.reward.XPReward;
 import dev.ftb.mods.ftbquests.quest.task.CheckmarkTask;
 import dev.ftb.mods.ftbquests.quest.task.ItemTask;
 import dev.ftb.mods.ftbquests.quest.task.Task;
+import dev.ftb.mods.ftbquests.quest.task.XPTask;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.entity.player.Player;
@@ -180,11 +183,17 @@ public class QuestDataSnapshotBuilder {
         }
         MutableComponent buttonText = task.getButtonText();
         String text = buttonText.getString().trim();
+        if (task instanceof XPTask) {
+            return Component.literal(text.isEmpty() ? "+1" : text);
+        }
         return Component.literal(text.isEmpty() ? "x1" : "x" + text);
     }
 
     private static Component rewardCountLabel(Reward reward) {
         String text = reward.getButtonText().trim();
+        if (reward instanceof XPReward || reward instanceof XPLevelsReward) {
+            return Component.literal(text.isEmpty() ? "+1" : text);
+        }
         return Component.literal(text.isEmpty() ? "x1" : "x" + text);
     }
 }

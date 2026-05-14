@@ -1,6 +1,9 @@
 package dev.ftb.mods.ftbquestsvisualoverhaul.client;
 
 import dev.ftb.mods.ftbquests.client.ClientQuestFile;
+import dev.ftb.mods.ftbquests.quest.Chapter;
+import dev.ftb.mods.ftbquests.quest.Quest;
+import dev.ftb.mods.ftbquests.quest.TeamData;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.QuestDataSnapshot;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.QuestDataSnapshotBuilder;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestViewState;
@@ -17,6 +20,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 
 public class QuestDataController {
     private static final QuestDataSnapshotBuilder SNAPSHOT_BUILDER = new QuestDataSnapshotBuilder();
@@ -37,6 +41,11 @@ public class QuestDataController {
     private static QuestViewState persistedViewState = new QuestViewState();
     private static QuestDataSnapshot snapshot = new QuestDataSnapshot(java.util.List.of(), false);
     private static boolean dirty = true;
+    private static final Set<Long> claimableQuestIds = new LinkedHashSet<>();
+    private static boolean claimableQuestTrackerInitialized;
+    private static long lastReadyToClaimQuestId;
+    private static ClientQuestFile trackedQuestFile;
+    private static UUID trackedPlayerId;
 
     static {
         loadPersistentTileTextures();
@@ -57,6 +66,21 @@ public class QuestDataController {
             dirty = false;
         }
         return snapshot;
+    }
+
+    public static boolean hasUnclaimedRewards() {
+        refreshClaimableQuestTracker();
+        return !claimableQuestIds.isEmpty();
+    }
+
+    public static long getPreferredReadyToClaimQuestId() {
+        refreshClaimableQuestTracker();
+
+        if (lastReadyToClaimQuestId != 0L && claimableQuestIds.contains(lastReadyToClaimQuestId)) {
+            return lastReadyToClaimQuestId;
+        }
+
+        return claimableQuestIds.stream().findFirst().orElse(0L);
     }
 
     public static QuestViewState copyPersistedViewState() {
@@ -93,6 +117,70 @@ public class QuestDataController {
     public static void setHiddenAcceptedQuestState(boolean hidden, Set<Long> questIds) {
         persistedViewState.setHideAcceptedQuests(hidden);
         persistedViewState.setHiddenAcceptedQuestIds(questIds);
+    }
+
+    private static void refreshClaimableQuestTracker() {
+        if (!ClientQuestFile.exists()) {
+            resetClaimableQuestTracker();
+            return;
+        }
+
+        ClientQuestFile file = ClientQuestFile.INSTANCE;
+        TeamData teamData = file.selfTeamData;
+        if (teamData == null) {
+            resetClaimableQuestTracker();
+            return;
+        }
+
+        UUID playerId = dev.ftb.mods.ftbquests.client.FTBQuestsClient.getClientPlayer() == null
+                ? null
+                : dev.ftb.mods.ftbquests.client.FTBQuestsClient.getClientPlayer().getUUID();
+        if (playerId == null) {
+            resetClaimableQuestTracker();
+            return;
+        }
+
+        if (trackedQuestFile != file || !playerId.equals(trackedPlayerId)) {
+            claimableQuestIds.clear();
+            claimableQuestTrackerInitialized = false;
+            lastReadyToClaimQuestId = 0L;
+            trackedQuestFile = file;
+            trackedPlayerId = playerId;
+        }
+
+        Set<Long> currentClaimableQuestIds = new LinkedHashSet<>();
+        long newestReadyQuestId = 0L;
+
+        for (Chapter chapter : file.getVisibleChapters(teamData)) {
+            for (Quest quest : chapter.getQuests()) {
+                if (!quest.isVisible(teamData) || !teamData.hasUnclaimedRewards(playerId, quest)) {
+                    continue;
+                }
+
+                currentClaimableQuestIds.add(quest.getId());
+                if (claimableQuestTrackerInitialized && !claimableQuestIds.contains(quest.getId())) {
+                    newestReadyQuestId = quest.getId();
+                }
+            }
+        }
+
+        claimableQuestIds.clear();
+        claimableQuestIds.addAll(currentClaimableQuestIds);
+        claimableQuestTrackerInitialized = true;
+
+        if (newestReadyQuestId != 0L) {
+            lastReadyToClaimQuestId = newestReadyQuestId;
+        } else if (lastReadyToClaimQuestId != 0L && !claimableQuestIds.contains(lastReadyToClaimQuestId)) {
+            lastReadyToClaimQuestId = 0L;
+        }
+    }
+
+    private static void resetClaimableQuestTracker() {
+        claimableQuestIds.clear();
+        claimableQuestTrackerInitialized = false;
+        lastReadyToClaimQuestId = 0L;
+        trackedQuestFile = null;
+        trackedPlayerId = null;
     }
 
     private static void loadPersistentTileTextures() {
