@@ -1,0 +1,384 @@
+{
+	default_hide_dependency_lines: false
+	default_quest_shape: ""
+	filename: "v45_grid_layout_demo"
+	group: "4000000000000003"
+	icon: "minecraft:iron_sword"
+	id: "3000000000002001"
+	order_index: 2
+	quest_links: [ ]
+	quests: [
+		{
+			description: [
+				"This chapter copies the exact quest count and authored coordinates from the local v4.5 monster hunter reference block."
+				"The content is simplified for testing, but every quest icon is placed at the same position as the source layout."
+			]
+			icon: "minecraft:campfire"
+			id: "3000000000002101"
+			rewards: [{
+				id: "3000000000002301"
+				item: "minecraft:paper"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002201"
+				type: "checkmark"
+			}]
+			title: "A Hunter's Tale"
+			x: 0.0d
+			y: 2.0d
+		}
+		{
+			dependencies: ["3000000000002101"]
+			icon: "minecraft:stone_sword"
+			id: "3000000000002102"
+			rewards: [{
+				id: "3000000000002302"
+				item: "minecraft:stick"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002202"
+				type: "checkmark"
+			}]
+			title: "The Hunt Begins"
+			x: 0.0d
+			y: 1.0d
+		}
+		{
+			dependencies: ["3000000000002102"]
+			icon: "minecraft:wooden_sword"
+			id: "3000000000002103"
+			rewards: [{
+				id: "3000000000002303"
+				item: "minecraft:wooden_sword"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002203"
+				type: "checkmark"
+			}]
+			title: "My First Tool"
+			x: 0.0d
+			y: -0.5d
+		}
+		{
+			dependencies: ["3000000000002103"]
+			icon: "minecraft:wheat"
+			id: "3000000000002104"
+			rewards: [{
+				id: "3000000000002304"
+				item: "minecraft:wheat"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002204"
+				type: "checkmark"
+			}]
+			title: "Garlic? Really?"
+			x: 1.5d
+			y: 0.0d
+		}
+		{
+			dependencies: ["3000000000002103"]
+			icon: "minecraft:potion"
+			id: "3000000000002105"
+			rewards: [{
+				id: "3000000000002305"
+				item: "minecraft:potion"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002205"
+				type: "checkmark"
+			}]
+			title: "Water Bottle"
+			x: -1.5d
+			y: 0.0d
+		}
+		{
+			dependencies: ["3000000000002105"]
+			icon: "minecraft:splash_potion"
+			id: "3000000000002106"
+			rewards: [{
+				id: "3000000000002306"
+				item: "minecraft:splash_potion"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002206"
+				type: "checkmark"
+			}]
+			title: "Enhanced"
+			x: -2.0d
+			y: -1.0d
+		}
+		{
+			dependencies: ["3000000000002104"]
+			icon: "minecraft:cooked_beef"
+			id: "3000000000002107"
+			rewards: [{
+				id: "3000000000002307"
+				item: "minecraft:cooked_beef"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002207"
+				type: "checkmark"
+			}]
+			title: "Grilled Garlic"
+			x: 2.0d
+			y: -1.0d
+		}
+		{
+			dependencies: ["3000000000002104"]
+			icon: "minecraft:bread"
+			id: "3000000000002108"
+			rewards: [{
+				id: "3000000000002308"
+				item: "minecraft:bread"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002208"
+				type: "checkmark"
+			}]
+			title: "\"GARLIC BREAD?!\""
+			x: 2.5d
+			y: -2.0d
+		}
+		{
+			dependencies: ["3000000000002103"]
+			icon: "minecraft:target"
+			id: "3000000000002109"
+			rewards: [{
+				id: "3000000000002309"
+				item: "minecraft:target"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002209"
+				type: "checkmark"
+			}]
+			title: "The Outpost"
+			x: 0.0d
+			y: -2.0d
+		}
+		{
+			dependencies: ["3000000000002109"]
+			icon: "minecraft:smithing_table"
+			id: "3000000000002110"
+			rewards: [{
+				id: "3000000000002310"
+				item: "minecraft:smithing_table"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002210"
+				type: "checkmark"
+			}]
+			title: "Hunter Crafting"
+			x: 0.0d
+			y: -3.75d
+		}
+		{
+			dependencies: ["3000000000002106"]
+			icon: "minecraft:glass_bottle"
+			id: "3000000000002111"
+			rewards: [{
+				id: "3000000000002311"
+				item: "minecraft:glass_bottle"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002211"
+				type: "checkmark"
+			}]
+			title: "Ultimate"
+			x: -3.0d
+			y: -3.0d
+		}
+		{
+			dependencies: ["3000000000002107"]
+			icon: "minecraft:bowl"
+			id: "3000000000002112"
+			rewards: [{
+				id: "3000000000002312"
+				item: "minecraft:bowl"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002212"
+				type: "checkmark"
+			}]
+			title: "Garlic Soup"
+			x: 3.0d
+			y: -3.0d
+		}
+		{
+			dependencies: ["3000000000002110"]
+			icon: "minecraft:leather_chestplate"
+			id: "3000000000002113"
+			rewards: [{
+				id: "3000000000002313"
+				item: "minecraft:leather_chestplate"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002213"
+				type: "checkmark"
+			}]
+			title: "Suit Up"
+			x: 0.0d
+			y: -5.0d
+		}
+		{
+			dependencies: ["3000000000002113"]
+			icon: "minecraft:potion"
+			id: "3000000000002114"
+			rewards: [{
+				id: "3000000000002314"
+				item: "minecraft:potion"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002214"
+				type: "checkmark"
+			}]
+			title: "Alchemic Hunter"
+			x: -3.0d
+			y: -8.5d
+		}
+		{
+			dependencies: ["3000000000002113"]
+			icon: "minecraft:iron_axe"
+			id: "3000000000002115"
+			rewards: [{
+				id: "3000000000002315"
+				item: "minecraft:iron_axe"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002215"
+				type: "checkmark"
+			}]
+			title: "Vampire Hunter"
+			x: -2.0d
+			y: -8.0d
+		}
+		{
+			dependencies: ["3000000000002113"]
+			icon: "minecraft:crossbow"
+			id: "3000000000002116"
+			rewards: [{
+				id: "3000000000002316"
+				item: "minecraft:crossbow"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002216"
+				type: "checkmark"
+			}]
+			title: "Crossbow Hunter"
+			x: -1.0d
+			y: -7.5d
+		}
+		{
+			dependencies: [
+				"3000000000002114"
+				"3000000000002115"
+				"3000000000002116"
+				"3000000000002118"
+				"3000000000002119"
+				"3000000000002120"
+			]
+			icon: "minecraft:lodestone"
+			id: "3000000000002117"
+			rewards: [{
+				id: "3000000000002317"
+				item: "minecraft:lodestone"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002217"
+				type: "checkmark"
+			}]
+			title: "Altar of Vampires"
+			x: 0.0d
+			y: -9.0d
+		}
+		{
+			dependencies: ["3000000000002113"]
+			icon: "minecraft:flint_and_steel"
+			id: "3000000000002118"
+			rewards: [{
+				id: "3000000000002318"
+				item: "minecraft:flint_and_steel"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002218"
+				type: "checkmark"
+			}]
+			title: "Marksman Hunter"
+			x: 1.0d
+			y: -7.5d
+		}
+		{
+			dependencies: ["3000000000002113"]
+			icon: "minecraft:iron_sword"
+			id: "3000000000002119"
+			rewards: [{
+				id: "3000000000002319"
+				item: "minecraft:iron_sword"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002219"
+				type: "checkmark"
+			}]
+			title: "Silver Hunter"
+			x: 2.0d
+			y: -8.0d
+		}
+		{
+			dependencies: ["3000000000002113"]
+			icon: "minecraft:book"
+			id: "3000000000002120"
+			rewards: [{
+				id: "3000000000002320"
+				item: "minecraft:book"
+				type: "item"
+			}]
+			subtitle: "Exact v4.5 position"
+			tasks: [{
+				id: "3000000000002220"
+				type: "checkmark"
+			}]
+			title: "Holy Hunter"
+			x: 3.0d
+			y: -8.5d
+		}
+	]
+	subtitle: ["Exact quest count and coordinates copied from the v4.5 monster hunter reference section"]
+	title: "v4.5 Grid Layout Demo"
+}

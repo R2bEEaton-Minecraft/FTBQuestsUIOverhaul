@@ -957,7 +957,7 @@ public class OverhaulQuestScreen extends Screen {
             nodes.add(new MutableNodePosition(quest.id(), rect.x(), rect.y()));
         }
 
-        relaxNodeOverlaps(nodes);
+        expandNodeLayout(nodes);
 
         for (MutableNodePosition node : nodes) {
             Rect rect = node.toRect();
@@ -969,9 +969,65 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
-    private void relaxNodeOverlaps(List<MutableNodePosition> nodes) {
+    private void expandNodeLayout(List<MutableNodePosition> nodes) {
         int minHorizontalSpacing = WIDGET_WIDTH + NODE_MIN_TILE_GAP;
         int minVerticalSpacing = WIDGET_HEIGHT + NODE_MIN_TILE_GAP;
+
+        double authoredScale = computeUniformExpansionScale(nodes, minHorizontalSpacing, minVerticalSpacing);
+        if (authoredScale > 1.0D) {
+            scaleNodeLayout(nodes, authoredScale);
+        }
+
+        relaxResidualNodeOverlaps(nodes, minHorizontalSpacing, minVerticalSpacing);
+    }
+
+    private double computeUniformExpansionScale(List<MutableNodePosition> nodes, int minHorizontalSpacing, int minVerticalSpacing) {
+        double requiredScale = 1.0D;
+
+        for (int i = 0; i < nodes.size(); i++) {
+            MutableNodePosition first = nodes.get(i);
+            for (int j = i + 1; j < nodes.size(); j++) {
+                MutableNodePosition second = nodes.get(j);
+                double deltaX = Math.abs(second.x() - first.x());
+                double deltaY = Math.abs(second.y() - first.y());
+                if (deltaX >= minHorizontalSpacing || deltaY >= minVerticalSpacing) {
+                    continue;
+                }
+
+                double scaleX = deltaX > 0.0D ? minHorizontalSpacing / deltaX : Double.POSITIVE_INFINITY;
+                double scaleY = deltaY > 0.0D ? minVerticalSpacing / deltaY : Double.POSITIVE_INFINITY;
+                double pairScale = Math.min(scaleX, scaleY);
+                if (Double.isFinite(pairScale)) {
+                    requiredScale = Math.max(requiredScale, pairScale);
+                }
+            }
+        }
+
+        return requiredScale;
+    }
+
+    private void scaleNodeLayout(List<MutableNodePosition> nodes, double scale) {
+        double minX = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
+
+        for (MutableNodePosition node : nodes) {
+            minX = Math.min(minX, node.x());
+            maxX = Math.max(maxX, node.x());
+            minY = Math.min(minY, node.y());
+            maxY = Math.max(maxY, node.y());
+        }
+
+        double centerX = (minX + maxX) * 0.5D;
+        double centerY = (minY + maxY) * 0.5D;
+
+        for (MutableNodePosition node : nodes) {
+            node.scaleFrom(centerX, centerY, scale);
+        }
+    }
+
+    private void relaxResidualNodeOverlaps(List<MutableNodePosition> nodes, int minHorizontalSpacing, int minVerticalSpacing) {
 
         for (int pass = 0; pass < NODE_LAYOUT_RELAXATION_PASSES; pass++) {
             boolean moved = false;
@@ -980,10 +1036,10 @@ public class OverhaulQuestScreen extends Screen {
                 MutableNodePosition first = nodes.get(i);
                 for (int j = i + 1; j < nodes.size(); j++) {
                     MutableNodePosition second = nodes.get(j);
-                    int deltaX = second.x() - first.x();
-                    int deltaY = second.y() - first.y();
-                    int overlapX = minHorizontalSpacing - Math.abs(deltaX);
-                    int overlapY = minVerticalSpacing - Math.abs(deltaY);
+                    double deltaX = second.x() - first.x();
+                    double deltaY = second.y() - first.y();
+                    double overlapX = minHorizontalSpacing - Math.abs(deltaX);
+                    double overlapY = minVerticalSpacing - Math.abs(deltaY);
                     if (overlapX <= 0 || overlapY <= 0) {
                         continue;
                     }
@@ -994,14 +1050,14 @@ public class OverhaulQuestScreen extends Screen {
 
                     if (separateOnX) {
                         int direction = separationDirection(deltaX, i, j);
-                        int firstPush = overlapX / 2;
-                        int secondPush = overlapX - firstPush;
+                        double firstPush = overlapX / 2.0D;
+                        double secondPush = overlapX - firstPush;
                         first.moveX(-direction * firstPush);
                         second.moveX(direction * secondPush);
                     } else {
                         int direction = separationDirection(deltaY, i, j);
-                        int firstPush = overlapY / 2;
-                        int secondPush = overlapY - firstPush;
+                        double firstPush = overlapY / 2.0D;
+                        double secondPush = overlapY - firstPush;
                         first.moveY(-direction * firstPush);
                         second.moveY(direction * secondPush);
                     }
@@ -1016,7 +1072,7 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
-    private int separationDirection(int delta, int firstIndex, int secondIndex) {
+    private int separationDirection(double delta, int firstIndex, int secondIndex) {
         if (delta < 0) {
             return -1;
         }
@@ -3044,10 +3100,10 @@ public class OverhaulQuestScreen extends Screen {
 
     private static final class MutableNodePosition {
         private final long id;
-        private int x;
-        private int y;
+        private double x;
+        private double y;
 
-        private MutableNodePosition(long id, int x, int y) {
+        private MutableNodePosition(long id, double x, double y) {
             this.id = id;
             this.x = x;
             this.y = y;
@@ -3057,24 +3113,29 @@ public class OverhaulQuestScreen extends Screen {
             return id;
         }
 
-        private int x() {
+        private double x() {
             return x;
         }
 
-        private int y() {
+        private double y() {
             return y;
         }
 
-        private void moveX(int delta) {
+        private void moveX(double delta) {
             x += delta;
         }
 
-        private void moveY(int delta) {
+        private void moveY(double delta) {
             y += delta;
         }
 
+        private void scaleFrom(double centerX, double centerY, double scale) {
+            x = centerX + (x - centerX) * scale;
+            y = centerY + (y - centerY) * scale;
+        }
+
         private Rect toRect() {
-            return new Rect(x, y, WIDGET_WIDTH, WIDGET_HEIGHT);
+            return new Rect((int) Math.round(x), (int) Math.round(y), WIDGET_WIDTH, WIDGET_HEIGHT);
         }
     }
 
