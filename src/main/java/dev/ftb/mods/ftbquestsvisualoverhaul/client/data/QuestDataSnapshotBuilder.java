@@ -27,6 +27,8 @@ import java.util.Locale;
 import java.util.UUID;
 
 public class QuestDataSnapshotBuilder {
+    private static final String DATA_KEY = "data.ftbquestsvisualoverhaul.";
+
     public QuestDataSnapshot build(TeamData teamData) {
         List<QuestDataSnapshot.ChapterSnapshot> chapters = new ArrayList<>();
         Player player = FTBQuestsClient.getClientPlayer();
@@ -42,7 +44,7 @@ public class QuestDataSnapshotBuilder {
             previousGroupId = groupId;
             Component groupTitle = group.getTitle();
             if (groupTitle.getString().isBlank()) {
-                groupTitle = group.isDefaultGroup() ? Component.literal("Quest Chapters") : group.getAltTitle();
+                groupTitle = group.isDefaultGroup() ? Component.translatable(DATA_KEY + "quest_chapters") : group.getAltTitle();
             }
 
             chapter.getQuests().stream()
@@ -51,23 +53,28 @@ public class QuestDataSnapshotBuilder {
                     .forEach(quest -> {
                         List<QuestDataSnapshot.TaskSnapshot> tasks = new ArrayList<>();
                         List<QuestDataSnapshot.RewardSnapshot> rewards = new ArrayList<>();
+                        boolean accepted = player != null && teamData.isQuestPinned(player, quest.getId());
 
                         for (Task task : quest.getTasks()) {
                             TaskInteractionMode interactionMode = resolveTaskMode(task);
-                            String fallbackReason = interactionMode == TaskInteractionMode.VANILLA_FALLBACK
-                                    ? "Custom or unsupported task interaction"
-                                    : "";
+                            Component fallbackReason = interactionMode == TaskInteractionMode.VANILLA_FALLBACK
+                                    ? Component.translatable(DATA_KEY + "fallback.task_interaction")
+                                    : Component.empty();
 
                             tasks.add(new QuestDataSnapshot.TaskSnapshot(
                                     task.getId(),
                                     task.getTitle(),
-                                    Component.literal(task.formatProgress(teamData, teamData.getProgress(task)) + "/" + task.formatMaxProgress()),
+                                    Component.translatable(
+                                            DATA_KEY + "progress_fraction",
+                                            task.formatProgress(teamData, teamData.getProgress(task)),
+                                            task.formatMaxProgress()
+                                    ),
                                     taskCountLabel(task),
                                     task.getIcon(),
                                     teamData.isCompleted(task),
                                     task instanceof CheckmarkTask,
                                     task.isOptionalForProgression(teamData),
-                                    canTaskInteract(task, teamData),
+                                    canTaskInteract(task, teamData, accepted),
                                     task.consumesResources(),
                                     interactionMode,
                                     fallbackReason
@@ -76,14 +83,14 @@ public class QuestDataSnapshotBuilder {
 
                         for (Reward reward : quest.getRewards()) {
                             RewardInteractionMode interactionMode = resolveRewardMode(reward);
-                            String fallbackReason = interactionMode == RewardInteractionMode.VANILLA_FALLBACK
-                                    ? "Custom or unsupported reward interaction"
-                                    : "";
+                            Component fallbackReason = interactionMode == RewardInteractionMode.VANILLA_FALLBACK
+                                    ? Component.translatable(DATA_KEY + "fallback.reward_interaction")
+                                    : Component.empty();
                             RewardClaimType claimType = playerId == null ? RewardClaimType.CANT_CLAIM : teamData.getClaimType(playerId, reward);
                             rewards.add(new QuestDataSnapshot.RewardSnapshot(
                                     reward.getId(),
                                     reward.getTitle(),
-                                    Component.literal(claimType.name().replace('_', ' ').toLowerCase(Locale.ROOT)),
+                                    rewardClaimTypeLabel(claimType),
                                     rewardCountLabel(reward),
                                     reward.getIcon(),
                                     claimType == RewardClaimType.CLAIMED,
@@ -108,7 +115,7 @@ public class QuestDataSnapshotBuilder {
                                 teamData.getRelativeProgress(quest),
                                 teamData.isCompleted(quest),
                                 teamData.isStarted(quest),
-                                player != null && teamData.isQuestPinned(player, quest.getId()),
+                                accepted,
                                 teamData.canStartTasks(quest),
                                 quest.hideDetailsUntilStartable() && !teamData.canStartTasks(quest) && !teamData.isCompleted(quest),
                                 playerId != null && teamData.hasUnclaimedRewards(playerId, quest),
@@ -147,8 +154,8 @@ public class QuestDataSnapshotBuilder {
         return new QuestDataSnapshot(chapters, hasFallbackEntries);
     }
 
-    private static boolean canTaskInteract(Task task, TeamData teamData) {
-        if (teamData.isCompleted(task) || !teamData.canStartTasks(task.getQuest())) {
+    private static boolean canTaskInteract(Task task, TeamData teamData, boolean accepted) {
+        if (!accepted || teamData.isCompleted(task) || !teamData.canStartTasks(task.getQuest())) {
             return false;
         }
         return resolveTaskMode(task) == TaskInteractionMode.SUBMIT;
@@ -184,16 +191,24 @@ public class QuestDataSnapshotBuilder {
         MutableComponent buttonText = task.getButtonText();
         String text = buttonText.getString().trim();
         if (task instanceof XPTask) {
-            return Component.literal(text.isEmpty() ? "+1" : text);
+            return text.isEmpty() ? Component.translatable(DATA_KEY + "count.plus_one") : buttonText;
         }
-        return Component.literal(text.isEmpty() ? "x1" : "x" + text);
+        return Component.translatable(DATA_KEY + "count.multiplier", text.isEmpty() ? "1" : text);
     }
 
     private static Component rewardCountLabel(Reward reward) {
         String text = reward.getButtonText().trim();
         if (reward instanceof XPReward || reward instanceof XPLevelsReward) {
-            return Component.literal(text.isEmpty() ? "+1" : text);
+            return text.isEmpty() ? Component.translatable(DATA_KEY + "count.plus_one") : Component.literal(text);
         }
-        return Component.literal(text.isEmpty() ? "x1" : "x" + text);
+        return Component.translatable(DATA_KEY + "count.multiplier", text.isEmpty() ? "1" : text);
+    }
+
+    private static Component rewardClaimTypeLabel(RewardClaimType claimType) {
+        return switch (claimType) {
+            case CANT_CLAIM -> Component.translatable(DATA_KEY + "reward_claim_type.cant_claim");
+            case CAN_CLAIM -> Component.translatable(DATA_KEY + "reward_claim_type.can_claim");
+            case CLAIMED -> Component.translatable(DATA_KEY + "reward_claim_type.claimed");
+        };
     }
 }

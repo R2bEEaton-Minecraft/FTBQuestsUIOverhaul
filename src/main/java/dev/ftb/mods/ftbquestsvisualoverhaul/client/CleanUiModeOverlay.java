@@ -23,7 +23,7 @@ public class CleanUiModeOverlay {
     private static final float BUTTON_TEXT_SCALE = 0.5F;
     private static final double BUTTON_LEFT_SHIFT_RATIO = 0.16D;
     private static final ResourceLocation BUTTONS_LOCATION = new ResourceLocation("textures/gui/widgets.png");
-    private static final Component BUTTON_LABEL = Component.literal("Clean UI Mode");
+    private static final Component BUTTON_LABEL = Component.translatable("button.ftbquestsvisualoverhaul.clean_ui_mode");
     private static long handCursor;
     private static boolean handCursorActive;
 

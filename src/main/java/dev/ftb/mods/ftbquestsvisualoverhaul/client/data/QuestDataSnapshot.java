@@ -98,7 +98,7 @@ public class QuestDataSnapshot {
             boolean canInteract,
             boolean consumesResources,
             TaskInteractionMode interactionMode,
-            String fallbackReason
+            Component fallbackReason
     ) {
     }
 
@@ -111,7 +111,7 @@ public class QuestDataSnapshot {
             boolean claimed,
             boolean canClaim,
             RewardInteractionMode interactionMode,
-            String fallbackReason
+            Component fallbackReason
     ) {
     }
 }

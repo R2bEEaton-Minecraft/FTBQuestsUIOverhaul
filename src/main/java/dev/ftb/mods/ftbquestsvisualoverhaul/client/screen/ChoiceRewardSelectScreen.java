@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ChoiceRewardSelectScreen extends Screen {
+    private static final String SCREEN_KEY = "screen.ftbquestsvisualoverhaul.choice_reward.";
     private static final int MODAL_MIN_WIDTH = 188;
     private static final int MODAL_MAX_WIDTH = 232;
     private static final int MODAL_MARGIN = 28;
@@ -30,7 +31,7 @@ public class ChoiceRewardSelectScreen extends Screen {
     private double scroll;
 
     public ChoiceRewardSelectScreen(Screen parent, ChoiceReward reward, QuestActionRouter router) {
-        super(Component.literal("Choose Reward"));
+        super(Component.translatable(SCREEN_KEY + "title"));
         this.parent = parent;
         this.reward = reward;
         this.router = router;
@@ -62,7 +63,7 @@ public class ChoiceRewardSelectScreen extends Screen {
         drawInsetBorder(graphics, header, 0xFFD6A85C, 0xAA3E2B13);
 
         reward.getIcon().draw(graphics, header.x() + 7, header.y() + 6, 16, 16);
-        drawCenteredScaledString(graphics, Component.literal("Choose Reward"), header.centerX(), header.y() + 6, 0xFFF6EDDB, TEXT_SCALE);
+        drawCenteredScaledString(graphics, Component.translatable(SCREEN_KEY + "title"), header.centerX(), header.y() + 6, 0xFFF6EDDB, TEXT_SCALE);
         drawCenteredScaledString(graphics, trim(reward.getQuest().getTitle(), header.width() - 52), header.centerX(), header.y() + 16, 0xFFD8C49D, TEXT_SCALE);
 
         Rect closeRect = new Rect(header.maxX() - 18, header.y() + 4, 12, 12);
@@ -82,10 +83,10 @@ public class ChoiceRewardSelectScreen extends Screen {
             choice.getReward().getIcon().draw(graphics, rowRect.x() + 3, rowRect.y() + 2, 14, 14);
             drawScaledString(graphics, trim(choice.getReward().getTitle(), rowRect.width() - 74), rowRect.x() + 22, rowRect.y() + 6, 0xFFF0E2C5, TEXT_SCALE);
 
-            String action = "Choose";
+            Component action = Component.translatable(SCREEN_KEY + "choose");
             int actionWidth = Math.round(font.width(action) * TEXT_SCALE);
             int actionX = rowRect.maxX() - actionWidth - 6;
-            drawScaledString(graphics, Component.literal(action), actionX, rowRect.y() + 6, hovered ? 0xFFF4DCB6 : 0xFFC8A97C, TEXT_SCALE);
+            drawScaledString(graphics, action, actionX, rowRect.y() + 6, hovered ? 0xFFF4DCB6 : 0xFFC8A97C, TEXT_SCALE);
 
             targets.add(new RowTarget(rowRect, i));
             contentY += ROW_HEIGHT + ROW_GAP;

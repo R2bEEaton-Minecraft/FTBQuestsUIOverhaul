@@ -51,6 +51,9 @@ import java.util.Set;
  * References vanilla classes: AdvancementsScreen, AdvancementTab, AdvancementWidget
  */
 public class OverhaulQuestScreen extends Screen {
+    private static final String SCREEN_KEY = "screen.ftbquestsvisualoverhaul.";
+    private static final String DATA_KEY = "data.ftbquestsvisualoverhaul.";
+
     // --- Custom background texture ---
     private static final ResourceLocation QUESTS_BACKGROUND_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quests_background.png");
     private static final ResourceLocation CHAPTER_BUTTON_INACTIVE_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/quest_line_button_inactive.png");
@@ -111,7 +114,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final float ACTIVE_CHAPTER_TITLE_TEXT_Y_OFFSET = 0.5F;
     private static final float ACTIVE_CHAPTER_TITLE_ICON_EXTRA_Y_OFFSET = -0.5F;
     private static final float ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET = 2.0F;
-    private static final Component CHAPTER_SELECTOR_TITLE = Component.literal("QUEST CHAPTERS");
+    private static final Component CHAPTER_SELECTOR_TITLE = Component.translatable(SCREEN_KEY + "section_title.chapter_selector");
 
     // --- Vanilla advancement textures ---
     private static final ResourceLocation WINDOW_LOCATION = new ResourceLocation("textures/gui/advancements/window.png");
@@ -231,7 +234,7 @@ public class OverhaulQuestScreen extends Screen {
     private int maxNodeY = Integer.MIN_VALUE;
 
     public OverhaulQuestScreen(QuestOpenContext openContext) {
-        super(Component.literal("Quests"));
+        super(Component.translatable(SCREEN_KEY + "screen_title"));
         this.openContext = openContext;
         this.viewState = openContext.previousState().copy();
         this.openingQuestSnapPending = true;
@@ -743,8 +746,10 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         Rect frame = frameRect();
-        Component freePanLabel = Component.literal(isCurrentChapterFreePan() ? "Free Pan: On" : "Free Pan: Off");
-        Component titleLabel = Component.literal("Change Tile");
+        Component freePanLabel = Component.translatable(isCurrentChapterFreePan()
+                ? SCREEN_KEY + "creative.free_pan.on"
+                : SCREEN_KEY + "creative.free_pan.off");
+        Component titleLabel = Component.translatable(SCREEN_KEY + "creative.change_tile");
         int buttonY = frame.y() + TREE_Y + 1;
         Rect freePanButton = creativeTreeButtonRect(frame.x() + TREE_X + 1, buttonY, freePanLabel);
         Rect titleButton = creativeTreeButtonRectRight(frame.x() + TREE_X + TREE_WIDTH - 4, buttonY, titleLabel);
@@ -1281,7 +1286,10 @@ public class OverhaulQuestScreen extends Screen {
         } else if (!quest.description().isEmpty()) {
             descComponent = quest.description().get(0).copy().withStyle(Style.EMPTY.withColor(obtained ? 0x55FF55 : locked ? 0xAAAAAA : 0xFFFF55));
         } else {
-            descComponent = Component.literal(quest.tasks().size() + " requirements").withStyle(Style.EMPTY.withColor(0xAAAAAA));
+            descComponent = Component.translatable(
+                    quest.tasks().size() == 1 ? DATA_KEY + "requirement_count.one" : DATA_KEY + "requirement_count.other",
+                    quest.tasks().size()
+            ).withStyle(Style.EMPTY.withColor(0xAAAAAA));
         }
 
         List<FormattedCharSequence> description = findOptimalLines(descComponent, tooltipWidth);
@@ -1613,13 +1621,13 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         if (!headerTexturePresent || !panelTexturePresent || !frameTexturePresent) {
-            drawCenteredScaledString(graphics, Component.literal("Missing modal texture resource"), rect.centerX(), rect.maxY() - 12, 0xFFFF8080, 0.55F);
+            drawCenteredScaledString(graphics, Component.translatable(SCREEN_KEY + "detail.missing_modal_texture"), rect.centerX(), rect.maxY() - 12, 0xFFFF8080, 0.55F);
         }
         graphics.pose().popPose();
     }
 
     private void renderDefaultViewButton(GuiGraphics graphics, int mouseX, int mouseY) {
-        Component label = Component.literal("Editing Mode");
+        Component label = Component.translatable("button.ftbquestsvisualoverhaul.editing_mode");
         int buttonWidth = Math.max(MODE_SWITCH_BUTTON_MIN_WIDTH, font.width(label) + MODE_SWITCH_BUTTON_PADDING_X * 2);
         Rect rect = new Rect(width - buttonWidth - MODE_SWITCH_BUTTON_MARGIN,
                 height - MODE_SWITCH_BUTTON_HEIGHT - 4, buttonWidth, MODE_SWITCH_BUTTON_HEIGHT);
@@ -1644,7 +1652,7 @@ public class OverhaulQuestScreen extends Screen {
         int contentY = y + sectionLayout.labelHeight() + MODAL_SECTION_LABEL_GAP;
         int contentX = x + Math.max(0, (sectionLayout.width() - sectionLayout.contentWidth()) / 2);
         if (tasks.isEmpty()) {
-            drawScaledString(graphics, Component.literal(sectionLayout.emptyText()), contentX, contentY, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
+            drawScaledString(graphics, sectionLayout.emptyText(), contentX, contentY, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
             return y + sectionLayout.height();
         }
 
@@ -1684,7 +1692,7 @@ public class OverhaulQuestScreen extends Screen {
         int contentY = y + sectionLayout.labelHeight() + MODAL_SECTION_LABEL_GAP;
         int contentX = x + Math.max(0, (sectionLayout.width() - sectionLayout.contentWidth()) / 2);
         if (rewards.isEmpty()) {
-            drawScaledString(graphics, Component.literal(sectionLayout.emptyText()), contentX, contentY, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
+            drawScaledString(graphics, sectionLayout.emptyText(), contentX, contentY, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
             return y + sectionLayout.height();
         }
 
@@ -1708,10 +1716,10 @@ public class OverhaulQuestScreen extends Screen {
         return y + sectionLayout.height();
     }
 
-    private void drawSectionHeading(GuiGraphics graphics, String label, int x, int y, int width) {
+    private void drawSectionHeading(GuiGraphics graphics, Component label, int x, int y, int width) {
         int labelHeight = Math.max(8, Math.round(font.lineHeight * MODAL_SECTION_LABEL_SCALE));
         int textY = y;
-        drawCenteredScaledString(graphics, Component.literal(label + ":"), x + width / 2, textY, 0xFFF6ECD6, MODAL_SECTION_LABEL_SCALE);
+        drawCenteredScaledString(graphics, withColon(label), x + width / 2, textY, 0xFFF6ECD6, MODAL_SECTION_LABEL_SCALE);
     }
 
     private void renderScrollArrow(GuiGraphics graphics, int x, int y, boolean up, boolean active) {
@@ -1736,7 +1744,7 @@ public class OverhaulQuestScreen extends Screen {
     private void renderFooterButton(
             GuiGraphics graphics,
             Rect rect,
-            String label,
+            Component label,
             boolean enabled,
             boolean hovered,
             boolean pressed,
@@ -1753,7 +1761,7 @@ public class OverhaulQuestScreen extends Screen {
         int textHeight = Math.round(font.lineHeight * MODAL_TEXT_SCALE);
         int textY = visualRect.y() + Math.max(0, (visualRect.height() - textHeight) / 2);
         int textColor = enabled ? 0xFFE0E0E0 : 0xFFA0A0A0;
-        drawCenteredScaledString(graphics, Component.literal(label), visualRect.centerX(), textY, textColor, MODAL_TEXT_SCALE);
+        drawCenteredScaledString(graphics, label, visualRect.centerX(), textY, textColor, MODAL_TEXT_SCALE);
         renderFooterButtonBadge(graphics, visualRect, showSpinner, showNotificationBadge, showCompletedBadge);
     }
 
@@ -1862,8 +1870,18 @@ public class OverhaulQuestScreen extends Screen {
         List<Component> rewardCountLabels = quest.rewards().stream().map(QuestDataSnapshot.RewardSnapshot::countLabel).toList();
         int requirementColumns = Math.max(1, Math.min(MODAL_SECTION_MAX_COLUMNS, tasks.size()));
         int rewardColumns = Math.max(1, Math.min(MODAL_SECTION_MAX_COLUMNS, quest.rewards().size()));
-        IconSectionLayout requirements = measureSectionLayout("Requirements", taskCountLabels, requirementColumns, "None");
-        IconSectionLayout rewards = measureSectionLayout("Rewards", rewardCountLabels, rewardColumns, "None");
+        IconSectionLayout requirements = measureSectionLayout(
+                Component.translatable(SCREEN_KEY + "detail.section.requirements"),
+                taskCountLabels,
+                requirementColumns,
+                Component.translatable(SCREEN_KEY + "detail.section.empty")
+        );
+        IconSectionLayout rewards = measureSectionLayout(
+                Component.translatable(SCREEN_KEY + "detail.section.rewards"),
+                rewardCountLabels,
+                rewardColumns,
+                Component.translatable(SCREEN_KEY + "detail.section.empty")
+        );
 
         while (availableWidth < Integer.MAX_VALUE
                 && requirements.width() + rewards.width() + MODAL_SECTION_GROUP_GAP > availableWidth
@@ -1876,8 +1894,18 @@ public class OverhaulQuestScreen extends Screen {
                 requirementColumns--;
             }
 
-            requirements = measureSectionLayout("Requirements", taskCountLabels, requirementColumns, "None");
-            rewards = measureSectionLayout("Rewards", rewardCountLabels, rewardColumns, "None");
+            requirements = measureSectionLayout(
+                    Component.translatable(SCREEN_KEY + "detail.section.requirements"),
+                    taskCountLabels,
+                    requirementColumns,
+                    Component.translatable(SCREEN_KEY + "detail.section.empty")
+            );
+            rewards = measureSectionLayout(
+                    Component.translatable(SCREEN_KEY + "detail.section.rewards"),
+                    rewardCountLabels,
+                    rewardColumns,
+                    Component.translatable(SCREEN_KEY + "detail.section.empty")
+            );
         }
 
         int gap = MODAL_SECTION_GROUP_GAP;
@@ -1901,13 +1929,13 @@ public class OverhaulQuestScreen extends Screen {
         return progressText.isEmpty() ? taskSnapshot.countLabel() : taskSnapshot.progressText();
     }
 
-    private IconSectionLayout measureSectionLayout(String label, List<Component> countLabels, int columns, String emptyText) {
-        int labelWidth = Math.round(font.width(Component.literal(label + ":")) * MODAL_SECTION_LABEL_SCALE);
+    private IconSectionLayout measureSectionLayout(Component label, List<Component> countLabels, int columns, Component emptyText) {
+        int labelWidth = Math.round(font.width(withColon(label)) * MODAL_SECTION_LABEL_SCALE);
         int labelHeight = Math.max(8, Math.round(font.lineHeight * MODAL_SECTION_LABEL_SCALE));
         int count = countLabels.size();
         if (count <= 0) {
             int noteHeight = Math.max(8, Math.round(font.lineHeight * MODAL_SECTION_NOTE_SCALE));
-            int noteWidth = Math.round(font.width(Component.literal(emptyText)) * MODAL_SECTION_NOTE_SCALE);
+            int noteWidth = Math.round(font.width(emptyText) * MODAL_SECTION_NOTE_SCALE);
             int width = Math.max(labelWidth, noteWidth);
             return new IconSectionLayout(label, 1, 0, labelWidth, labelHeight, noteWidth,
                     noteWidth, noteHeight,
@@ -1938,7 +1966,7 @@ public class OverhaulQuestScreen extends Screen {
             lines.addAll(font.split(component, maxWidth));
         }
         if (lines.isEmpty()) {
-            lines.addAll(font.split(Component.literal("No description"), maxWidth));
+            lines.addAll(font.split(Component.translatable(SCREEN_KEY + "detail.no_description"), maxWidth));
         }
         return lines;
     }
@@ -1952,9 +1980,9 @@ public class OverhaulQuestScreen extends Screen {
 
     private List<Component> resolveDescription(QuestDataSnapshot.QuestSnapshot quest) {
         if (quest.hiddenDetails()) {
-            return List.of(Component.literal("Details stay hidden until this quest becomes available."));
+            return List.of(Component.translatable(SCREEN_KEY + "detail.hidden_details"));
         }
-        return quest.description().isEmpty() ? List.of(Component.literal("No additional details.")) : quest.description();
+        return quest.description().isEmpty() ? List.of(Component.translatable(SCREEN_KEY + "detail.no_additional_details")) : quest.description();
     }
 
     private boolean canClaimAnyReward(QuestDataSnapshot.QuestSnapshot quest) {
@@ -2301,14 +2329,22 @@ public class OverhaulQuestScreen extends Screen {
         tooltip.add(task.title());
         tooltip.add(task.progressText());
 
-        String state = switch (task.interactionMode()) {
-            case SUBMIT -> task.completed() ? "Completed" : task.canInteract() ? "Ready" : "Locked";
-            case VANILLA_FALLBACK -> task.canInteract() ? "Use default FTB Quests UI" : "Locked";
-            case READ_ONLY -> task.completed() ? "Completed" : "Tracked automatically";
+        Component state = switch (task.interactionMode()) {
+            case SUBMIT -> task.completed()
+                    ? Component.translatable(SCREEN_KEY + "tooltip.task.completed")
+                    : task.canInteract()
+                    ? Component.translatable(SCREEN_KEY + "tooltip.task.ready")
+                    : Component.translatable(SCREEN_KEY + "tooltip.task.locked");
+            case VANILLA_FALLBACK -> task.canInteract()
+                    ? Component.translatable(SCREEN_KEY + "tooltip.task.use_default_ui")
+                    : Component.translatable(SCREEN_KEY + "tooltip.task.locked");
+            case READ_ONLY -> task.completed()
+                    ? Component.translatable(SCREEN_KEY + "tooltip.task.completed")
+                    : Component.translatable(SCREEN_KEY + "tooltip.task.tracked_automatically");
         };
-        tooltip.add(Component.literal(state).withStyle(task.completed() ? Style.EMPTY.withColor(0x75D65C) : Style.EMPTY.withColor(0xD9BE96)));
-        if (!task.fallbackReason().isBlank()) {
-            tooltip.add(Component.literal(task.fallbackReason()).withStyle(Style.EMPTY.withColor(0xC8B08C)));
+        tooltip.add(state.copy().withStyle(task.completed() ? Style.EMPTY.withColor(0x75D65C) : Style.EMPTY.withColor(0xD9BE96)));
+        if (!task.fallbackReason().getString().isBlank()) {
+            tooltip.add(task.fallbackReason().copy().withStyle(Style.EMPTY.withColor(0xC8B08C)));
         }
         return tooltip;
     }
@@ -2316,20 +2352,29 @@ public class OverhaulQuestScreen extends Screen {
     private List<Component> buildRewardTooltip(QuestDataSnapshot.RewardSnapshot reward) {
         List<Component> tooltip = new ArrayList<>();
         tooltip.add(reward.title());
-        String rewardStatus = reward.statusText().getString().trim().toLowerCase(Locale.ROOT);
-        if (!rewardStatus.equals("cant claim") && !rewardStatus.equals("claimed") && !rewardStatus.equals("can claim")) {
+        if (!isGenericRewardStatus(reward.statusText())) {
             tooltip.add(reward.statusText());
         }
 
-        String state = switch (reward.interactionMode()) {
-            case CLAIM -> reward.canClaim() ? "Claimable via Complete" : reward.claimed() ? "Claimed" : "Locked";
-            case CHOICE -> reward.canClaim() ? "Choose via Complete" : reward.claimed() ? "Claimed" : "Locked";
-            case VANILLA_FALLBACK -> reward.canClaim() ? "Use Complete or default FTB Quests UI" : "Locked";
+        Component state = switch (reward.interactionMode()) {
+            case CLAIM -> reward.canClaim()
+                    ? Component.translatable(SCREEN_KEY + "tooltip.reward.claimable_via_complete")
+                    : reward.claimed()
+                    ? Component.translatable(SCREEN_KEY + "tooltip.task.completed")
+                    : Component.translatable(SCREEN_KEY + "tooltip.reward.locked");
+            case CHOICE -> reward.canClaim()
+                    ? Component.translatable(SCREEN_KEY + "tooltip.reward.choice_via_complete")
+                    : reward.claimed()
+                    ? Component.translatable(SCREEN_KEY + "tooltip.task.completed")
+                    : Component.translatable(SCREEN_KEY + "tooltip.reward.locked");
+            case VANILLA_FALLBACK -> reward.canClaim()
+                    ? Component.translatable(SCREEN_KEY + "tooltip.reward.use_complete_or_default_ui")
+                    : Component.translatable(SCREEN_KEY + "tooltip.reward.locked");
         };
         int color = reward.canClaim() ? 0x7DE25E : reward.claimed() ? 0xB6B6B6 : 0xD5B58C;
-        tooltip.add(Component.literal(state).withStyle(Style.EMPTY.withColor(color)));
-        if (!reward.fallbackReason().isBlank()) {
-            tooltip.add(Component.literal(reward.fallbackReason()).withStyle(Style.EMPTY.withColor(0xC8B08C)));
+        tooltip.add(state.copy().withStyle(Style.EMPTY.withColor(color)));
+        if (!reward.fallbackReason().getString().isBlank()) {
+            tooltip.add(reward.fallbackReason().copy().withStyle(Style.EMPTY.withColor(0xC8B08C)));
         }
         return tooltip;
     }
@@ -2353,7 +2398,7 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private boolean isQuestAvailable(QuestDataSnapshot.QuestSnapshot quest) {
-        return quest.started() || (quest.canStart() && areQuestDependenciesVisuallyComplete(quest));
+        return quest.pinned() || (quest.canStart() && areQuestDependenciesVisuallyComplete(quest));
     }
 
     private void refreshState(QuestDataSnapshot snapshot) {
@@ -2907,7 +2952,7 @@ public class OverhaulQuestScreen extends Screen {
     private void renderMissingPanelFallback(GuiGraphics graphics, Rect rect, ResourceLocation texture) {
         graphics.fill(rect.x(), rect.y(), rect.maxX(), rect.maxY(), 0xD4211711);
         drawInsetBorder(graphics, rect, 0xFF8F6938, 0xCC160F0B);
-        drawCenteredScaledString(graphics, Component.literal("Missing: " + texture), rect.centerX(), rect.centerY() - 3, 0xFFFF8080, 0.45F);
+        drawCenteredScaledString(graphics, Component.translatable(SCREEN_KEY + "overlay.missing_resource", texture), rect.centerX(), rect.centerY() - 3, 0xFFFF8080, 0.45F);
     }
 
     private double clampScroll(double scroll, int contentHeight, int visibleHeight) {
@@ -2969,17 +3014,32 @@ public class OverhaulQuestScreen extends Screen {
         return overflow * (1D - (cyclePos / travelDuration));
     }
 
-    private String statusLabel(QuestDataSnapshot.QuestSnapshot quest) {
+    private Component statusLabel(QuestDataSnapshot.QuestSnapshot quest) {
         if (isPendingManualQuestCompletion(quest)) {
-            return "Ready to Complete";
+            return Component.translatable(SCREEN_KEY + "quest_status.ready_to_complete");
         }
         if (quest.completed()) {
-            return quest.hasUnclaimedRewards() ? "Completed - rewards waiting" : "Completed";
+            return quest.hasUnclaimedRewards()
+                    ? Component.translatable(SCREEN_KEY + "quest_status.completed_rewards_waiting")
+                    : Component.translatable(SCREEN_KEY + "quest_status.completed");
         }
         if (isQuestAvailable(quest)) {
-            return quest.started() ? "In Progress" : "Available";
+            return quest.pinned()
+                    ? Component.translatable(SCREEN_KEY + "quest_status.in_progress")
+                    : Component.translatable(SCREEN_KEY + "quest_status.available");
         }
-        return "Locked";
+        return Component.translatable(SCREEN_KEY + "quest_status.locked");
+    }
+
+    private boolean isGenericRewardStatus(Component statusText) {
+        String text = statusText.getString().trim();
+        return text.equals(Component.translatable(DATA_KEY + "reward_claim_type.cant_claim").getString())
+                || text.equals(Component.translatable(DATA_KEY + "reward_claim_type.claimed").getString())
+                || text.equals(Component.translatable(DATA_KEY + "reward_claim_type.can_claim").getString());
+    }
+
+    private Component withColon(Component label) {
+        return Component.translatable(SCREEN_KEY + "detail.section.heading", label);
     }
 
     private static final class MutableNodePosition {
@@ -3088,12 +3148,14 @@ public class OverhaulQuestScreen extends Screen {
             return new PrimaryActionButtonState(PrimaryActionType.COMPLETED, false);
         }
 
-        private String label(boolean hovered) {
+        private Component label(boolean hovered) {
             return switch (type) {
-                case ACCEPT -> "Accept";
-                case IN_PROGRESS -> hovered ? "Cancel" : "In progress";
-                case COMPLETE -> "Complete";
-                case COMPLETED -> "Completed";
+                case ACCEPT -> Component.translatable(SCREEN_KEY + "action.accept");
+                case IN_PROGRESS -> hovered
+                        ? Component.translatable(SCREEN_KEY + "action.cancel")
+                        : Component.translatable(SCREEN_KEY + "action.in_progress");
+                case COMPLETE -> Component.translatable(SCREEN_KEY + "action.complete");
+                case COMPLETED -> Component.translatable(SCREEN_KEY + "action.completed");
             };
         }
 
@@ -3111,7 +3173,7 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private record IconSectionLayout(
-            String label,
+            Component label,
             int columns,
             int rows,
             int labelWidth,
@@ -3121,7 +3183,7 @@ public class OverhaulQuestScreen extends Screen {
             int cellHeight,
             int width,
             int height,
-            String emptyText
+            Component emptyText
     ) {
     }
 

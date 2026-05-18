@@ -18,7 +18,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.event.TickEvent;
 
 public class QuestLauncherButtonInjector {
-    private static final Component QUEST_BOOK = Component.literal("Quest Book");
+    private static final Component QUEST_BOOK = Component.translatable("button.ftbquestsvisualoverhaul.quest_book");
     private static final ResourceLocation RECIPE_BUTTON_TEXTURE = new ResourceLocation("minecraft", "textures/gui/recipe_button.png");
     private static final ResourceLocation NOTIFICATION_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/notification.png");
 
