@@ -43,8 +43,10 @@ public class QuestLauncherButtonInjector {
 
     private static class QuestBookIconButton extends Button {
         private static final ItemStack ICON = new ItemStack(FTBQuestsItems.BOOK.get());
-        private static final int INVENTORY_X_OFFSET = 126;
-        private static final int INVENTORY_Y_OFFSET = 61;
+        // Place the quest book directly above the offhand slot and aligned with
+        // the lower row of the 2x2 crafting grid.
+        private static final int INVENTORY_X_OFFSET = 76;
+        private static final int INVENTORY_Y_OFFSET = 35;
         private final InventoryScreen inventoryScreen;
 
         private QuestBookIconButton(InventoryScreen inventoryScreen) {
