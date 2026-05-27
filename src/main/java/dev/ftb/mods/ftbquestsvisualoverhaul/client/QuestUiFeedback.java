@@ -42,7 +42,7 @@ public final class QuestUiFeedback {
     public static void playUiClickSound() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.getSoundManager() != null) {
-            minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F, 1.0F));
+            minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F));
         }
     }
 
