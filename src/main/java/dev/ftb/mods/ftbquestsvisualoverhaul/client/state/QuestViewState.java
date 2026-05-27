@@ -12,6 +12,8 @@ public class QuestViewState {
     private long selectedChapterId;
     private long viewedQuestId;
     private long lastAcceptedQuestId;
+    private long lastReadyToCompleteQuestId;
+    private long lastCompletedQuestId;
     private boolean hideAcceptedQuests;
     private Set<Long> hiddenAcceptedQuestIds;
     private String searchText;
@@ -31,6 +33,8 @@ public class QuestViewState {
         selectedChapterId = 0L;
         viewedQuestId = 0L;
         lastAcceptedQuestId = 0L;
+        lastReadyToCompleteQuestId = 0L;
+        lastCompletedQuestId = 0L;
         hideAcceptedQuests = false;
         hiddenAcceptedQuestIds = new HashSet<>();
         searchText = "";
@@ -52,6 +56,8 @@ public class QuestViewState {
         copy.selectedChapterId = selectedChapterId;
         copy.viewedQuestId = viewedQuestId;
         copy.lastAcceptedQuestId = lastAcceptedQuestId;
+        copy.lastReadyToCompleteQuestId = lastReadyToCompleteQuestId;
+        copy.lastCompletedQuestId = lastCompletedQuestId;
         copy.hideAcceptedQuests = hideAcceptedQuests;
         copy.hiddenAcceptedQuestIds = new HashSet<>(hiddenAcceptedQuestIds);
         copy.searchText = searchText;
@@ -91,6 +97,22 @@ public class QuestViewState {
 
     public void setLastAcceptedQuestId(long lastAcceptedQuestId) {
         this.lastAcceptedQuestId = lastAcceptedQuestId;
+    }
+
+    public long getLastReadyToCompleteQuestId() {
+        return lastReadyToCompleteQuestId;
+    }
+
+    public void setLastReadyToCompleteQuestId(long lastReadyToCompleteQuestId) {
+        this.lastReadyToCompleteQuestId = lastReadyToCompleteQuestId;
+    }
+
+    public long getLastCompletedQuestId() {
+        return lastCompletedQuestId;
+    }
+
+    public void setLastCompletedQuestId(long lastCompletedQuestId) {
+        this.lastCompletedQuestId = lastCompletedQuestId;
     }
 
     public boolean isHideAcceptedQuests() {

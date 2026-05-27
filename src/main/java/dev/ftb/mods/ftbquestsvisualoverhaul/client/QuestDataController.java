@@ -42,6 +42,8 @@ public class QuestDataController {
     private static QuestDataSnapshot snapshot = new QuestDataSnapshot(java.util.List.of(), false);
     private static boolean dirty = true;
     private static final Set<Long> claimableQuestIds = new LinkedHashSet<>();
+    private static final Set<Long> completableQuestIds = new LinkedHashSet<>();
+    private static final Set<Long> completedQuestIds = new LinkedHashSet<>();
     private static boolean claimableQuestTrackerInitialized;
     private static long lastReadyToClaimQuestId;
     private static ClientQuestFile trackedQuestFile;
@@ -63,6 +65,7 @@ public class QuestDataController {
     public static QuestDataSnapshot getSnapshot() {
         if (dirty && ClientQuestFile.exists()) {
             snapshot = SNAPSHOT_BUILDER.build(ClientQuestFile.INSTANCE.selfTeamData);
+            refreshRecentQuestStateTrackers(snapshot);
             dirty = false;
         }
         return snapshot;
@@ -90,6 +93,8 @@ public class QuestDataController {
     public static void saveViewState(QuestViewState state) {
         QuestViewState copy = state.copy();
         copy.setLastAcceptedQuestId(persistedViewState.getLastAcceptedQuestId());
+        copy.setLastReadyToCompleteQuestId(persistedViewState.getLastReadyToCompleteQuestId());
+        copy.setLastCompletedQuestId(persistedViewState.getLastCompletedQuestId());
         copy.setHideAcceptedQuests(persistedViewState.isHideAcceptedQuests());
         copy.setHiddenAcceptedQuestIds(persistedViewState.getHiddenAcceptedQuestIds());
         persistedViewState = copy;
@@ -104,6 +109,14 @@ public class QuestDataController {
 
     public static void setLastAcceptedQuestId(long questId) {
         persistedViewState.setLastAcceptedQuestId(questId);
+    }
+
+    public static long getLastReadyToCompleteQuestId() {
+        return persistedViewState.getLastReadyToCompleteQuestId();
+    }
+
+    public static long getLastCompletedQuestId() {
+        return persistedViewState.getLastCompletedQuestId();
     }
 
     public static boolean isHideAcceptedQuests() {
@@ -142,6 +155,8 @@ public class QuestDataController {
 
         if (trackedQuestFile != file || !playerId.equals(trackedPlayerId)) {
             claimableQuestIds.clear();
+            completableQuestIds.clear();
+            completedQuestIds.clear();
             claimableQuestTrackerInitialized = false;
             lastReadyToClaimQuestId = 0L;
             trackedQuestFile = file;
@@ -177,10 +192,100 @@ public class QuestDataController {
 
     private static void resetClaimableQuestTracker() {
         claimableQuestIds.clear();
+        completableQuestIds.clear();
+        completedQuestIds.clear();
         claimableQuestTrackerInitialized = false;
         lastReadyToClaimQuestId = 0L;
         trackedQuestFile = null;
         trackedPlayerId = null;
+    }
+
+    private static void refreshRecentQuestStateTrackers(QuestDataSnapshot snapshot) {
+        if (!claimableQuestTrackerInitialized) {
+            completableQuestIds.clear();
+            completedQuestIds.clear();
+            for (QuestDataSnapshot.ChapterSnapshot chapter : snapshot.chapters()) {
+                for (QuestDataSnapshot.QuestSnapshot quest : chapter.quests()) {
+                    if (isQuestReadyToComplete(quest)) {
+                        completableQuestIds.add(quest.id());
+                    }
+                    if (isQuestCompleted(quest)) {
+                        completedQuestIds.add(quest.id());
+                    }
+                }
+            }
+            claimableQuestTrackerInitialized = true;
+            return;
+        }
+
+        Set<Long> currentCompletableQuestIds = new LinkedHashSet<>();
+        Set<Long> currentCompletedQuestIds = new LinkedHashSet<>();
+        long newestCompletableQuestId = 0L;
+        long newestCompletedQuestId = 0L;
+
+        for (QuestDataSnapshot.ChapterSnapshot chapter : snapshot.chapters()) {
+            for (QuestDataSnapshot.QuestSnapshot quest : chapter.quests()) {
+                if (isQuestReadyToComplete(quest)) {
+                    currentCompletableQuestIds.add(quest.id());
+                    if (!completableQuestIds.contains(quest.id())) {
+                        newestCompletableQuestId = quest.id();
+                    }
+                }
+                if (isQuestCompleted(quest)) {
+                    currentCompletedQuestIds.add(quest.id());
+                    if (!completedQuestIds.contains(quest.id())) {
+                        newestCompletedQuestId = quest.id();
+                    }
+                }
+            }
+        }
+
+        completableQuestIds.clear();
+        completableQuestIds.addAll(currentCompletableQuestIds);
+        completedQuestIds.clear();
+        completedQuestIds.addAll(currentCompletedQuestIds);
+
+        if (newestCompletableQuestId != 0L) {
+            persistedViewState.setLastReadyToCompleteQuestId(newestCompletableQuestId);
+        } else if (persistedViewState.getLastReadyToCompleteQuestId() != 0L
+                && !completableQuestIds.contains(persistedViewState.getLastReadyToCompleteQuestId())) {
+            persistedViewState.setLastReadyToCompleteQuestId(0L);
+        }
+
+        if (newestCompletedQuestId != 0L) {
+            persistedViewState.setLastCompletedQuestId(newestCompletedQuestId);
+        } else if (persistedViewState.getLastCompletedQuestId() != 0L
+                && !completedQuestIds.contains(persistedViewState.getLastCompletedQuestId())) {
+            persistedViewState.setLastCompletedQuestId(0L);
+        }
+    }
+
+    private static boolean isQuestReadyToComplete(QuestDataSnapshot.QuestSnapshot quest) {
+        if (quest.rewards().stream().anyMatch(QuestDataSnapshot.RewardSnapshot::canClaim)) {
+            return true;
+        }
+
+        if (!quest.pinned()) {
+            return false;
+        }
+
+        if (quest.completed()) {
+            return true;
+        }
+
+        boolean hasPendingRequiredCheckmarkTask = quest.tasks().stream()
+                .anyMatch(task -> task.checkmarkTask() && !task.optional() && !task.completed());
+        if (!hasPendingRequiredCheckmarkTask) {
+            return false;
+        }
+
+        boolean hasIncompleteRequiredNonCheckmarkTask = quest.tasks().stream()
+                .anyMatch(task -> !task.checkmarkTask() && !task.optional() && !task.completed());
+        return !hasIncompleteRequiredNonCheckmarkTask;
+    }
+
+    private static boolean isQuestCompleted(QuestDataSnapshot.QuestSnapshot quest) {
+        return quest.completed();
     }
 
     private static void loadPersistentTileTextures() {

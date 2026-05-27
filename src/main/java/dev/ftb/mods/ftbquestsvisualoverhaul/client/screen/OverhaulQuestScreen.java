@@ -1124,13 +1124,15 @@ public class OverhaulQuestScreen extends Screen {
 
                 Rect parentRect = getNodeWorldRect(parent);
                 Rect childRect = getNodeWorldRect(quest);
+                Rect parentFrameRect = getWidgetFrameWorldRect(parentRect);
+                Rect childFrameRect = getWidgetFrameWorldRect(childRect);
 
                 int lineColor = outline ? 0xFF000000 : isQuestVisuallyCompleted(parent) && isQuestAvailable(quest) ? 0xFF35E041 : 0xFFFFFFFF;
 
-                int startX = parentRect.centerX();
-                int startY = parentRect.centerY();
-                int endX = childRect.centerX();
-                int endY = childRect.centerY();
+                int startX = parentFrameRect.centerX();
+                int startY = parentFrameRect.centerY();
+                int endX = childFrameRect.centerX();
+                int endY = childFrameRect.centerY();
                 int bendX = (startX + endX) / 2;
                 int thickness = outline ? 3 : 1;
 
@@ -1165,11 +1167,13 @@ public class OverhaulQuestScreen extends Screen {
                                 QuestDataSnapshot.QuestSnapshot child, int thickness, int color) {
         Rect parentRect = getNodeWorldRect(parent);
         Rect childRect = getNodeWorldRect(child);
+        Rect parentFrameRect = getWidgetFrameWorldRect(parentRect);
+        Rect childFrameRect = getWidgetFrameWorldRect(childRect);
 
-        int startX = parentRect.centerX();
-        int startY = parentRect.centerY();
-        int endX = childRect.centerX();
-        int endY = childRect.centerY();
+        int startX = parentFrameRect.centerX();
+        int startY = parentFrameRect.centerY();
+        int endX = childFrameRect.centerX();
+        int endY = childFrameRect.centerY();
         int bendX = (startX + endX) / 2;
 
         drawElbowLine(graphics, startX, bendX, startY, endX, endY, thickness, color);
@@ -1724,7 +1728,7 @@ public class OverhaulQuestScreen extends Screen {
             Rect hoverRect = new Rect(cellX, cellY, sectionLayout.cellWidth(), sectionLayout.cellHeight());
             renderTaskIcon(graphics, task, iconRect);
             int countY = iconRect.maxY() + MODAL_SECTION_COUNT_GAP;
-            int countColor = task.completed() ? 0xFF6FE142 : 0xFFF6ECD6;
+            int countColor = (task.completed() || task.progressSatisfied()) ? 0xFF6FE142 : 0xFFF6ECD6;
             drawCenteredScaledString(graphics, requirementCountLabel(task), cellX + sectionLayout.cellWidth() / 2, countY, countColor, MODAL_SECTION_COUNT_SCALE);
             modalTooltipTargets.add(new TooltipTarget(hoverRect, buildTaskTooltip(task)));
         }
@@ -1874,8 +1878,11 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private Rect widgetStatusRect(Rect nodeRect, int overlayWidth, int overlayHeight, int topInset) {
-        Rect widgetFrameRect = new Rect(nodeRect.x() + WIDGET_FRAME_X_OFFSET, nodeRect.y(), WIDGET_WIDTH, WIDGET_HEIGHT);
-        return topRightRect(widgetFrameRect, overlayWidth, overlayHeight, STATUS_OVERLAY_RIGHT_INSET, topInset);
+        return topRightRect(getWidgetFrameWorldRect(nodeRect), overlayWidth, overlayHeight, STATUS_OVERLAY_RIGHT_INSET, topInset);
+    }
+
+    private Rect getWidgetFrameWorldRect(Rect nodeRect) {
+        return new Rect(nodeRect.x() + WIDGET_FRAME_X_OFFSET, nodeRect.y(), WIDGET_WIDTH, WIDGET_HEIGHT);
     }
 
     private Rect topRightRect(Rect ownerRect, int overlayWidth, int overlayHeight, int rightInset, int topInset) {
@@ -2074,6 +2081,14 @@ public class OverhaulQuestScreen extends Screen {
                 && !hasIncompleteRequiredNonCheckmarkTask(questSnapshot));
     }
 
+    private boolean isReadyForManualCompletionAfterAccept(QuestDataSnapshot.QuestSnapshot questSnapshot) {
+        return !questSnapshot.pinned()
+                && isQuestAvailable(questSnapshot)
+                && (questSnapshot.completed()
+                || hasPendingRequiredCheckmarkTask(questSnapshot)
+                && !hasIncompleteRequiredNonCheckmarkTask(questSnapshot));
+    }
+
     private PrimaryActionButtonState resolvePrimaryActionButtonState(QuestDataSnapshot.QuestSnapshot questSnapshot) {
         if (canClaimAnyReward(questSnapshot)) {
             return PrimaryActionButtonState.complete();
@@ -2097,7 +2112,12 @@ public class OverhaulQuestScreen extends Screen {
 
         primaryButtonPressedUntilMs = Util.getMillis() + BUTTON_PRESS_DURATION_MS;
         switch (buttonState.type()) {
-            case ACCEPT -> acceptQuest(questSnapshot);
+            case ACCEPT -> {
+                acceptQuest(questSnapshot);
+                if (isReadyForManualCompletionAfterAccept(questSnapshot)) {
+                    completeQuest(questSnapshot);
+                }
+            }
             case IN_PROGRESS -> cancelAcceptedQuest(questSnapshot);
             case COMPLETE -> completeQuest(questSnapshot);
             case COMPLETED -> {
@@ -2123,7 +2143,7 @@ public class OverhaulQuestScreen extends Screen {
             return;
         }
 
-        QuestDataSnapshot.QuestSnapshot selectedChapterQuest = findPreferredInProgressQuest(snapshot, viewState.getSelectedChapterId());
+        QuestDataSnapshot.QuestSnapshot selectedChapterQuest = findPreferredQuestToFocus(snapshot, viewState.getSelectedChapterId());
         if (selectedChapterQuest != null) {
             QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(selectedChapterQuest.chapterId());
             if (chapter != null) {
@@ -2136,7 +2156,7 @@ public class OverhaulQuestScreen extends Screen {
             return;
         }
 
-        QuestDataSnapshot.QuestSnapshot preferredQuest = findPreferredInProgressQuest(snapshot, 0L);
+        QuestDataSnapshot.QuestSnapshot preferredQuest = findPreferredQuestToFocus(snapshot, 0L);
         if (preferredQuest != null) {
             viewState.setSelectedChapterId(preferredQuest.chapterId());
             QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(preferredQuest.chapterId());
@@ -2149,9 +2169,28 @@ public class OverhaulQuestScreen extends Screen {
         viewState.setViewedQuestId(0L);
     }
 
+    private QuestDataSnapshot.QuestSnapshot findPreferredQuestToFocus(QuestDataSnapshot snapshot, long chapterId) {
+        QuestDataSnapshot.QuestSnapshot rememberedInProgressQuest = snapshot.findQuest(QuestDataController.getLastAcceptedQuestId());
+        if (isPreferredInProgressQuest(rememberedInProgressQuest, chapterId)) {
+            return rememberedInProgressQuest;
+        }
+
+        QuestDataSnapshot.QuestSnapshot rememberedReadyQuest = snapshot.findQuest(QuestDataController.getLastReadyToCompleteQuestId());
+        if (isReadyToCompleteFocusQuest(rememberedReadyQuest, chapterId)) {
+            return rememberedReadyQuest;
+        }
+
+        QuestDataSnapshot.QuestSnapshot rememberedCompletedQuest = snapshot.findQuest(QuestDataController.getLastCompletedQuestId());
+        if (isCompletedFocusQuest(rememberedCompletedQuest, chapterId)) {
+            return rememberedCompletedQuest;
+        }
+
+        return findPreferredInProgressQuest(snapshot, chapterId);
+    }
+
     private QuestDataSnapshot.QuestSnapshot findPreferredInProgressQuest(QuestDataSnapshot snapshot, long chapterId) {
         QuestDataSnapshot.QuestSnapshot rememberedQuest = snapshot.findQuest(QuestDataController.getLastAcceptedQuestId());
-        if (rememberedQuest != null && rememberedQuest.pinned() && (chapterId == 0L || rememberedQuest.chapterId() == chapterId)) {
+        if (isPreferredInProgressQuest(rememberedQuest, chapterId)) {
             return rememberedQuest;
         }
 
@@ -2162,16 +2201,36 @@ public class OverhaulQuestScreen extends Screen {
             }
 
             return chapter.quests().stream()
-                    .filter(QuestDataSnapshot.QuestSnapshot::pinned)
+                    .filter(quest -> isPreferredInProgressQuest(quest, chapterId))
                     .findFirst()
                     .orElse(null);
         }
 
         return snapshot.chapters().stream()
                 .flatMap(chapter -> chapter.quests().stream())
-                .filter(QuestDataSnapshot.QuestSnapshot::pinned)
+                .filter(quest -> isPreferredInProgressQuest(quest, 0L))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private boolean isPreferredInProgressQuest(QuestDataSnapshot.QuestSnapshot quest, long chapterId) {
+        return quest != null
+                && quest.pinned()
+                && !isReadyForManualCompletion(quest)
+                && !canClaimAnyReward(quest)
+                && (chapterId == 0L || quest.chapterId() == chapterId);
+    }
+
+    private boolean isReadyToCompleteFocusQuest(QuestDataSnapshot.QuestSnapshot quest, long chapterId) {
+        return quest != null
+                && (isReadyForManualCompletion(quest) || canClaimAnyReward(quest))
+                && (chapterId == 0L || quest.chapterId() == chapterId);
+    }
+
+    private boolean isCompletedFocusQuest(QuestDataSnapshot.QuestSnapshot quest, long chapterId) {
+        return quest != null
+                && quest.completed()
+                && (chapterId == 0L || quest.chapterId() == chapterId);
     }
 
     private void centerTreeOnQuest(QuestDataSnapshot.ChapterSnapshot chapter, QuestDataSnapshot.QuestSnapshot quest) {
@@ -2490,9 +2549,9 @@ public class OverhaulQuestScreen extends Screen {
             if (focusedQuest != null && focusedQuest.chapterId() == chapter.id()) {
                 centerTreeOnQuest(chapter, focusedQuest);
             } else {
-                QuestDataSnapshot.QuestSnapshot inProgressQuest = findPreferredInProgressQuest(snapshot, chapter.id());
-                if (inProgressQuest != null) {
-                    centerTreeOnQuest(chapter, inProgressQuest);
+                QuestDataSnapshot.QuestSnapshot priorityQuest = findPreferredQuestToFocus(snapshot, chapter.id());
+                if (priorityQuest != null) {
+                    centerTreeOnQuest(chapter, priorityQuest);
                 }
             }
         }

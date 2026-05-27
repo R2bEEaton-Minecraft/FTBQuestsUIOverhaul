@@ -19,8 +19,10 @@ import dev.ftb.mods.ftbquests.quest.task.XPTask;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -60,21 +62,25 @@ public class QuestDataSnapshotBuilder {
                             Component fallbackReason = interactionMode == TaskInteractionMode.VANILLA_FALLBACK
                                     ? Component.translatable(DATA_KEY + "fallback.task_interaction")
                                     : Component.empty();
+                            long displayProgress = resolveDisplayProgress(task, teamData, player);
+                            boolean completed = teamData.isCompleted(task);
+                            boolean progressSatisfied = isTaskProgressSatisfied(task, teamData, player, displayProgress);
 
                             tasks.add(new QuestDataSnapshot.TaskSnapshot(
                                     task.getId(),
                                     task.getTitle(),
                                     Component.translatable(
                                             DATA_KEY + "progress_fraction",
-                                            task.formatProgress(teamData, teamData.getProgress(task)),
+                                            task.formatProgress(teamData, displayProgress),
                                             task.formatMaxProgress()
                                     ),
                                     taskCountLabel(task),
                                     task.getIcon(),
-                                    teamData.isCompleted(task),
+                                    completed,
+                                    progressSatisfied,
                                     task instanceof CheckmarkTask,
                                     task.isOptionalForProgression(teamData),
-                                    canTaskInteract(task, teamData, accepted),
+                                    canTaskInteract(task, teamData, accepted, player, displayProgress),
                                     task.consumesResources(),
                                     interactionMode,
                                     fallbackReason
@@ -154,11 +160,50 @@ public class QuestDataSnapshotBuilder {
         return new QuestDataSnapshot(chapters, hasFallbackEntries);
     }
 
-    private static boolean canTaskInteract(Task task, TeamData teamData, boolean accepted) {
+    private static boolean canTaskInteract(Task task, TeamData teamData, boolean accepted, Player player, long displayProgress) {
         if (!accepted || teamData.isCompleted(task) || !teamData.canStartTasks(task.getQuest())) {
             return false;
         }
+        if (task instanceof ItemTask itemTask && itemTask.consumesResources()) {
+            return displayProgress >= itemTask.getMaxProgress();
+        }
         return resolveTaskMode(task) == TaskInteractionMode.SUBMIT;
+    }
+
+    private static boolean isTaskProgressSatisfied(Task task, TeamData teamData, Player player, long displayProgress) {
+        if (teamData.isCompleted(task)) {
+            return true;
+        }
+        if (task instanceof ItemTask itemTask && itemTask.consumesResources() && player != null) {
+            return displayProgress >= itemTask.getMaxProgress();
+        }
+        return false;
+    }
+
+    private static long resolveDisplayProgress(Task task, TeamData teamData, Player player) {
+        if (task instanceof ItemTask itemTask && itemTask.consumesResources() && !teamData.isCompleted(task)) {
+            return countMatchingInventoryItems(itemTask, player);
+        }
+        return teamData.getProgress(task);
+    }
+
+    private static long countMatchingInventoryItems(ItemTask itemTask, Player player) {
+        if (player == null) {
+            return 0L;
+        }
+
+        Collection<ItemStack> inventoryStacks = player.getInventory().items;
+        long total = 0L;
+        long required = itemTask.getMaxProgress();
+        for (ItemStack stack : inventoryStacks) {
+            if (itemTask.test(stack)) {
+                total += stack.getCount();
+                if (total >= required) {
+                    return required;
+                }
+            }
+        }
+        return Math.min(total, required);
     }
 
     private static TaskInteractionMode resolveTaskMode(Task task) {
