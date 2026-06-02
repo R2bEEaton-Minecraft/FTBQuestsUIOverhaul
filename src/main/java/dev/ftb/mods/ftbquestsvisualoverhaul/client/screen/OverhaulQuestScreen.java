@@ -6,6 +6,7 @@ import dev.ftb.mods.ftblibrary.config.ui.SelectImageResourceScreen;
 import dev.ftb.mods.ftbquests.client.ClientQuestFile;
 import dev.ftb.mods.ftbquests.client.FTBQuestsClient;
 import dev.ftb.mods.ftbquests.client.gui.quests.QuestScreen;
+import dev.ftb.mods.ftbquests.client.gui.SelectChoiceRewardScreen;
 import dev.ftb.mods.ftbquests.quest.Quest;
 import dev.ftb.mods.ftbquests.quest.TeamData;
 import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
@@ -130,6 +131,8 @@ public class OverhaulQuestScreen extends Screen {
     private static final ResourceLocation OVERHAUL_LOCK_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/lock.png");
     private static final ResourceLocation OVERHAUL_CHECK_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/checked.png");
     private static final ResourceLocation OVERHAUL_NOTIFICATION_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/notification.png");
+    private static final ResourceLocation OVERHAUL_UP_ARROW_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/up.png");
+    private static final ResourceLocation OVERHAUL_DOWN_ARROW_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/down.png");
     private static final int ADVANCEMENT_PANEL_TEXTURE_WIDTH = 200;
     private static final int ADVANCEMENT_PANEL_TEXTURE_HEIGHT = 26;
     private static final int ADVANCEMENT_PANEL_TEXTURE_BORDER = 10;
@@ -1783,9 +1786,13 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderScrollArrow(GuiGraphics graphics, int x, int y, boolean up, boolean active) {
-        graphics.fill(x, y, x + 12, y + 12, active ? 0xCC72522E : 0x88342519);
-        drawInsetBorder(graphics, new Rect(x, y, 12, 12), active ? 0xFFC18F4B : 0xAA58412A, 0x990F0B08);
-        graphics.drawCenteredString(font, Component.literal(up ? "^" : "v"), x + 6, y + 2, active ? 0xFFF7E9D3 : 0xFF8F7556);
+        if (!active) {
+            return;
+        }
+
+        RenderSystem.enableBlend();
+        graphics.blit(up ? OVERHAUL_UP_ARROW_TEXTURE : OVERHAUL_DOWN_ARROW_TEXTURE, x + 2, y + 2, 0, 0.0F, 0.0F, 8, 8, 8, 8);
+        RenderSystem.disableBlend();
     }
 
     private void drawVanillaButton(GuiGraphics graphics, Rect rect, boolean enabled, boolean hovered) {
@@ -2327,7 +2334,7 @@ public class OverhaulQuestScreen extends Screen {
                 actionRouter.claimReward(liveReward, true);
                 claimedImmediateReward = true;
             } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.CHOICE && !openedChoiceScreen && liveReward instanceof ChoiceReward choiceReward) {
-                minecraft.setScreen(new ChoiceRewardSelectScreen(this, choiceReward, actionRouter));
+                new SelectChoiceRewardScreen(choiceReward).openGui();
                 openedChoiceScreen = true;
             } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.VANILLA_FALLBACK) {
                 Quest liveQuest = resolveQuest(questSnapshot.id());
@@ -2360,7 +2367,7 @@ public class OverhaulQuestScreen extends Screen {
                 actionRouter.claimReward(liveReward, true);
                 claimedImmediateReward = true;
             } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.CHOICE && !openedChoiceScreen && liveReward instanceof ChoiceReward choiceReward) {
-                minecraft.setScreen(new ChoiceRewardSelectScreen(this, choiceReward, actionRouter));
+                new SelectChoiceRewardScreen(choiceReward).openGui();
                 openedChoiceScreen = true;
             } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.VANILLA_FALLBACK) {
                 Quest liveQuest = resolveQuest(questSnapshot.id());
@@ -2404,7 +2411,7 @@ public class OverhaulQuestScreen extends Screen {
                 unpinQuestIfPinned(questSnapshot);
             }
         } else if (rewardSnapshot.interactionMode() == RewardInteractionMode.CHOICE && liveReward instanceof ChoiceReward choiceReward) {
-            minecraft.setScreen(new ChoiceRewardSelectScreen(this, choiceReward, actionRouter));
+            new SelectChoiceRewardScreen(choiceReward).openGui();
             if (questSnapshot != null) {
                 unpinQuestIfPinned(questSnapshot);
             }
