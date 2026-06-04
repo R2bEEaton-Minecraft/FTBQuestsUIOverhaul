@@ -159,6 +159,7 @@ public class QuestDataController {
             completedQuestIds.clear();
             claimableQuestTrackerInitialized = false;
             lastReadyToClaimQuestId = 0L;
+            persistedViewState.setExpandedChapterGroups(new LinkedHashSet<>()); // collapse all chapter groups on each login
             trackedQuestFile = file;
             trackedPlayerId = playerId;
         }
