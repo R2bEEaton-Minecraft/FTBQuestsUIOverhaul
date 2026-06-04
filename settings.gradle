@@ -6,4 +6,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'ftbquests-visual-overhaul'
+rootProject.name = 'FTB Quests UI Overhaul'
