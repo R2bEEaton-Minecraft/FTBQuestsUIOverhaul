@@ -68,6 +68,25 @@ advancements) draw with them:
 | `title_box.png` | Quest tooltip title box |
 | `task_frame_obtained.png` / `task_frame_unobtained.png` | 26x26 quest node frames |
 
+## Text and accent colors (`assets/ftbquestsvisualoverhaul/ui_colors.json`)
+
+Every text, scrollbar, and separator color the overhaul UI draws can be
+re-colored by shipping your own `ui_colors.json` in your pack. Values accept
+`"#RRGGBB"` or `"#AARRGGBB"`. Any key you leave out keeps the mod default, and
+the file hot-reloads with F3+T, so you can tune colors live.
+
+The default file (white/grey palette) lives at
+`src/main/resources/assets/ftbquestsvisualoverhaul/ui_colors.json` and lists
+every available key. The built-in Questbook Edition pack overrides the same
+file to restore the classic cream palette - copy whichever is closer to your
+pack's look and adjust from there.
+
+Key groups: `chapter_button_text*` (chapter list labels, with `_completed`
+variants), `group_header_text*`, `selector_title_text`, `chapter_title_text*`
+(title band above the quest tree), `scrollbar_*`, `modal_*` (quest detail
+popup), `section_divider*` (paragraph separator lines), `tooltip_*`, and
+`choice_*` (choice reward popup).
+
 ## Tips
 
 - Start by copying the built-in pack: the brown textures live in this repo at

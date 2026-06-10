@@ -13,6 +13,7 @@ import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
 import dev.ftb.mods.ftbquests.quest.reward.Reward;
 import dev.ftb.mods.ftbquests.quest.task.CheckmarkTask;
 import dev.ftb.mods.ftbquests.quest.task.Task;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.UiColors;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestActionRouter;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestDataController;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestUiFeedback;
@@ -159,6 +160,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final int STATUS_NOTIFICATION_ICON_HEIGHT = 9;
     private static final int STATUS_OVERLAY_RIGHT_INSET = -1;
     private static final int TREE_PAN_BOUND_PADDING = 12;
+    private static final int TREE_EDGE_SHADOW_SIZE = 6;
     private static final double TREE_ZOOM_MIN = 0.5D;
     private static final double TREE_ZOOM_MAX = 1.75D;
     private static final double TREE_ZOOM_SCROLL_FACTOR = 1.125D;
@@ -479,6 +481,7 @@ public class OverhaulQuestScreen extends Screen {
 
         // Render tree content inside the tree panel area (vanilla advancement style)
         renderInside(graphics, snapshot, mouseX, mouseY, treeLeft, treeTop);
+        renderTreeEdgeShadows(graphics, treeLeft, treeTop);
         renderActiveChapterTitle(graphics, snapshot, treeLeft, treeTop);
         renderCreativeTreeControls(graphics, mouseX, mouseY, selectedQuest == null);
 
@@ -575,6 +578,29 @@ public class OverhaulQuestScreen extends Screen {
         graphics.disableScissor();
     }
 
+    /**
+     * The background texture bakes an inner drop shadow around the tree viewport,
+     * but the pannable tree content is drawn after (and therefore over) the
+     * background. Re-blit the viewport's edge strips from the background texture
+     * so the shadow sits on top of the tree content again.
+     */
+    private void renderTreeEdgeShadows(GuiGraphics graphics, int treeLeft, int treeTop) {
+        int size = TREE_EDGE_SHADOW_SIZE;
+        RenderSystem.enableBlend();
+        graphics.blit(QUESTS_BACKGROUND_TEXTURE, treeLeft, treeTop, TREE_X, TREE_Y,
+                TREE_WIDTH, size, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+        graphics.blit(QUESTS_BACKGROUND_TEXTURE, treeLeft, treeTop + TREE_HEIGHT - size,
+                TREE_X, TREE_Y + TREE_HEIGHT - size,
+                TREE_WIDTH, size, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+        graphics.blit(QUESTS_BACKGROUND_TEXTURE, treeLeft, treeTop + size,
+                TREE_X, TREE_Y + size,
+                size, TREE_HEIGHT - size * 2, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+        graphics.blit(QUESTS_BACKGROUND_TEXTURE, treeLeft + TREE_WIDTH - size, treeTop + size,
+                TREE_X + TREE_WIDTH - size, TREE_Y + size,
+                size, TREE_HEIGHT - size * 2, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+        RenderSystem.disableBlend();
+    }
+
     private void renderChapterSelector(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, boolean interactive) {
         renderChapterSelectorHeader(graphics);
         Rect viewportRect = chapterSelectorViewportRect();
@@ -590,7 +616,7 @@ public class OverhaulQuestScreen extends Screen {
                 Rect headerRect = new Rect(viewportRect.x(), y, CHAPTER_BUTTON_REGULAR_WIDTH, CHAPTER_GROUP_HEADER_HEIGHT);
                 boolean headerHovered = interactive && headerRect.contains(mouseX, mouseY);
                 if (headerRect.intersects(viewportRect)) {
-                    int headerColor = headerHovered ? 0xFFFFFFFF : 0xFFF0E4CB;
+                    int headerColor = UiColors.get(headerHovered ? UiColors.GROUP_HEADER_TEXT_HOVER : UiColors.GROUP_HEADER_TEXT);
                     drawScaledString(graphics, Component.literal(collapsed ? ">" : "v"),
                             headerRect.x() + 4, headerRect.y() + CHAPTER_GROUP_TEXT_Y_OFFSET, headerColor, CHAPTER_GROUP_TEXT_SCALE, true);
                     drawScaledString(graphics, trim(chapter.groupTitle(), headerRect.width() - 17, CHAPTER_GROUP_TEXT_SCALE),
@@ -656,8 +682,10 @@ public class OverhaulQuestScreen extends Screen {
         int textY = Mth.floor(buttonRect.y() + (buttonRect.height() - scaledTextHeight) * 0.5F) + CHAPTER_SELECTOR_TEXT_Y_OFFSET;
         int availableWidth = buttonRect.maxX() - textLeft - CHAPTER_SELECTOR_TEXT_RIGHT_PADDING;
         int textColor = chapter.progress() >= 100
-                ? selected ? 0xFF9BF27B : hovered ? 0xFF92E574 : 0xFF7BD45F
-                : selected ? 0xFFF2E8D6 : hovered ? 0xFFF6EAD0 : 0xFFE3D5BE;
+                ? UiColors.get(selected ? UiColors.CHAPTER_BUTTON_TEXT_COMPLETED_SELECTED
+                        : hovered ? UiColors.CHAPTER_BUTTON_TEXT_COMPLETED_HOVER : UiColors.CHAPTER_BUTTON_TEXT_COMPLETED)
+                : UiColors.get(selected ? UiColors.CHAPTER_BUTTON_TEXT_SELECTED
+                        : hovered ? UiColors.CHAPTER_BUTTON_TEXT_HOVER : UiColors.CHAPTER_BUTTON_TEXT);
         renderScrollingChapterLabel(graphics, chapter.title(), buttonRect, textLeft, textY, availableWidth, textColor, hovered || selected);
     }
 
@@ -665,7 +693,7 @@ public class OverhaulQuestScreen extends Screen {
         Rect headerRect = chapterSelectorHeaderRect();
         int titleY = headerRect.y() + Math.max(0, (headerRect.height() - Math.round(font.lineHeight * CHAPTER_SELECTOR_TITLE_SCALE)) / 2);
         int titleCenterX = headerRect.x() + CHAPTER_BUTTON_REGULAR_WIDTH / 2;
-        drawCenteredScaledString(graphics, CHAPTER_SELECTOR_TITLE, titleCenterX, titleY, 0xFFFFFFFF, CHAPTER_SELECTOR_TITLE_SCALE, true);
+        drawCenteredScaledString(graphics, CHAPTER_SELECTOR_TITLE, titleCenterX, titleY, UiColors.get(UiColors.SELECTOR_TITLE_TEXT), CHAPTER_SELECTOR_TITLE_SCALE, true);
     }
 
     private void renderChapterSelectorBottomShadow(GuiGraphics graphics, Rect viewportRect, QuestDataSnapshot snapshot) {
@@ -715,7 +743,7 @@ public class OverhaulQuestScreen extends Screen {
                 + separatorWidth
                 + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING
                 + ACTIVE_CHAPTER_TITLE_ICON_SIZE;
-        int color = chapter.progress() >= 100 ? 0xFF9BF27B : 0xFFFFFFFF;
+        int color = UiColors.get(chapter.progress() >= 100 ? UiColors.CHAPTER_TITLE_TEXT_COMPLETED : UiColors.CHAPTER_TITLE_TEXT);
         int drawX = titleBandRect.x() + Math.max(0, (titleBandRect.width() - totalWidth) / 2);
 
         if (totalWidth > titleBandRect.width()) {
@@ -1610,10 +1638,10 @@ public class OverhaulQuestScreen extends Screen {
                 topRightRect(frameRect, STATUS_NOTIFICATION_ICON_WIDTH, STATUS_NOTIFICATION_ICON_HEIGHT, -1, -1));
         drawScaledString(graphics,
                 trim(quest.title(), (int) ((header.width() - TITLE_X - 26) / MODAL_TEXT_SCALE)),
-                header.x() + TITLE_X, headerTextY, 0xFFF6EDDB, MODAL_TEXT_SCALE, true);
+                header.x() + TITLE_X, headerTextY, UiColors.get(UiColors.MODAL_TITLE_TEXT), MODAL_TEXT_SCALE, true);
 
         int closeX = header.maxX() - 18;
-        drawCenteredScaledString(graphics, Component.literal("x"), closeX + 5, headerTextY, 0xFFE9DFC7, MODAL_TEXT_SCALE, true);
+        drawCenteredScaledString(graphics, Component.literal("x"), closeX + 5, headerTextY, UiColors.get(UiColors.MODAL_CLOSE_TEXT), MODAL_TEXT_SCALE, true);
         clickTargets.add(new ClickTarget(new Rect(closeX, header.y() + 4, 12, 12), this::closeViewedQuest));
 
         graphics.enableScissor(body.x(), body.y(), body.maxX(), body.maxY());
@@ -1624,7 +1652,7 @@ public class OverhaulQuestScreen extends Screen {
         contentY += 10;
 
         for (FormattedCharSequence line : layout.descriptionLines()) {
-            drawCenteredScaledString(graphics, line, body.centerX(), contentY, 0xFFF0E2C5, MODAL_DESCRIPTION_SCALE);
+            drawCenteredScaledString(graphics, line, body.centerX(), contentY, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
             contentY += Math.max(7, Math.round(font.lineHeight * MODAL_DESCRIPTION_SCALE));
         }
         contentY += 8;
@@ -1714,7 +1742,7 @@ public class OverhaulQuestScreen extends Screen {
         int contentY = y + sectionLayout.labelHeight() + MODAL_SECTION_LABEL_GAP;
         int contentX = x + Math.max(0, (sectionLayout.width() - sectionLayout.contentWidth()) / 2);
         if (tasks.isEmpty()) {
-            drawScaledString(graphics, sectionLayout.emptyText(), contentX, contentY, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
+            drawScaledString(graphics, sectionLayout.emptyText(), contentX, contentY, UiColors.get(UiColors.MODAL_SECTION_EMPTY_TEXT), MODAL_SECTION_NOTE_SCALE);
             return y + sectionLayout.height();
         }
 
@@ -1730,7 +1758,7 @@ public class OverhaulQuestScreen extends Screen {
             Rect hoverRect = new Rect(cellX, cellY, sectionLayout.cellWidth(), sectionLayout.cellHeight());
             renderTaskIcon(graphics, task, iconRect);
             int countY = iconRect.maxY() + MODAL_SECTION_COUNT_GAP;
-            int countColor = (task.completed() || task.progressSatisfied()) ? 0xFF6FE142 : 0xFFF6ECD6;
+            int countColor = UiColors.get((task.completed() || task.progressSatisfied()) ? UiColors.MODAL_SECTION_COUNT_DONE_TEXT : UiColors.MODAL_SECTION_COUNT_TEXT);
             drawCenteredScaledString(graphics, requirementCountLabel(task), cellX + sectionLayout.cellWidth() / 2, countY, countColor, MODAL_SECTION_COUNT_SCALE);
             modalTooltipTargets.add(new TooltipTarget(hoverRect, buildTaskTooltip(task)));
         }
@@ -1754,7 +1782,7 @@ public class OverhaulQuestScreen extends Screen {
         int contentY = y + sectionLayout.labelHeight() + MODAL_SECTION_LABEL_GAP;
         int contentX = x + Math.max(0, (sectionLayout.width() - sectionLayout.contentWidth()) / 2);
         if (rewards.isEmpty()) {
-            drawScaledString(graphics, sectionLayout.emptyText(), contentX, contentY, 0xFFC8B08C, MODAL_SECTION_NOTE_SCALE);
+            drawScaledString(graphics, sectionLayout.emptyText(), contentX, contentY, UiColors.get(UiColors.MODAL_SECTION_EMPTY_TEXT), MODAL_SECTION_NOTE_SCALE);
             return y + sectionLayout.height();
         }
 
@@ -1770,7 +1798,7 @@ public class OverhaulQuestScreen extends Screen {
             Rect hoverRect = new Rect(cellX, cellY, sectionLayout.cellWidth(), sectionLayout.cellHeight());
             reward.icon().draw(graphics, iconRect.x(), iconRect.y(), iconRect.width(), iconRect.height());
             int countY = iconRect.maxY() + MODAL_SECTION_COUNT_GAP;
-            int countColor = reward.claimed() ? 0xFF6FE142 : 0xFFF6ECD6;
+            int countColor = UiColors.get(reward.claimed() ? UiColors.MODAL_SECTION_COUNT_DONE_TEXT : UiColors.MODAL_SECTION_COUNT_TEXT);
             drawCenteredScaledString(graphics, reward.countLabel(), cellX + sectionLayout.cellWidth() / 2, countY, countColor, MODAL_SECTION_COUNT_SCALE);
             modalTooltipTargets.add(new TooltipTarget(hoverRect, buildRewardTooltip(reward)));
         }
@@ -1781,7 +1809,7 @@ public class OverhaulQuestScreen extends Screen {
     private void drawSectionHeading(GuiGraphics graphics, Component label, int x, int y, int width) {
         int labelHeight = Math.max(8, Math.round(font.lineHeight * MODAL_SECTION_LABEL_SCALE));
         int textY = y;
-        drawCenteredScaledString(graphics, withColon(label), x + width / 2, textY, 0xFFF6ECD6, MODAL_SECTION_LABEL_SCALE);
+        drawCenteredScaledString(graphics, withColon(label), x + width / 2, textY, UiColors.get(UiColors.MODAL_SECTION_LABEL_TEXT), MODAL_SECTION_LABEL_SCALE);
     }
 
     private void renderScrollArrow(GuiGraphics graphics, int x, int y, boolean up, boolean active) {
@@ -2463,9 +2491,9 @@ public class OverhaulQuestScreen extends Screen {
                     ? Component.translatable(SCREEN_KEY + "tooltip.task.completed")
                     : Component.translatable(SCREEN_KEY + "tooltip.task.tracked_automatically");
         };
-        tooltip.add(state.copy().withStyle(task.completed() ? Style.EMPTY.withColor(0x75D65C) : Style.EMPTY.withColor(0xD9BE96)));
+        tooltip.add(state.copy().withStyle(task.completed() ? Style.EMPTY.withColor(UiColors.rgb(UiColors.TOOLTIP_TASK_DONE_TEXT)) : Style.EMPTY.withColor(UiColors.rgb(UiColors.TOOLTIP_TASK_PENDING_TEXT))));
         if (!task.fallbackReason().getString().isBlank()) {
-            tooltip.add(task.fallbackReason().copy().withStyle(Style.EMPTY.withColor(0xC8B08C)));
+            tooltip.add(task.fallbackReason().copy().withStyle(Style.EMPTY.withColor(UiColors.rgb(UiColors.TOOLTIP_FALLBACK_TEXT))));
         }
         return tooltip;
     }
@@ -2492,10 +2520,10 @@ public class OverhaulQuestScreen extends Screen {
                     ? Component.translatable(SCREEN_KEY + "tooltip.reward.use_complete_or_default_ui")
                     : Component.translatable(SCREEN_KEY + "tooltip.reward.locked");
         };
-        int color = reward.canClaim() ? 0x7DE25E : reward.claimed() ? 0xB6B6B6 : 0xD5B58C;
+        int color = UiColors.rgb(reward.canClaim() ? UiColors.TOOLTIP_REWARD_CLAIMABLE_TEXT : reward.claimed() ? UiColors.TOOLTIP_REWARD_CLAIMED_TEXT : UiColors.TOOLTIP_REWARD_PENDING_TEXT);
         tooltip.add(state.copy().withStyle(Style.EMPTY.withColor(color)));
         if (!reward.fallbackReason().getString().isBlank()) {
-            tooltip.add(reward.fallbackReason().copy().withStyle(Style.EMPTY.withColor(0xC8B08C)));
+            tooltip.add(reward.fallbackReason().copy().withStyle(Style.EMPTY.withColor(UiColors.rgb(UiColors.TOOLTIP_FALLBACK_TEXT))));
         }
         return tooltip;
     }
@@ -2716,9 +2744,9 @@ public class OverhaulQuestScreen extends Screen {
             return;
         }
 
-        graphics.fill(trackRect.x(), trackRect.y(), trackRect.maxX(), trackRect.maxY(), 0x44271410);
+        graphics.fill(trackRect.x(), trackRect.y(), trackRect.maxX(), trackRect.maxY(), UiColors.get(UiColors.SCROLLBAR_TRACK));
         graphics.fill(thumbRect.x(), thumbRect.y(), thumbRect.maxX(), thumbRect.maxY(),
-                chapterScrollbarDragging ? 0xFFF0E2C5 : 0xCCBFA68A);
+                UiColors.get(chapterScrollbarDragging ? UiColors.SCROLLBAR_THUMB_DRAGGING : UiColors.SCROLLBAR_THUMB));
     }
 
     private Rect chapterSelectorViewportRect() {
@@ -2905,8 +2933,8 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void drawSectionDivider(GuiGraphics graphics, int x, int width, int y) {
-        graphics.fill(x, y, x + width, y + 1, 0x88664B30);
-        graphics.fill(x, y + 1, x + width, y + 2, 0x44180F0B);
+        graphics.fill(x, y, x + width, y + 1, UiColors.get(UiColors.SECTION_DIVIDER));
+        graphics.fill(x, y + 1, x + width, y + 2, UiColors.get(UiColors.SECTION_DIVIDER_SHADOW));
     }
 
     private void drawScaledString(GuiGraphics graphics, Component component, int x, int y, int color, float scale) {
@@ -2970,11 +2998,11 @@ public class OverhaulQuestScreen extends Screen {
         int firstLineWidth = Math.round(font.width(firstLine) * MODAL_TEXT_SCALE);
         int lineX = layout.bodyRect().centerX() - firstLineWidth / 2;
 
-        drawScaledString(graphics, firstLine, lineX, y, 0xFF6FE142, MODAL_TEXT_SCALE);
+        drawScaledString(graphics, firstLine, lineX, y, UiColors.get(UiColors.MODAL_OBJECTIVE_TEXT), MODAL_TEXT_SCALE);
         y += 10;
 
         for (int i = 1; i < layout.objectiveLines().size(); i++) {
-            drawCenteredScaledString(graphics, layout.objectiveLines().get(i), layout.bodyRect().centerX(), y, 0xFF6FE142, MODAL_TEXT_SCALE);
+            drawCenteredScaledString(graphics, layout.objectiveLines().get(i), layout.bodyRect().centerX(), y, UiColors.get(UiColors.MODAL_OBJECTIVE_TEXT), MODAL_TEXT_SCALE);
             y += 8;
         }
 

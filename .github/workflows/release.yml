@@ -1,0 +1,65 @@
+# Builds the mod and uploads it to CurseForge whenever a version tag is pushed.
+#
+# Usage:
+#   1. Make sure mod_version in gradle.properties matches the tag (e.g. 1.0.2 -> v1.0.2)
+#   2. Update the top section of CHANGELOG.md (it becomes the CurseForge changelog)
+#   3. git tag v1.0.2 && git push origin v1.0.2
+#
+# One-time setup: add a repository secret named CURSEFORGE_TOKEN
+# (GitHub repo > Settings > Secrets and variables > Actions). Generate the
+# token at https://authors.curseforge.com/account/api-tokens
+
+name: Release to CurseForge
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # -Dorg.gradle.java.home overrides the Windows-specific java home
+      # hardcoded in gradle.properties for local development.
+      - name: Build
+        run: ./gradlew build --no-daemon "-Dorg.gradle.java.home=$JAVA_HOME"
+
+      - name: Collect version, jar path, and latest changelog section
+        id: meta
+        run: |
+          VERSION=$(grep '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+          MC=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+          LOADER=$(grep '^mod_loader=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+          JAR="build/libs/ftb-quests-ui-overhaul-${LOADER}-${MC}-${VERSION}.jar"
+          test -f "$JAR" || { echo "Expected jar not found: $JAR"; ls build/libs; exit 1; }
+          echo "jar=$JAR" >> "$GITHUB_OUTPUT"
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            awk '/^## /{ if (found) exit; found=1 } found' CHANGELOG.md
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload to CurseForge
+        uses: itsmeow/curseforge-upload@v3
+        with:
+          token: ${{ secrets.CURSEFORGE_TOKEN }}
+          project_id: "1564772"
+          game_endpoint: minecraft
+          file_path: ${{ steps.meta.outputs.jar }}
+          changelog_type: markdown
+          changelog: ${{ steps.meta.outputs.changelog }}
+          game_versions: "Minecraft 1.20:1.20.1,Forge,Client,Java 17"
+          release_type: release

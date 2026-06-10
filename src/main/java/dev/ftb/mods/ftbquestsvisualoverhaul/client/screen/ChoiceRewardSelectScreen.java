@@ -2,6 +2,7 @@ package dev.ftb.mods.ftbquestsvisualoverhaul.client.screen;
 
 import dev.ftb.mods.ftbquests.quest.loot.WeightedReward;
 import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.UiColors;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestActionRouter;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestUiFeedback;
 import dev.ftb.mods.ftblibrary.ui.CursorType;
@@ -63,11 +64,11 @@ public class ChoiceRewardSelectScreen extends Screen {
         drawInsetBorder(graphics, header, 0xFFD6A85C, 0xAA3E2B13);
 
         reward.getIcon().draw(graphics, header.x() + 7, header.y() + 6, 16, 16);
-        drawCenteredScaledString(graphics, Component.translatable(SCREEN_KEY + "title"), header.centerX(), header.y() + 6, 0xFFF6EDDB, TEXT_SCALE);
-        drawCenteredScaledString(graphics, trim(reward.getQuest().getTitle(), header.width() - 52), header.centerX(), header.y() + 16, 0xFFD8C49D, TEXT_SCALE);
+        drawCenteredScaledString(graphics, Component.translatable(SCREEN_KEY + "title"), header.centerX(), header.y() + 6, UiColors.get(UiColors.CHOICE_TITLE_TEXT), TEXT_SCALE);
+        drawCenteredScaledString(graphics, trim(reward.getQuest().getTitle(), header.width() - 52), header.centerX(), header.y() + 16, UiColors.get(UiColors.CHOICE_SUBTITLE_TEXT), TEXT_SCALE);
 
         Rect closeRect = new Rect(header.maxX() - 18, header.y() + 4, 12, 12);
-        drawCenteredScaledString(graphics, Component.literal("x"), closeRect.centerX(), closeRect.y() + 4, 0xFFF6E8C9, TEXT_SCALE);
+        drawCenteredScaledString(graphics, Component.literal("x"), closeRect.centerX(), closeRect.y() + 4, UiColors.get(UiColors.CHOICE_CLOSE_TEXT), TEXT_SCALE);
         targets.add(new RowTarget(closeRect, -1));
 
         graphics.enableScissor(body.x(), body.y(), body.maxX(), body.maxY());
@@ -81,12 +82,12 @@ public class ChoiceRewardSelectScreen extends Screen {
             drawInsetBorder(graphics, rowRect, hovered ? 0xFFB8894D : 0x88634731, 0x55201510);
 
             choice.getReward().getIcon().draw(graphics, rowRect.x() + 3, rowRect.y() + 2, 14, 14);
-            drawScaledString(graphics, trim(choice.getReward().getTitle(), rowRect.width() - 74), rowRect.x() + 22, rowRect.y() + 6, 0xFFF0E2C5, TEXT_SCALE);
+            drawScaledString(graphics, trim(choice.getReward().getTitle(), rowRect.width() - 74), rowRect.x() + 22, rowRect.y() + 6, UiColors.get(UiColors.CHOICE_ROW_TEXT), TEXT_SCALE);
 
             Component action = Component.translatable(SCREEN_KEY + "choose");
             int actionWidth = Math.round(font.width(action) * TEXT_SCALE);
             int actionX = rowRect.maxX() - actionWidth - 6;
-            drawScaledString(graphics, action, actionX, rowRect.y() + 6, hovered ? 0xFFF4DCB6 : 0xFFC8A97C, TEXT_SCALE);
+            drawScaledString(graphics, action, actionX, rowRect.y() + 6, UiColors.get(hovered ? UiColors.CHOICE_ACTION_TEXT_HOVER : UiColors.CHOICE_ACTION_TEXT), TEXT_SCALE);
 
             targets.add(new RowTarget(rowRect, i));
             contentY += ROW_HEIGHT + ROW_GAP;
@@ -97,8 +98,8 @@ public class ChoiceRewardSelectScreen extends Screen {
             int indicatorX = body.maxX() - 10;
             boolean canScrollUp = scroll > 0D;
             boolean canScrollDown = scroll < layout.contentHeight() - body.height();
-            drawCenteredScaledString(graphics, Component.literal("^"), indicatorX, body.y() - 2, canScrollUp ? 0xFFE7D0A8 : 0xAA77644A, TEXT_SCALE);
-            drawCenteredScaledString(graphics, Component.literal("v"), indicatorX, body.maxY() - 8, canScrollDown ? 0xFFE7D0A8 : 0xAA77644A, TEXT_SCALE);
+            drawCenteredScaledString(graphics, Component.literal("^"), indicatorX, body.y() - 2, UiColors.get(canScrollUp ? UiColors.CHOICE_SCROLL_INDICATOR : UiColors.CHOICE_SCROLL_INDICATOR_DISABLED), TEXT_SCALE);
+            drawCenteredScaledString(graphics, Component.literal("v"), indicatorX, body.maxY() - 8, UiColors.get(canScrollDown ? UiColors.CHOICE_SCROLL_INDICATOR : UiColors.CHOICE_SCROLL_INDICATOR_DISABLED), TEXT_SCALE);
         }
         graphics.pose().popPose();
         CursorType.set(isInteractiveTargetHovered(mouseX, mouseY) ? CursorType.HAND : null);
