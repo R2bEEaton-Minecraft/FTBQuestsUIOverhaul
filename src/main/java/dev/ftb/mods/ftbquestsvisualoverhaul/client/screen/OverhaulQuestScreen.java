@@ -69,9 +69,9 @@ public class OverhaulQuestScreen extends Screen {
 
     // --- Tree panel area within the background texture ---
     private static final int TREE_X = 119;
-    private static final int TREE_Y = 19;
+    private static final int TREE_Y = 27;
     private static final int TREE_WIDTH = 248;
-    private static final int TREE_HEIGHT = 173;
+    private static final int TREE_HEIGHT = 166;
     private static final int CHAPTER_SELECTOR_X = 15;
     private static final int CHAPTER_SELECTOR_Y = 13;
     private static final int CHAPTER_SELECTOR_TITLE_HEIGHT = 10;
@@ -106,13 +106,13 @@ public class OverhaulQuestScreen extends Screen {
     private static final int MODE_SWITCH_BUTTON_PADDING_X = 6;
     private static final int MODE_SWITCH_BUTTON_MIN_WIDTH = 64;
     private static final int MODE_SWITCH_BUTTON_MARGIN = 8;
-    private static final int ACTIVE_CHAPTER_TITLE_TOP_PADDING = 12;
+    private static final int ACTIVE_CHAPTER_TITLE_TOP_PADDING = 16;
     private static final int ACTIVE_CHAPTER_TITLE_BOTTOM_PADDING = 4;
     private static final int ACTIVE_CHAPTER_TITLE_SIDE_PADDING = 5;
     private static final int ACTIVE_CHAPTER_TITLE_ICON_SIZE = 10;
     private static final int ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING = 4;
     private static final int ACTIVE_CHAPTER_TITLE_Y_OFFSET = -1;
-    private static final float ACTIVE_CHAPTER_TITLE_TEXT_Y_OFFSET = 0.5F;
+    private static final float ACTIVE_CHAPTER_TITLE_TEXT_Y_OFFSET = 0.0F;
     private static final float ACTIVE_CHAPTER_TITLE_ICON_EXTRA_Y_OFFSET = -0.5F;
     private static final float ACTIVE_CHAPTER_TITLE_ICON_Y_OFFSET = 2.0F;
     private static final Component CHAPTER_SELECTOR_TITLE = Component.translatable(SCREEN_KEY + "section_title.chapter_selector");
@@ -590,12 +590,11 @@ public class OverhaulQuestScreen extends Screen {
                 Rect headerRect = new Rect(viewportRect.x(), y, CHAPTER_BUTTON_REGULAR_WIDTH, CHAPTER_GROUP_HEADER_HEIGHT);
                 boolean headerHovered = interactive && headerRect.contains(mouseX, mouseY);
                 if (headerRect.intersects(viewportRect)) {
-                    graphics.fill(headerRect.x(), headerRect.y() + 1, headerRect.maxX() - 4, headerRect.maxY() - 1,
-                            headerHovered ? 0x99221712 : 0x77140E0C);
+                    int headerColor = headerHovered ? 0xFFFFFFFF : 0xFFF0E4CB;
                     drawScaledString(graphics, Component.literal(collapsed ? ">" : "v"),
-                            headerRect.x() + 4, headerRect.y() + CHAPTER_GROUP_TEXT_Y_OFFSET, 0xFFF0E4CB, CHAPTER_GROUP_TEXT_SCALE);
+                            headerRect.x() + 4, headerRect.y() + CHAPTER_GROUP_TEXT_Y_OFFSET, headerColor, CHAPTER_GROUP_TEXT_SCALE, true);
                     drawScaledString(graphics, trim(chapter.groupTitle(), headerRect.width() - 17, CHAPTER_GROUP_TEXT_SCALE),
-                            headerRect.x() + 13, headerRect.y() + CHAPTER_GROUP_TEXT_Y_OFFSET, 0xFFF0E4CB, CHAPTER_GROUP_TEXT_SCALE);
+                            headerRect.x() + 13, headerRect.y() + CHAPTER_GROUP_TEXT_Y_OFFSET, headerColor, CHAPTER_GROUP_TEXT_SCALE, true);
                 }
                 if (interactive) {
                     addClippedClickTarget(headerRect, viewportRect, () -> toggleChapterGroup(chapter.groupId()));
@@ -666,7 +665,7 @@ public class OverhaulQuestScreen extends Screen {
         Rect headerRect = chapterSelectorHeaderRect();
         int titleY = headerRect.y() + Math.max(0, (headerRect.height() - Math.round(font.lineHeight * CHAPTER_SELECTOR_TITLE_SCALE)) / 2);
         int titleCenterX = headerRect.x() + CHAPTER_BUTTON_REGULAR_WIDTH / 2;
-        drawCenteredScaledString(graphics, CHAPTER_SELECTOR_TITLE, titleCenterX, titleY, 0xFFF2E8D6, CHAPTER_SELECTOR_TITLE_SCALE);
+        drawCenteredScaledString(graphics, CHAPTER_SELECTOR_TITLE, titleCenterX, titleY, 0xFFFFFFFF, CHAPTER_SELECTOR_TITLE_SCALE, true);
     }
 
     private void renderChapterSelectorBottomShadow(GuiGraphics graphics, Rect viewportRect, QuestDataSnapshot snapshot) {
@@ -716,7 +715,7 @@ public class OverhaulQuestScreen extends Screen {
                 + separatorWidth
                 + ACTIVE_CHAPTER_TITLE_ELEMENT_SPACING
                 + ACTIVE_CHAPTER_TITLE_ICON_SIZE;
-        int color = chapter.progress() >= 100 ? 0xFF9BF27B : 0xFFF2E8D6;
+        int color = chapter.progress() >= 100 ? 0xFF9BF27B : 0xFFFFFFFF;
         int drawX = titleBandRect.x() + Math.max(0, (titleBandRect.width() - totalWidth) / 2);
 
         if (totalWidth > titleBandRect.width()) {
@@ -3097,14 +3096,14 @@ public class OverhaulQuestScreen extends Screen {
                                              int availableWidth, int color, boolean animate) {
         int textWidth = Math.round(font.width(component) * CHAPTER_SELECTOR_TEXT_SCALE);
         if (textWidth <= availableWidth) {
-            drawScaledString(graphics, component, textLeft, textY, color, CHAPTER_SELECTOR_TEXT_SCALE);
+            drawScaledString(graphics, component, textLeft, textY, color, CHAPTER_SELECTOR_TEXT_SCALE, true);
             return;
         }
 
         int overflow = textWidth - availableWidth;
         int offset = animate ? Mth.floor(getMarqueeOffset(overflow)) : 0;
         graphics.enableScissor(textLeft, buttonRect.y(), textLeft + availableWidth, buttonRect.maxY());
-        drawScaledString(graphics, component, textLeft - offset, textY, color, CHAPTER_SELECTOR_TEXT_SCALE);
+        drawScaledString(graphics, component, textLeft - offset, textY, color, CHAPTER_SELECTOR_TEXT_SCALE, true);
         graphics.disableScissor();
     }
 
