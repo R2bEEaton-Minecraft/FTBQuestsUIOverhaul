@@ -51,5 +51,6 @@
   "screen.ftbquestsvisualoverhaul.tooltip.task.locked": "Locked",
   "screen.ftbquestsvisualoverhaul.tooltip.task.ready": "Ready",
   "screen.ftbquestsvisualoverhaul.tooltip.task.tracked_automatically": "Tracked automatically",
-  "screen.ftbquestsvisualoverhaul.tooltip.task.use_default_ui": "Use default FTB Quests UI"
+  "screen.ftbquestsvisualoverhaul.tooltip.task.use_default_ui": "Use default FTB Quests UI",
+  "screen.ftbquestsvisualoverhaul.tooltip.task.view_recipe": "View recipe"
 }

@@ -3,6 +3,7 @@ package dev.ftb.mods.ftbquestsvisualoverhaul.client.screen;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.ftb.mods.ftblibrary.config.ImageResourceConfig;
 import dev.ftb.mods.ftblibrary.config.ui.SelectImageResourceScreen;
+import dev.ftb.mods.ftbquests.FTBQuests;
 import dev.ftb.mods.ftbquests.client.ClientQuestFile;
 import dev.ftb.mods.ftbquests.client.FTBQuestsClient;
 import dev.ftb.mods.ftbquests.client.gui.quests.QuestScreen;
@@ -12,6 +13,7 @@ import dev.ftb.mods.ftbquests.quest.TeamData;
 import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
 import dev.ftb.mods.ftbquests.quest.reward.Reward;
 import dev.ftb.mods.ftbquests.quest.task.CheckmarkTask;
+import dev.ftb.mods.ftbquests.quest.task.ItemTask;
 import dev.ftb.mods.ftbquests.quest.task.Task;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.UiColors;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestActionRouter;
@@ -1761,6 +1763,7 @@ public class OverhaulQuestScreen extends Screen {
             int countColor = UiColors.get((task.completed() || task.progressSatisfied()) ? UiColors.MODAL_SECTION_COUNT_DONE_TEXT : UiColors.MODAL_SECTION_COUNT_TEXT);
             drawCenteredScaledString(graphics, requirementCountLabel(task), cellX + sectionLayout.cellWidth() / 2, countY, countColor, MODAL_SECTION_COUNT_SCALE);
             modalTooltipTargets.add(new TooltipTarget(hoverRect, buildTaskTooltip(task)));
+            clickTargets.add(new ClickTarget(hoverRect, () -> handleTaskClick(task)));
         }
 
         return y + sectionLayout.height();
@@ -2417,6 +2420,40 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
+    private void handleTaskClick(QuestDataSnapshot.TaskSnapshot taskSnapshot) {
+        Task liveTask = resolveTask(taskSnapshot.id());
+        if (liveTask == null) {
+            return;
+        }
+
+        if (tryOpenTaskRecipe(liveTask)) {
+            return;
+        }
+
+        if (taskSnapshot.interactionMode() == TaskInteractionMode.SUBMIT && taskSnapshot.canInteract()) {
+            actionRouter.submitTask(liveTask);
+            return;
+        }
+
+        if (taskSnapshot.interactionMode() == TaskInteractionMode.VANILLA_FALLBACK || liveTask instanceof ItemTask itemTask && !itemTask.consumesResources()) {
+            openVanillaSelected();
+        }
+    }
+
+    private boolean tryOpenTaskRecipe(Task liveTask) {
+        if (!(liveTask instanceof ItemTask itemTask) || itemTask.consumesResources() || !FTBQuests.getRecipeModHelper().isRecipeModAvailable()) {
+            return false;
+        }
+
+        List<net.minecraft.world.item.ItemStack> validItems = itemTask.getValidDisplayItems();
+        if (validItems.size() != 1) {
+            return false;
+        }
+
+        FTBQuests.getRecipeModHelper().showRecipes(validItems.get(0));
+        return true;
+    }
+
     private void handleRewardClick(QuestDataSnapshot.RewardSnapshot rewardSnapshot) {
         QuestDataSnapshot.QuestSnapshot questSnapshot = QuestDataController.getSnapshot().findQuest(viewState.getViewedQuestId());
         if (questSnapshot != null && questSnapshot.pinned() && questSnapshot.completed()) {
@@ -2487,7 +2524,9 @@ public class OverhaulQuestScreen extends Screen {
             case VANILLA_FALLBACK -> task.canInteract()
                     ? Component.translatable(SCREEN_KEY + "tooltip.task.use_default_ui")
                     : Component.translatable(SCREEN_KEY + "tooltip.task.locked");
-            case READ_ONLY -> task.completed()
+            case READ_ONLY -> canOpenRecipe(task)
+                    ? Component.translatable(SCREEN_KEY + "tooltip.task.view_recipe")
+                    : task.completed()
                     ? Component.translatable(SCREEN_KEY + "tooltip.task.completed")
                     : Component.translatable(SCREEN_KEY + "tooltip.task.tracked_automatically");
         };
@@ -2496,6 +2535,15 @@ public class OverhaulQuestScreen extends Screen {
             tooltip.add(task.fallbackReason().copy().withStyle(Style.EMPTY.withColor(UiColors.rgb(UiColors.TOOLTIP_FALLBACK_TEXT))));
         }
         return tooltip;
+    }
+
+    private boolean canOpenRecipe(QuestDataSnapshot.TaskSnapshot taskSnapshot) {
+        Task liveTask = resolveTask(taskSnapshot.id());
+        if (!(liveTask instanceof ItemTask itemTask) || itemTask.consumesResources() || !FTBQuests.getRecipeModHelper().isRecipeModAvailable()) {
+            return false;
+        }
+
+        return itemTask.getValidDisplayItems().size() == 1;
     }
 
     private List<Component> buildRewardTooltip(QuestDataSnapshot.RewardSnapshot reward) {
