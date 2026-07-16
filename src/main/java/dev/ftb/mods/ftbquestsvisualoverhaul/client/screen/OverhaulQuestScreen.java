@@ -3,6 +3,8 @@ package dev.ftb.mods.ftbquestsvisualoverhaul.client.screen;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.ftb.mods.ftblibrary.config.ImageResourceConfig;
 import dev.ftb.mods.ftblibrary.config.ui.SelectImageResourceScreen;
+import dev.ftb.mods.ftblibrary.util.client.ImageComponent;
+import dev.ftb.mods.ftblibrary.util.client.ImageComponent.ImageAlign;
 import dev.ftb.mods.ftbquests.FTBQuests;
 import dev.ftb.mods.ftbquests.client.ClientQuestFile;
 import dev.ftb.mods.ftbquests.client.FTBQuestsClient;
@@ -206,6 +208,9 @@ public class OverhaulQuestScreen extends Screen {
     private static final int MODAL_SECTION_ICON_GAP_X = 2;
     private static final int MODAL_SECTION_ICON_GAP_Y = 4;
     private static final int MODAL_SECTION_MAX_COLUMNS = 4;
+    private static final int MODAL_DESCRIPTION_BLOCK_GAP = 3;
+    private static final int MODAL_DESCRIPTION_PAGEBREAK_HEIGHT = 12;
+    private static final int MODAL_DESCRIPTION_PAGEBREAK_LABEL_GAP = 2;
     private static final ResourceLocation IN_PROGRESS_WHEEL_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/gui/in_progress_wheel_strip.png");
     private static final int IN_PROGRESS_WHEEL_FRAME_SIZE = 9;
     private static final int IN_PROGRESS_WHEEL_FRAME_COUNT = 48;
@@ -1653,10 +1658,7 @@ public class OverhaulQuestScreen extends Screen {
         drawSectionDivider(graphics, body.x() + MODAL_SECTION_DIVIDER_INSET, body.width() - MODAL_SECTION_DIVIDER_INSET * 2, contentY);
         contentY += 10;
 
-        for (FormattedCharSequence line : layout.descriptionLines()) {
-            drawCenteredScaledString(graphics, line, body.centerX(), contentY, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
-            contentY += Math.max(7, Math.round(font.lineHeight * MODAL_DESCRIPTION_SCALE));
-        }
+        contentY = renderDescriptionBlocks(graphics, layout, body, contentY);
         contentY += 8;
         drawSectionDivider(graphics, body.x() + MODAL_SECTION_DIVIDER_INSET, body.width() - MODAL_SECTION_DIVIDER_INSET * 2, contentY);
         contentY += 10;
@@ -1942,11 +1944,11 @@ public class OverhaulQuestScreen extends Screen {
                 (modalWidth - 64) / MODAL_DESCRIPTION_SCALE
         ));
         List<FormattedCharSequence> objectiveLines = font.split(resolveObjectiveText(quest), textWidth);
-        List<FormattedCharSequence> descriptionLines = flattenDescription(resolveDescription(quest), textWidth);
+        List<DescriptionBlock> descriptionBlocks = buildDescriptionBlocks(quest, textWidth, modalWidth - 64);
         SectionPairLayout sectionLayout = buildRequirementRewardLayout(quest, modalWidth - 48);
 
         int objectiveHeight = 10 + objectiveLines.size() * 8;
-        int descriptionHeight = descriptionLines.size() * Math.max(7, Math.round(font.lineHeight * MODAL_DESCRIPTION_SCALE));
+        int descriptionHeight = measureDescriptionHeight(descriptionBlocks);
         int contentHeight = objectiveHeight + 10 + descriptionHeight + 10 + sectionLayout.height() + MODAL_CONTENT_BOTTOM_PADDING;
 
         int maxHeight = height - MODAL_MARGIN;
@@ -1961,7 +1963,7 @@ public class OverhaulQuestScreen extends Screen {
                 panelRect.width() - MODAL_CONTENT_SIDE_PADDING * 2, footerRect.y() - (headerRect.maxY() + 4) - 6);
 
         viewState.setDetailScroll(clampScroll(viewState.getDetailScroll(), contentHeight, bodyRect.height()));
-        return new DetailLayout(rect, headerRect, panelRect, bodyRect, footerRect, objectiveLines, descriptionLines, sectionLayout, contentHeight);
+        return new DetailLayout(rect, headerRect, panelRect, bodyRect, footerRect, objectiveLines, descriptionBlocks, sectionLayout, contentHeight);
     }
 
     private SectionPairLayout buildRequirementRewardLayout(QuestDataSnapshot.QuestSnapshot quest, int availableWidth) {
@@ -2060,15 +2062,128 @@ public class OverhaulQuestScreen extends Screen {
                 labelHeight + MODAL_SECTION_LABEL_GAP + gridHeight, emptyText);
     }
 
-    private List<FormattedCharSequence> flattenDescription(List<Component> description, int maxWidth) {
-        List<FormattedCharSequence> lines = new ArrayList<>();
-        for (Component component : description) {
-            lines.addAll(font.split(component, maxWidth));
+    private List<DescriptionBlock> buildDescriptionBlocks(QuestDataSnapshot.QuestSnapshot quest, int textWidth, int imageWidth) {
+        List<Component> description = resolveDescription(quest);
+        List<String> rawDescription = resolveRawDescription(quest);
+        List<DescriptionBlock> blocks = new ArrayList<>();
+        int nextPageNumber = 2;
+
+        for (int i = 0; i < description.size(); i++) {
+            Component component = description.get(i);
+            String raw = i < rawDescription.size() ? rawDescription.get(i) : component.getString();
+            if (Quest.PAGEBREAK_CODE.equals(raw)) {
+                if (!blocks.isEmpty()) {
+                    blocks.add(new PageBreakBlock(Component.literal("Page " + nextPageNumber++)));
+                }
+                continue;
+            }
+
+            ImageComponent image = findImageComponent(component);
+            if (image != null) {
+                blocks.add(createImageBlock(image, imageWidth));
+                continue;
+            }
+
+            List<FormattedCharSequence> lines = font.split(component, textWidth);
+            if (!lines.isEmpty()) {
+                blocks.add(new TextBlock(lines));
+            }
         }
-        if (lines.isEmpty()) {
-            lines.addAll(font.split(Component.translatable(SCREEN_KEY + "detail.no_description"), maxWidth));
+
+        if (blocks.isEmpty()) {
+            blocks.add(new TextBlock(font.split(Component.translatable(SCREEN_KEY + "detail.no_description"), textWidth)));
         }
-        return lines;
+
+        return blocks;
+    }
+
+    private List<String> resolveRawDescription(QuestDataSnapshot.QuestSnapshot quest) {
+        Quest liveQuest = resolveQuest(quest.id());
+        if (liveQuest != null) {
+            return liveQuest.getRawDescription();
+        }
+        return quest.description().stream().map(Component::getString).toList();
+    }
+
+    private DescriptionBlock createImageBlock(ImageComponent image, int availableWidth) {
+        int width = Math.max(1, image.width);
+        int height = Math.max(1, image.height);
+        if (image.fit && width > 0) {
+            double scale = availableWidth / (double) width;
+            width = Math.max(1, Mth.floor(width * scale));
+            height = Math.max(1, Mth.floor(height * scale));
+        }
+        return new ImageBlock(image, width, height);
+    }
+
+    private int measureDescriptionHeight(List<DescriptionBlock> descriptionBlocks) {
+        if (descriptionBlocks.isEmpty()) {
+            return 0;
+        }
+
+        int height = 0;
+        for (int i = 0; i < descriptionBlocks.size(); i++) {
+            DescriptionBlock block = descriptionBlocks.get(i);
+            if (i > 0) {
+                height += MODAL_DESCRIPTION_BLOCK_GAP;
+            }
+            if (block instanceof TextBlock textBlock) {
+                height += textBlock.lines().size() * Math.max(7, Math.round(font.lineHeight * MODAL_DESCRIPTION_SCALE));
+            } else if (block instanceof ImageBlock imageBlock) {
+                height += imageBlock.height();
+            } else {
+                height += MODAL_DESCRIPTION_PAGEBREAK_HEIGHT;
+            }
+        }
+        return height;
+    }
+
+    private int renderDescriptionBlocks(GuiGraphics graphics, DetailLayout layout, Rect bodyRect, int startY) {
+        int y = startY;
+        boolean first = true;
+        for (DescriptionBlock block : layout.descriptionBlocks()) {
+            if (!first) {
+                y += MODAL_DESCRIPTION_BLOCK_GAP;
+            }
+            first = false;
+
+            if (block instanceof TextBlock textBlock) {
+                for (FormattedCharSequence line : textBlock.lines()) {
+                    drawScaledString(graphics, line, bodyRect.x(), y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
+                    y += Math.max(7, Math.round(font.lineHeight * MODAL_DESCRIPTION_SCALE));
+                }
+            } else if (block instanceof ImageBlock imageBlock) {
+                int imageX;
+                if (imageBlock.image().align == ImageAlign.CENTER) {
+                    imageX = bodyRect.x() + Math.max(0, (bodyRect.width() - imageBlock.width()) / 2);
+                } else if (imageBlock.image().align == ImageAlign.RIGHT) {
+                    imageX = bodyRect.maxX() - imageBlock.width();
+                } else {
+                    imageX = bodyRect.x();
+                }
+                imageBlock.image().image.draw(graphics, imageX, y, imageBlock.width(), imageBlock.height());
+                y += imageBlock.height();
+            } else if (block instanceof PageBreakBlock pageBreakBlock) {
+                int labelY = y + Math.max(0, (MODAL_DESCRIPTION_PAGEBREAK_HEIGHT - Math.round(font.lineHeight * MODAL_SECTION_NOTE_SCALE)) / 2);
+                drawSectionDivider(graphics, bodyRect.x() + MODAL_SECTION_DIVIDER_INSET, bodyRect.width() - MODAL_SECTION_DIVIDER_INSET * 2, y + MODAL_DESCRIPTION_PAGEBREAK_HEIGHT / 2);
+                drawCenteredScaledString(graphics, pageBreakBlock.label(), bodyRect.centerX(), labelY - MODAL_DESCRIPTION_PAGEBREAK_LABEL_GAP, UiColors.get(UiColors.MODAL_SECTION_EMPTY_TEXT), MODAL_SECTION_NOTE_SCALE);
+                y += MODAL_DESCRIPTION_PAGEBREAK_HEIGHT;
+            }
+        }
+        return y;
+    }
+
+    private ImageComponent findImageComponent(Component component) {
+        for (Component sibling : component.getSiblings()) {
+            if (sibling.getContents() instanceof ImageComponent image) {
+                return image;
+            }
+            ImageComponent nested = findImageComponent(sibling);
+            if (nested != null) {
+                return nested;
+            }
+        }
+        return null;
     }
 
     private Component resolveObjectiveText(QuestDataSnapshot.QuestSnapshot quest) {
@@ -3311,10 +3426,22 @@ public class OverhaulQuestScreen extends Screen {
             Rect bodyRect,
             Rect footerRect,
             List<FormattedCharSequence> objectiveLines,
-            List<FormattedCharSequence> descriptionLines,
+            List<DescriptionBlock> descriptionBlocks,
             SectionPairLayout sectionLayout,
             int contentHeight
     ) {
+    }
+
+    private sealed interface DescriptionBlock permits TextBlock, ImageBlock, PageBreakBlock {
+    }
+
+    private record TextBlock(List<FormattedCharSequence> lines) implements DescriptionBlock {
+    }
+
+    private record ImageBlock(ImageComponent image, int width, int height) implements DescriptionBlock {
+    }
+
+    private record PageBreakBlock(Component label) implements DescriptionBlock {
     }
 
     private record SectionPairLayout(
