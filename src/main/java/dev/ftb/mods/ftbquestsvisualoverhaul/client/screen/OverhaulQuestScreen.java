@@ -42,6 +42,7 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -164,6 +165,8 @@ public class OverhaulQuestScreen extends Screen {
     private static final int STATUS_NOTIFICATION_ICON_HEIGHT = 9;
     private static final int STATUS_OVERLAY_RIGHT_INSET = -1;
     private static final int TREE_PAN_BOUND_PADDING = 12;
+    private static final int TREE_FOCUS_PADDING = 12;
+    private static final int MAX_FOCUS_TARGETS = 8;
     private static final int TREE_EDGE_SHADOW_SIZE = 6;
     private static final double TREE_ZOOM_MIN = 0.5D;
     private static final double TREE_ZOOM_MAX = 1.75D;
@@ -2304,7 +2307,9 @@ public class OverhaulQuestScreen extends Screen {
             }
         }
 
-        if (viewState.getSelectedChapterId() != 0L && snapshot.findChapter(viewState.getSelectedChapterId()) != null) {
+        QuestDataSnapshot.ChapterSnapshot selectedChapter = snapshot.findChapter(viewState.getSelectedChapterId());
+        if (viewState.getSelectedChapterId() != 0L && selectedChapter != null) {
+            frameTreeOnQuests(selectedChapter, resolveChapterFocusTargets(selectedChapter));
             return;
         }
 
@@ -2386,13 +2391,108 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void centerTreeOnQuest(QuestDataSnapshot.ChapterSnapshot chapter, QuestDataSnapshot.QuestSnapshot quest) {
+        frameTreeOnQuests(chapter, List.of(quest));
+    }
+
+    /**
+     * Picks the quests the camera should frame when a chapter is opened without an explicitly
+     * viewed quest. The first non-empty tier wins: the chapter's priority (pinned) quest, then
+     * quests ready to complete or hand out rewards, then - in a chapter with progress - whatever
+     * the player can do next, and finally the chapter's starting quests when nothing has been
+     * started at all. An empty result means "no better idea than the whole chapter".
+     */
+    private List<QuestDataSnapshot.QuestSnapshot> resolveChapterFocusTargets(QuestDataSnapshot.ChapterSnapshot chapter) {
+        List<QuestDataSnapshot.QuestSnapshot> quests = chapter.quests();
+        if (quests.isEmpty()) {
+            return List.of();
+        }
+
+        List<QuestDataSnapshot.QuestSnapshot> priorityQuests = quests.stream()
+                .filter(quest -> isPreferredInProgressQuest(quest, chapter.id()))
+                .toList();
+        if (!priorityQuests.isEmpty()) {
+            return priorityQuests;
+        }
+
+        List<QuestDataSnapshot.QuestSnapshot> readyQuests = quests.stream()
+                .filter(quest -> isReadyToCompleteFocusQuest(quest, chapter.id()))
+                .toList();
+        if (!readyQuests.isEmpty()) {
+            return readyQuests;
+        }
+
+        boolean chapterHasProgress = quests.stream()
+                .anyMatch(quest -> isQuestVisuallyCompleted(quest) || quest.started());
+        if (chapterHasProgress) {
+            // A fully completed chapter yields nothing here, which correctly falls through to
+            // framing the whole chapter rather than snapping back to its starting quests.
+            return quests.stream()
+                    .filter(quest -> !isQuestVisuallyCompleted(quest) && isQuestAvailable(quest))
+                    .toList();
+        }
+
+        return quests.stream()
+                .filter(quest -> quest.dependencyQuestIds().isEmpty())
+                .toList();
+    }
+
+    /**
+     * Pans the tree so the given quests sit in the middle of the viewport, zooming out (never in)
+     * if they do not all fit at the player's current zoom.
+     */
+    private void frameTreeOnQuests(QuestDataSnapshot.ChapterSnapshot chapter, List<QuestDataSnapshot.QuestSnapshot> targets) {
+        if (targets.isEmpty()) {
+            return;
+        }
+
         computeNodeBounds(chapter.quests());
-        Rect nodeRect = getNodeWorldRect(quest);
+        List<Rect> rects = limitFocusRects(targets.stream().map(this::getNodeWorldRect).toList());
+
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        for (Rect rect : rects) {
+            minX = Math.min(minX, rect.x());
+            minY = Math.min(minY, rect.y());
+            maxX = Math.max(maxX, rect.maxX());
+            maxY = Math.max(maxY, rect.maxY());
+        }
+
+        double boxWidth = (maxX - minX) + TREE_FOCUS_PADDING * 2.0D;
+        double boxHeight = (maxY - minY) + TREE_FOCUS_PADDING * 2.0D;
         double zoom = viewState.getTreeZoom();
-        viewState.setTreePanX(TREE_WIDTH / 2.0D - nodeRect.centerX() * zoom);
-        viewState.setTreePanY(TREE_HEIGHT / 2.0D - nodeRect.centerY() * zoom);
+        double fitZoom = Math.min(TREE_WIDTH / boxWidth, TREE_HEIGHT / boxHeight);
+        if (fitZoom < zoom) {
+            zoom = Math.max(fitZoom, TREE_ZOOM_MIN);
+            viewState.setTreeZoom(zoom);
+        }
+
+        viewState.setTreePanX(TREE_WIDTH / 2.0D - ((minX + maxX) / 2.0D) * zoom);
+        viewState.setTreePanY(TREE_HEIGHT / 2.0D - ((minY + maxY) / 2.0D) * zoom);
         clampTreePanToQuestBounds();
         centered = true;
+    }
+
+    /**
+     * Keeps a scattered chapter from dragging the camera down to minimum zoom: only the targets
+     * closest to their shared centre are framed.
+     */
+    private List<Rect> limitFocusRects(List<Rect> rects) {
+        if (rects.size() <= MAX_FOCUS_TARGETS) {
+            return rects;
+        }
+
+        double averageX = rects.stream().mapToDouble(Rect::centerX).average().orElse(0.0D);
+        double averageY = rects.stream().mapToDouble(Rect::centerY).average().orElse(0.0D);
+        return rects.stream()
+                .sorted(Comparator.comparingDouble(rect -> {
+                    double dx = rect.centerX() - averageX;
+                    double dy = rect.centerY() - averageY;
+                    return dx * dx + dy * dy;
+                }))
+                .limit(MAX_FOCUS_TARGETS)
+                .toList();
     }
 
     private void acceptQuest(QuestDataSnapshot.QuestSnapshot questSnapshot) {
@@ -2749,6 +2849,8 @@ public class OverhaulQuestScreen extends Screen {
                 QuestDataSnapshot.QuestSnapshot priorityQuest = findPreferredQuestToFocus(snapshot, chapter.id());
                 if (priorityQuest != null) {
                     centerTreeOnQuest(chapter, priorityQuest);
+                } else {
+                    frameTreeOnQuests(chapter, resolveChapterFocusTargets(chapter));
                 }
             }
         }
