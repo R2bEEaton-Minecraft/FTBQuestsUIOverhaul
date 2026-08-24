@@ -9,6 +9,7 @@ import dev.ftb.mods.ftbquests.quest.QuestObject;
 import dev.ftb.mods.ftbquests.quest.TeamData;
 import dev.ftb.mods.ftbquests.quest.reward.ChoiceReward;
 import dev.ftb.mods.ftbquests.quest.reward.Reward;
+import dev.ftb.mods.ftbquests.quest.reward.RewardAutoClaim;
 import dev.ftb.mods.ftbquests.quest.reward.RewardClaimType;
 import dev.ftb.mods.ftbquests.quest.reward.XPLevelsReward;
 import dev.ftb.mods.ftbquests.quest.reward.XPReward;
@@ -88,6 +89,9 @@ public class QuestDataSnapshotBuilder {
                         }
 
                         for (Reward reward : quest.getRewards()) {
+                            if (isHiddenReward(reward, teamData)) {
+                                continue;
+                            }
                             RewardInteractionMode interactionMode = resolveRewardMode(reward);
                             Component fallbackReason = interactionMode == RewardInteractionMode.VANILLA_FALLBACK
                                     ? Component.translatable(DATA_KEY + "fallback.reward_interaction")
@@ -124,7 +128,8 @@ public class QuestDataSnapshotBuilder {
                                 accepted,
                                 teamData.canStartTasks(quest),
                                 quest.hideDetailsUntilStartable() && !teamData.canStartTasks(quest) && !teamData.isCompleted(quest),
-                                playerId != null && teamData.hasUnclaimedRewards(playerId, quest),
+                                playerId != null && teamData.hasUnclaimedRewards(playerId, quest)
+                                        && rewards.stream().anyMatch(QuestDataSnapshot.RewardSnapshot::canClaim),
                                 checkmarkOnly,
                                 quest.streamDependencies()
                                         .filter(Quest.class::isInstance)
@@ -217,6 +222,16 @@ public class QuestDataSnapshotBuilder {
             return itemTask.consumesResources() ? TaskInteractionMode.SUBMIT : TaskInteractionMode.READ_ONLY;
         }
         return TaskInteractionMode.READ_ONLY;
+    }
+
+    /**
+     * Mirrors the visibility rule in FTB Quests' own ViewQuestPanel: rewards flagged invisible
+     * (typically command rewards used for backend bookkeeping) and rewards the team is blocked
+     * from are never shown to the player. Editing happens on the vanilla screen, so unlike
+     * ViewQuestPanel there is no editor exemption here.
+     */
+    private static boolean isHiddenReward(Reward reward, TeamData teamData) {
+        return reward.getAutoClaimType() == RewardAutoClaim.INVISIBLE || teamData.isRewardBlocked(reward);
     }
 
     private static RewardInteractionMode resolveRewardMode(Reward reward) {

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.3
+
+### Navigation
+- Opening the questbook or switching chapters now focuses the camera on your progress instead of the middle of the chapter: your tracked quest, then anything with rewards waiting, then whatever you can do next, and in an untouched chapter its starting quests
+- When several quests need framing, the view zooms out just enough to fit them - it never zooms in past the zoom you chose
+- New rebindable key (default **Space**) re-centers the quest view on your progress, like the default FTB Quests UI
+- New **Tracked Quest** button under the chapter list jumps straight to the quest on your HUD and opens it, so you can untrack it without hunting through chapters - it cycles if you have several tracked
+- New chevron beside the QUEST CHAPTERS title collapses or expands every chapter group at once
+
+### Fixes
+- Rewards marked invisible (commonly command rewards used for backend functionality) are no longer shown in the quest popup
+- Long quest subtitles no longer overflow outside the quest popup
+
 ## 1.0.2
 
 ### Colors

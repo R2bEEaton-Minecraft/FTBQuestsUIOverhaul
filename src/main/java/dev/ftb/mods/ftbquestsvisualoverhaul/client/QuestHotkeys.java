@@ -35,11 +35,36 @@ public final class QuestHotkeys {
             GLFW.GLFW_KEY_F8,
             KEY_CATEGORY
     );
+    private static final KeyMapping RECENTER_VIEW_KEY = new KeyMapping(
+            "key.ftbquestsvisualoverhaul.recenter_view",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_SPACE,
+            KEY_CATEGORY
+    );
     private static final QuestActionRouter ACTION_ROUTER = new QuestActionRouter();
     private static FTBQuestsClientEventHandler pinnedQuestHudHandler;
     private static Field pinnedQuestTextField;
 
     private QuestHotkeys() {
+    }
+
+    /**
+     * Consumed by the quest screen itself rather than the client tick handler, so it only
+     * re-frames the tree while the book is actually open.
+     */
+    public static boolean isRecenterViewKey(int keyCode, int scanCode) {
+        return RECENTER_VIEW_KEY.matches(keyCode, scanCode);
+    }
+
+    /**
+     * Quest ids the player has explicitly tracked, excluding the auto-pin marker. The underlying
+     * set is hash-ordered, so callers that need a stable order must impose one themselves.
+     */
+    public static Set<Long> trackedQuestIds() {
+        if (!ClientQuestFile.exists() || Minecraft.getInstance().player == null) {
+            return Set.of();
+        }
+        return explicitAcceptedQuestIds();
     }
 
     public static void init() {
@@ -50,6 +75,7 @@ public final class QuestHotkeys {
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(UNACCEPT_ALL_KEY);
         event.register(TOGGLE_HIDE_ACCEPTED_KEY);
+        event.register(RECENTER_VIEW_KEY);
     }
 
     @SubscribeEvent

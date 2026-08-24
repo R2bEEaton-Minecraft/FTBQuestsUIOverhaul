@@ -20,6 +20,7 @@ import dev.ftb.mods.ftbquests.quest.task.Task;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.UiColors;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestActionRouter;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestDataController;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestHotkeys;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestUiFeedback;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.QuestDataSnapshot;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.RewardInteractionMode;
@@ -82,7 +83,8 @@ public class OverhaulQuestScreen extends Screen {
     private static final int CHAPTER_SELECTOR_Y = 13;
     private static final int CHAPTER_SELECTOR_TITLE_HEIGHT = 10;
     private static final int CHAPTER_SELECTOR_TITLE_BOTTOM_GAP = 8;
-    private static final int CHAPTER_SELECTOR_BOTTOM_PADDING = 18;
+    private static final int CHAPTER_SELECTOR_BOTTOM_PADDING = 26;
+    private static final int TRACKED_QUEST_BUTTON_GAP = 3;
     private static final int CHAPTER_BUTTON_ACTIVE_WIDTH = 98;
     private static final int CHAPTER_BUTTON_REGULAR_WIDTH = 86;
     private static final int CHAPTER_BUTTON_HEIGHT = 19;
@@ -103,6 +105,8 @@ public class OverhaulQuestScreen extends Screen {
     private static final float CHAPTER_SELECTOR_TEXT_SCALE = 0.6F;
     private static final float CHAPTER_SELECTOR_TITLE_SCALE = 0.7F;
     private static final float CHAPTER_GROUP_TEXT_SCALE = 0.65F;
+    private static final int CHAPTER_GROUP_TOGGLE_ALL_WIDTH = 12;
+    private static final int CHAPTER_GROUP_TOGGLE_ALL_GAP = 2;
     private static final int CHAPTER_GROUP_HEADER_HEIGHT = 15;
     private static final int CREATIVE_TREE_BUTTON_HEIGHT = 10;
     private static final int CREATIVE_TREE_BUTTON_PADDING_X = 4;
@@ -236,6 +240,7 @@ public class OverhaulQuestScreen extends Screen {
     private long focusedChapterId = Long.MIN_VALUE;
     private float fade;
     private boolean centered;
+    private int trackedJumpIndex;
     private boolean openingQuestSnapPending;
     private int tabPage;
     private int maxPages;
@@ -307,6 +312,10 @@ public class OverhaulQuestScreen extends Screen {
         }
         if (keyCode == 256 && viewState.getViewedQuestId() != 0L) {
             closeViewedQuest();
+            return true;
+        }
+        if (viewState.getViewedQuestId() == 0L && QuestHotkeys.isRecenterViewKey(keyCode, scanCode)) {
+            recenterTreeOnProgress();
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -612,7 +621,8 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderChapterSelector(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, boolean interactive) {
-        renderChapterSelectorHeader(graphics);
+        renderChapterSelectorHeader(graphics, snapshot, mouseX, mouseY, interactive);
+        renderTrackedQuestButton(graphics, snapshot, mouseX, mouseY, interactive);
         Rect viewportRect = chapterSelectorViewportRect();
         clampChapterScroll(snapshot);
         int y = viewportRect.y() - Mth.floor(chapterScroll);
@@ -699,11 +709,117 @@ public class OverhaulQuestScreen extends Screen {
         renderScrollingChapterLabel(graphics, chapter.title(), buttonRect, textLeft, textY, availableWidth, textColor, hovered || selected);
     }
 
-    private void renderChapterSelectorHeader(GuiGraphics graphics) {
+    private void renderChapterSelectorHeader(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, boolean interactive) {
         Rect headerRect = chapterSelectorHeaderRect();
         int titleY = headerRect.y() + Math.max(0, (headerRect.height() - Math.round(font.lineHeight * CHAPTER_SELECTOR_TITLE_SCALE)) / 2);
         int titleCenterX = headerRect.x() + CHAPTER_BUTTON_REGULAR_WIDTH / 2;
         drawCenteredScaledString(graphics, CHAPTER_SELECTOR_TITLE, titleCenterX, titleY, UiColors.get(UiColors.SELECTOR_TITLE_TEXT), CHAPTER_SELECTOR_TITLE_SCALE, true);
+
+        List<Long> groupIds = chapterGroupIds(snapshot);
+        if (groupIds.size() < 2) {
+            return;
+        }
+
+        boolean anyExpanded = groupIds.stream().anyMatch(groupId -> !isChapterGroupCollapsed(groupId));
+        // Sits just past the right edge of the centred title rather than at the panel edge.
+        int titleRightX = titleCenterX + Math.round(font.width(CHAPTER_SELECTOR_TITLE) * CHAPTER_SELECTOR_TITLE_SCALE) / 2;
+        int toggleX = Math.min(titleRightX + CHAPTER_GROUP_TOGGLE_ALL_GAP,
+                headerRect.maxX() - CHAPTER_GROUP_TOGGLE_ALL_WIDTH);
+        Rect toggleRect = new Rect(toggleX, headerRect.y(), CHAPTER_GROUP_TOGGLE_ALL_WIDTH, headerRect.height());
+        boolean hovered = interactive && toggleRect.contains(mouseX, mouseY);
+        int color = UiColors.get(hovered ? UiColors.GROUP_HEADER_TEXT_HOVER : UiColors.GROUP_HEADER_TEXT);
+        drawCenteredScaledString(graphics, Component.literal(anyExpanded ? "v" : ">"),
+                toggleRect.centerX(), titleY, color, CHAPTER_GROUP_TEXT_SCALE, true);
+
+        if (interactive) {
+            clickTargets.add(new ClickTarget(toggleRect, () -> setAllChapterGroupsExpanded(!anyExpanded)));
+        }
+    }
+
+    /**
+     * Group ids in selector order, one entry per group that actually renders a header.
+     */
+    private List<Long> chapterGroupIds(QuestDataSnapshot snapshot) {
+        return snapshot.chapters().stream()
+                .filter(QuestDataSnapshot.ChapterSnapshot::firstInGroup)
+                .map(QuestDataSnapshot.ChapterSnapshot::groupId)
+                .toList();
+    }
+
+    private void setAllChapterGroupsExpanded(boolean expanded) {
+        for (Long groupId : chapterGroupIds(QuestDataController.getSnapshot())) {
+            viewState.setChapterGroupExpanded(groupId, expanded);
+        }
+        QuestDataController.markDirty();
+    }
+
+    /**
+     * A jump-to-tracked-quest button below the chapter list. Only drawn when the player actually
+     * has tracked (pinned) quests, so packs where nobody tracks anything lose no space to it.
+     */
+    private void renderTrackedQuestButton(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, boolean interactive) {
+        List<QuestDataSnapshot.QuestSnapshot> tracked = trackedQuests(snapshot);
+        if (tracked.isEmpty()) {
+            return;
+        }
+
+        int index = Math.floorMod(trackedJumpIndex, tracked.size());
+        Component label = tracked.size() == 1
+                ? Component.translatable(SCREEN_KEY + "tracked_quest.jump")
+                : Component.translatable(SCREEN_KEY + "tracked_quest.jump_indexed", index + 1, tracked.size());
+
+        Rect rect = trackedQuestButtonRect();
+        boolean hovered = interactive && rect.contains(mouseX, mouseY);
+        renderCreativeTreeButton(graphics, rect, label, hovered);
+
+        if (interactive) {
+            clickTargets.add(new ClickTarget(rect, () -> {
+                jumpToTrackedQuest(tracked.get(index));
+                trackedJumpIndex = index + 1;
+            }));
+        }
+    }
+
+    private Rect trackedQuestButtonRect() {
+        Rect viewportRect = chapterSelectorViewportRect();
+        return new Rect(viewportRect.x(), viewportRect.maxY() + TRACKED_QUEST_BUTTON_GAP,
+                CHAPTER_BUTTON_REGULAR_WIDTH, CREATIVE_TREE_BUTTON_HEIGHT);
+    }
+
+    /**
+     * Tracked quests still present in the snapshot, in book order. The pinned-id set itself is
+     * hash-ordered, so walking the snapshot instead keeps the cycle button stable and makes it
+     * step through tracked quests the way they are laid out in the chapter list.
+     */
+    private List<QuestDataSnapshot.QuestSnapshot> trackedQuests(QuestDataSnapshot snapshot) {
+        Set<Long> trackedIds = QuestHotkeys.trackedQuestIds();
+        if (trackedIds.isEmpty()) {
+            return List.of();
+        }
+
+        return snapshot.chapters().stream()
+                .flatMap(chapter -> chapter.quests().stream())
+                .filter(quest -> trackedIds.contains(quest.id()))
+                .toList();
+    }
+
+    private void jumpToTrackedQuest(QuestDataSnapshot.QuestSnapshot quest) {
+        QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
+        QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(quest.chapterId());
+        if (chapter == null) {
+            return;
+        }
+
+        // Expand the owning group first, otherwise the chapter row it scrolls to is not rendered.
+        viewState.setChapterGroupExpanded(chapter.groupId(), true);
+        viewState.setSelectedChapterId(chapter.id());
+        focusedChapterId = chapter.id();
+        ensureSelectedChapterVisible(snapshot.chapters(), chapter.id());
+        centerTreeOnQuest(chapter, quest);
+
+        viewState.setViewedQuestId(quest.id());
+        viewState.setDetailScroll(0D);
+        QuestDataController.markDirty();
     }
 
     private void renderChapterSelectorBottomShadow(GuiGraphics graphics, Rect viewportRect, QuestDataSnapshot snapshot) {
@@ -1943,11 +2059,17 @@ public class OverhaulQuestScreen extends Screen {
         int desiredWidth = Math.max(MODAL_MIN_WIDTH, preferredSections.width() + 48);
         int modalWidth = Mth.clamp(desiredWidth, MODAL_MIN_WIDTH, maxModalWidth);
 
-        int textWidth = Math.max(8, Math.round(
+        int descriptionTextWidth = Math.max(8, Math.round(
                 (modalWidth - 64) / MODAL_DESCRIPTION_SCALE
         ));
-        List<FormattedCharSequence> objectiveLines = font.split(resolveObjectiveText(quest), textWidth);
-        List<DescriptionBlock> descriptionBlocks = buildDescriptionBlocks(quest, textWidth, modalWidth - 64);
+        // The objective is drawn at MODAL_TEXT_SCALE into the full body width, so it has to be
+        // wrapped against that scale and width - not the description's - or long subtitles spill
+        // out of the modal.
+        int objectiveTextWidth = Math.max(8, Math.round(
+                (modalWidth - MODAL_CONTENT_SIDE_PADDING * 2 - 20) / MODAL_TEXT_SCALE
+        ));
+        List<FormattedCharSequence> objectiveLines = font.split(resolveObjectiveText(quest), objectiveTextWidth);
+        List<DescriptionBlock> descriptionBlocks = buildDescriptionBlocks(quest, descriptionTextWidth, modalWidth - 64);
         SectionPairLayout sectionLayout = buildRequirementRewardLayout(quest, modalWidth - 48);
 
         int objectiveHeight = 10 + objectiveLines.size() * 8;
@@ -2882,6 +3004,26 @@ public class OverhaulQuestScreen extends Screen {
         if (quest != null) {
             actionRouter.togglePin(quest);
             QuestDataController.markDirty();
+        }
+    }
+
+    /**
+     * Re-runs the same framing the book performs when a chapter is opened. Falls back to the
+     * whole-chapter overview when the chapter offers no progress target. Zoom is left as the
+     * player set it, apart from the zoom-out frameTreeOnQuests may need to fit its targets.
+     */
+    private void recenterTreeOnProgress() {
+        QuestDataSnapshot snapshot = QuestDataController.getSnapshot();
+        QuestDataSnapshot.ChapterSnapshot chapter = snapshot.findChapter(viewState.getSelectedChapterId());
+        if (chapter == null) {
+            return;
+        }
+
+        List<QuestDataSnapshot.QuestSnapshot> targets = resolveChapterFocusTargets(chapter);
+        if (targets.isEmpty()) {
+            centered = false;
+        } else {
+            frameTreeOnQuests(chapter, targets);
         }
     }
 
