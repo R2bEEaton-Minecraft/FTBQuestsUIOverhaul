@@ -3,9 +3,9 @@ package dev.ftb.mods.ftbquestsvisualoverhaul.client.screen;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.ftb.mods.ftblibrary.config.ImageResourceConfig;
 import dev.ftb.mods.ftblibrary.config.ui.SelectImageResourceScreen;
+import dev.ftb.mods.ftblibrary.icon.ItemIcon;
 import dev.ftb.mods.ftblibrary.util.client.ImageComponent;
 import dev.ftb.mods.ftblibrary.util.client.ImageComponent.ImageAlign;
-import dev.ftb.mods.ftbquests.FTBQuests;
 import dev.ftb.mods.ftbquests.client.ClientQuestFile;
 import dev.ftb.mods.ftbquests.client.FTBQuestsClient;
 import dev.ftb.mods.ftbquests.client.gui.quests.QuestScreen;
@@ -25,6 +25,9 @@ import dev.ftb.mods.ftbquestsvisualoverhaul.client.QuestUiFeedback;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.QuestDataSnapshot;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.RewardInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.TaskInteractionMode;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.config.ModClientConfig;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.integration.RecipeViewer;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.DescriptionAlignment;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestOpenContext;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestViewState;
 import dev.ftb.mods.ftbquestsvisualoverhaul.FTBQuestsVisualOverhaul;
@@ -34,6 +37,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
@@ -2273,8 +2277,13 @@ public class OverhaulQuestScreen extends Screen {
             first = false;
 
             if (block instanceof TextBlock textBlock) {
+                boolean centered = ModClientConfig.DESCRIPTION_ALIGNMENT.get() == DescriptionAlignment.CENTER;
                 for (FormattedCharSequence line : textBlock.lines()) {
-                    drawScaledString(graphics, line, bodyRect.x(), y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
+                    if (centered) {
+                        drawCenteredScaledString(graphics, line, bodyRect.centerX(), y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
+                    } else {
+                        drawScaledString(graphics, line, bodyRect.x(), y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
+                    }
                     y += Math.max(7, Math.round(font.lineHeight * MODAL_DESCRIPTION_SCALE));
                 }
             } else if (block instanceof ImageBlock imageBlock) {
@@ -2763,12 +2772,14 @@ public class OverhaulQuestScreen extends Screen {
             return;
         }
 
-        if (tryOpenTaskRecipe(liveTask)) {
+        // Submitting is the only interaction a player can't get anywhere else, so it wins;
+        // everything else prefers the recipe viewer over bouncing out to the default UI.
+        if (taskSnapshot.interactionMode() == TaskInteractionMode.SUBMIT && taskSnapshot.canInteract()) {
+            actionRouter.submitTask(liveTask);
             return;
         }
 
-        if (taskSnapshot.interactionMode() == TaskInteractionMode.SUBMIT && taskSnapshot.canInteract()) {
-            actionRouter.submitTask(liveTask);
+        if (tryOpenTaskRecipe(liveTask)) {
             return;
         }
 
@@ -2778,17 +2789,31 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private boolean tryOpenTaskRecipe(Task liveTask) {
-        if (!(liveTask instanceof ItemTask itemTask) || itemTask.consumesResources() || !FTBQuests.getRecipeModHelper().isRecipeModAvailable()) {
-            return false;
+        return RecipeViewer.showRecipes(taskRecipeStack(liveTask));
+    }
+
+    /**
+     * Picks the stack a requirement icon stands for so clicking it can open the recipe viewer.
+     * Item tasks may accept a whole tag, in which case the first display item is what the icon
+     * is showing when the player clicks; other task types only qualify when their icon is a
+     * plain item.
+     */
+    private ItemStack taskRecipeStack(Task liveTask) {
+        if (liveTask instanceof ItemTask itemTask) {
+            for (ItemStack candidate : itemTask.getValidDisplayItems()) {
+                if (!candidate.isEmpty()) {
+                    return candidate;
+                }
+            }
+            ItemStack configured = itemTask.getItemStack();
+            return configured != null && !configured.isEmpty() ? configured : null;
         }
 
-        List<net.minecraft.world.item.ItemStack> validItems = itemTask.getValidDisplayItems();
-        if (validItems.size() != 1) {
-            return false;
+        if (liveTask.getIcon() instanceof ItemIcon itemIcon && !itemIcon.getStack().isEmpty()) {
+            return itemIcon.getStack();
         }
 
-        FTBQuests.getRecipeModHelper().showRecipes(validItems.get(0));
-        return true;
+        return null;
     }
 
     private void handleRewardClick(QuestDataSnapshot.RewardSnapshot rewardSnapshot) {
@@ -2852,16 +2877,21 @@ public class OverhaulQuestScreen extends Screen {
         tooltip.add(task.title());
         tooltip.add(task.progressText());
 
+        boolean recipeAvailable = canOpenRecipe(task);
         Component state = switch (task.interactionMode()) {
-            case SUBMIT -> task.completed()
-                    ? Component.translatable(SCREEN_KEY + "tooltip.task.completed")
-                    : task.canInteract()
+            case SUBMIT -> task.canInteract()
                     ? Component.translatable(SCREEN_KEY + "tooltip.task.ready")
+                    : task.completed()
+                    ? Component.translatable(SCREEN_KEY + "tooltip.task.completed")
+                    : recipeAvailable
+                    ? Component.translatable(SCREEN_KEY + "tooltip.task.view_recipe")
                     : Component.translatable(SCREEN_KEY + "tooltip.task.locked");
-            case VANILLA_FALLBACK -> task.canInteract()
+            case VANILLA_FALLBACK -> recipeAvailable
+                    ? Component.translatable(SCREEN_KEY + "tooltip.task.view_recipe")
+                    : task.canInteract()
                     ? Component.translatable(SCREEN_KEY + "tooltip.task.use_default_ui")
                     : Component.translatable(SCREEN_KEY + "tooltip.task.locked");
-            case READ_ONLY -> canOpenRecipe(task)
+            case READ_ONLY -> recipeAvailable
                     ? Component.translatable(SCREEN_KEY + "tooltip.task.view_recipe")
                     : task.completed()
                     ? Component.translatable(SCREEN_KEY + "tooltip.task.completed")
@@ -2876,11 +2906,7 @@ public class OverhaulQuestScreen extends Screen {
 
     private boolean canOpenRecipe(QuestDataSnapshot.TaskSnapshot taskSnapshot) {
         Task liveTask = resolveTask(taskSnapshot.id());
-        if (!(liveTask instanceof ItemTask itemTask) || itemTask.consumesResources() || !FTBQuests.getRecipeModHelper().isRecipeModAvailable()) {
-            return false;
-        }
-
-        return itemTask.getValidDisplayItems().size() == 1;
+        return liveTask != null && RecipeViewer.isAvailable() && taskRecipeStack(liveTask) != null;
     }
 
     private List<Component> buildRewardTooltip(QuestDataSnapshot.RewardSnapshot reward) {
