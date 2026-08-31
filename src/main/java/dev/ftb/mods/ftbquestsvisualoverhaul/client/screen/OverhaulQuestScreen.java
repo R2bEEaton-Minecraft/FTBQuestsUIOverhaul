@@ -88,7 +88,9 @@ public class OverhaulQuestScreen extends Screen {
     private static final int CHAPTER_SELECTOR_TITLE_HEIGHT = 10;
     private static final int CHAPTER_SELECTOR_TITLE_BOTTOM_GAP = 8;
     private static final int CHAPTER_SELECTOR_BOTTOM_PADDING = 26;
-    private static final int TRACKED_QUEST_BUTTON_GAP = 3;
+    private static final int TRACKED_QUEST_BUTTON_HEIGHT = 8;
+    private static final int TRACKED_QUEST_BUTTON_PADDING_X = 4;
+    private static final int TRACKED_QUEST_BUTTON_Y_NUDGE = -8;
     private static final int CHAPTER_BUTTON_ACTIVE_WIDTH = 98;
     private static final int CHAPTER_BUTTON_REGULAR_WIDTH = 86;
     private static final int CHAPTER_BUTTON_HEIGHT = 19;
@@ -507,6 +509,7 @@ public class OverhaulQuestScreen extends Screen {
         renderTreeEdgeShadows(graphics, treeLeft, treeTop);
         renderActiveChapterTitle(graphics, snapshot, treeLeft, treeTop);
         renderCreativeTreeControls(graphics, mouseX, mouseY, selectedQuest == null);
+        renderTrackedQuestButton(graphics, snapshot, mouseX, mouseY, selectedQuest == null && updateCursor);
 
         super.render(graphics, mouseX, mouseY, partialTick);
 
@@ -626,7 +629,6 @@ public class OverhaulQuestScreen extends Screen {
 
     private void renderChapterSelector(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, boolean interactive) {
         renderChapterSelectorHeader(graphics, snapshot, mouseX, mouseY, interactive);
-        renderTrackedQuestButton(graphics, snapshot, mouseX, mouseY, interactive);
         Rect viewportRect = chapterSelectorViewportRect();
         clampChapterScroll(snapshot);
         int y = viewportRect.y() - Mth.floor(chapterScroll);
@@ -758,8 +760,8 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     /**
-     * A jump-to-tracked-quest button below the chapter list. Only drawn when the player actually
-     * has tracked (pinned) quests, so packs where nobody tracks anything lose no space to it.
+     * A jump-to-tracked-quest button in the frame strip under the quest tree. Only drawn when the
+     * player actually has tracked (pinned) quests, so packs where nobody tracks anything see nothing.
      */
     private void renderTrackedQuestButton(GuiGraphics graphics, QuestDataSnapshot snapshot, int mouseX, int mouseY, boolean interactive) {
         List<QuestDataSnapshot.QuestSnapshot> tracked = trackedQuests(snapshot);
@@ -772,7 +774,7 @@ public class OverhaulQuestScreen extends Screen {
                 ? Component.translatable(SCREEN_KEY + "tracked_quest.jump")
                 : Component.translatable(SCREEN_KEY + "tracked_quest.jump_indexed", index + 1, tracked.size());
 
-        Rect rect = trackedQuestButtonRect();
+        Rect rect = trackedQuestButtonRect(label);
         boolean hovered = interactive && rect.contains(mouseX, mouseY);
         renderCreativeTreeButton(graphics, rect, label, hovered);
 
@@ -784,10 +786,18 @@ public class OverhaulQuestScreen extends Screen {
         }
     }
 
-    private Rect trackedQuestButtonRect() {
-        Rect viewportRect = chapterSelectorViewportRect();
-        return new Rect(viewportRect.x(), viewportRect.maxY() + TRACKED_QUEST_BUTTON_GAP,
-                CHAPTER_BUTTON_REGULAR_WIDTH, CREATIVE_TREE_BUTTON_HEIGHT);
+    /**
+     * Centred in the frame border strip under the quest tree, sized to its own label. Living below
+     * the tree instead of below the chapter list keeps it clear of the selector; it is centred in
+     * the leftover strip and then nudged up by TRACKED_QUEST_BUTTON_Y_NUDGE.
+     */
+    private Rect trackedQuestButtonRect(Component label) {
+        Rect frame = frameRect();
+        int width = Math.round(font.width(label) * CREATIVE_TREE_BUTTON_TEXT_SCALE) + TRACKED_QUEST_BUTTON_PADDING_X * 2;
+        int treeBottom = TREE_Y + TREE_HEIGHT;
+        int y = treeBottom + (BACKGROUND_HEIGHT - treeBottom - TRACKED_QUEST_BUTTON_HEIGHT) / 2 + TRACKED_QUEST_BUTTON_Y_NUDGE;
+        return new Rect(frame.x() + TREE_X + (TREE_WIDTH - width) / 2, frame.y() + y,
+                width, TRACKED_QUEST_BUTTON_HEIGHT);
     }
 
     /**

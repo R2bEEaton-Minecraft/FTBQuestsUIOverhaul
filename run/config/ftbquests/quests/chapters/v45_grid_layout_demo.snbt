@@ -378,6 +378,29 @@
 			x: 3.0d
 			y: -8.5d
 		}
+		{
+			description: [
+				"Deliberately slow to finish: accepting it pins the quest, but the kill counter only ticks up in-world."
+				"Use this to leave a quest sitting in the tracked state while testing the tracked-quest button."
+			]
+			icon: "minecraft:zombie_head"
+			id: "3000000000002121"
+			rewards: [{
+				id: "3000000000002321"
+				item: "minecraft:rotten_flesh"
+				type: "item"
+			}]
+			subtitle: "Accept without completing"
+			tasks: [{
+				entity: "minecraft:zombie"
+				id: "3000000000002221"
+				type: "kill"
+				value: 10L
+			}]
+			title: "Tracked Quest Test"
+			x: 2.0d
+			y: 2.0d
+		}
 	]
 	subtitle: ["Exact quest count and coordinates copied from the v4.5 monster hunter reference section"]
 	title: "v4.5 Grid Layout Demo"
