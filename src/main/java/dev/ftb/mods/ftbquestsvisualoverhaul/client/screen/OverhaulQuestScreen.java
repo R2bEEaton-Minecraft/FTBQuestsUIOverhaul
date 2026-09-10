@@ -88,9 +88,11 @@ public class OverhaulQuestScreen extends Screen {
     private static final int CHAPTER_SELECTOR_TITLE_HEIGHT = 10;
     private static final int CHAPTER_SELECTOR_TITLE_BOTTOM_GAP = 8;
     private static final int CHAPTER_SELECTOR_BOTTOM_PADDING = 26;
-    private static final int TRACKED_QUEST_BUTTON_HEIGHT = 8;
-    private static final int TRACKED_QUEST_BUTTON_PADDING_X = 4;
-    private static final int TRACKED_QUEST_BUTTON_Y_NUDGE = -8;
+    // The button belongs in the panner's lower bevel, just below its pannable content.
+    private static final int TRACKED_QUEST_BUTTON_SIZE = 11;
+    private static final int TRACKED_QUEST_ICON_SIZE = 9;
+    private static final int TRACKED_QUEST_BUTTON_BOTTOM_INSET = 2;
+    private static final int TRACKED_QUEST_BUTTON_RIGHT_INSET = 2;
     private static final int CHAPTER_BUTTON_ACTIVE_WIDTH = 98;
     private static final int CHAPTER_BUTTON_REGULAR_WIDTH = 86;
     private static final int CHAPTER_BUTTON_HEIGHT = 19;
@@ -147,6 +149,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final ResourceLocation OVERHAUL_LOCK_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/lock.png");
     private static final ResourceLocation OVERHAUL_CHECK_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/checked.png");
     private static final ResourceLocation OVERHAUL_NOTIFICATION_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/notification.png");
+    private static final ResourceLocation TRACKED_QUEST_ICON_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/find_tracked.png");
     private static final ResourceLocation OVERHAUL_UP_ARROW_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/up.png");
     private static final ResourceLocation OVERHAUL_DOWN_ARROW_TEXTURE = new ResourceLocation("ftbquestsvisualoverhaul", "textures/icons/down.png");
     private static final int ADVANCEMENT_PANEL_TEXTURE_WIDTH = 200;
@@ -770,13 +773,10 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         int index = Math.floorMod(trackedJumpIndex, tracked.size());
-        Component label = tracked.size() == 1
-                ? Component.translatable(SCREEN_KEY + "tracked_quest.jump")
-                : Component.translatable(SCREEN_KEY + "tracked_quest.jump_indexed", index + 1, tracked.size());
 
-        Rect rect = trackedQuestButtonRect(label);
+        Rect rect = trackedQuestButtonRect();
         boolean hovered = interactive && rect.contains(mouseX, mouseY);
-        renderCreativeTreeButton(graphics, rect, label, hovered);
+        renderTrackedQuestButton(graphics, rect, hovered);
 
         if (interactive) {
             clickTargets.add(new ClickTarget(rect, () -> {
@@ -787,17 +787,14 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     /**
-     * Centred in the frame border strip under the quest tree, sized to its own label. Living below
-     * the tree instead of below the chapter list keeps it clear of the selector; it is centred in
-     * the leftover strip and then nudged up by TRACKED_QUEST_BUTTON_Y_NUDGE.
+     * Bottom-right corner of the pannable tree viewport itself, matching how the free-pan/change-tile
+     * buttons sit inset in the tree's top corners rather than in the outer frame bevel below it.
      */
-    private Rect trackedQuestButtonRect(Component label) {
+    private Rect trackedQuestButtonRect() {
         Rect frame = frameRect();
-        int width = Math.round(font.width(label) * CREATIVE_TREE_BUTTON_TEXT_SCALE) + TRACKED_QUEST_BUTTON_PADDING_X * 2;
-        int treeBottom = TREE_Y + TREE_HEIGHT;
-        int y = treeBottom + (BACKGROUND_HEIGHT - treeBottom - TRACKED_QUEST_BUTTON_HEIGHT) / 2 + TRACKED_QUEST_BUTTON_Y_NUDGE;
-        return new Rect(frame.x() + TREE_X + (TREE_WIDTH - width) / 2, frame.y() + y,
-                width, TRACKED_QUEST_BUTTON_HEIGHT);
+        int x = TREE_X + TREE_WIDTH - TRACKED_QUEST_BUTTON_RIGHT_INSET - TRACKED_QUEST_BUTTON_SIZE;
+        int y = TREE_Y + TREE_HEIGHT - TRACKED_QUEST_BUTTON_BOTTOM_INSET - TRACKED_QUEST_BUTTON_SIZE;
+        return new Rect(frame.x() + x, frame.y() + y, TRACKED_QUEST_BUTTON_SIZE, TRACKED_QUEST_BUTTON_SIZE);
     }
 
     /**
@@ -951,6 +948,16 @@ public class OverhaulQuestScreen extends Screen {
         float textX = rect.x() + (rect.width() - scaledTextWidth) * 0.5F;
         float textY = rect.y() + (rect.height() - scaledTextHeight) * 0.5F;
         drawScaledString(graphics, label, textX, textY, hovered ? 0xFFFFA0 : 0xE0E0E0, CREATIVE_TREE_BUTTON_TEXT_SCALE);
+    }
+
+    private void renderTrackedQuestButton(GuiGraphics graphics, Rect rect, boolean hovered) {
+        drawVanillaButton(graphics, rect, true, hovered);
+        int iconX = rect.x() + (rect.width() - TRACKED_QUEST_ICON_SIZE) / 2;
+        int iconY = rect.y() + (rect.height() - TRACKED_QUEST_ICON_SIZE) / 2;
+        RenderSystem.enableBlend();
+        graphics.blit(TRACKED_QUEST_ICON_TEXTURE, iconX, iconY, 0, 0.0F, 0.0F,
+                TRACKED_QUEST_ICON_SIZE, TRACKED_QUEST_ICON_SIZE, TRACKED_QUEST_ICON_SIZE, TRACKED_QUEST_ICON_SIZE);
+        RenderSystem.disableBlend();
     }
 
     private void openChapterTitleTextureSelector() {

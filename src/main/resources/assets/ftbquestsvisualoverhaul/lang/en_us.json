@@ -40,8 +40,6 @@
   "screen.ftbquestsvisualoverhaul.choice_reward.choose": "Choose",
   "screen.ftbquestsvisualoverhaul.choice_reward.title": "Choose Reward",
   "screen.ftbquestsvisualoverhaul.creative.change_tile": "Change Tile",
-  "screen.ftbquestsvisualoverhaul.tracked_quest.jump": "Tracked Quest",
-  "screen.ftbquestsvisualoverhaul.tracked_quest.jump_indexed": "Tracked %s/%s",
   "screen.ftbquestsvisualoverhaul.creative.free_pan.off": "Free Pan: Off",
   "screen.ftbquestsvisualoverhaul.creative.free_pan.on": "Free Pan: On",
   "screen.ftbquestsvisualoverhaul.detail.hidden_details": "Details stay hidden until this quest becomes available.",
