@@ -91,6 +91,7 @@ public class OverhaulQuestScreen extends Screen {
     // The button belongs in the panner's lower bevel, just below its pannable content.
     private static final int TRACKED_QUEST_BUTTON_SIZE = 11;
     private static final int TRACKED_QUEST_ICON_SIZE = 9;
+    private static final float TRACKED_QUEST_ICON_SCALE = 0.75F;
     private static final int TRACKED_QUEST_BUTTON_BOTTOM_INSET = 2;
     private static final int TRACKED_QUEST_BUTTON_RIGHT_INSET = 2;
     private static final int CHAPTER_BUTTON_ACTIVE_WIDTH = 98;
@@ -952,11 +953,16 @@ public class OverhaulQuestScreen extends Screen {
 
     private void renderTrackedQuestButton(GuiGraphics graphics, Rect rect, boolean hovered) {
         drawVanillaButton(graphics, rect, true, hovered);
-        int iconX = rect.x() + (rect.width() - TRACKED_QUEST_ICON_SIZE) / 2;
-        int iconY = rect.y() + (rect.height() - TRACKED_QUEST_ICON_SIZE) / 2;
+        float renderSize = TRACKED_QUEST_ICON_SIZE * TRACKED_QUEST_ICON_SCALE;
+        float iconX = rect.x() + (rect.width() - renderSize) * 0.5F;
+        float iconY = rect.y() + (rect.height() - renderSize) * 0.5F;
         RenderSystem.enableBlend();
-        graphics.blit(TRACKED_QUEST_ICON_TEXTURE, iconX, iconY, 0, 0.0F, 0.0F,
+        graphics.pose().pushPose();
+        graphics.pose().translate(iconX, iconY, 0.0F);
+        graphics.pose().scale(TRACKED_QUEST_ICON_SCALE, TRACKED_QUEST_ICON_SCALE, 1.0F);
+        graphics.blit(TRACKED_QUEST_ICON_TEXTURE, 0, 0, 0, 0.0F, 0.0F,
                 TRACKED_QUEST_ICON_SIZE, TRACKED_QUEST_ICON_SIZE, TRACKED_QUEST_ICON_SIZE, TRACKED_QUEST_ICON_SIZE);
+        graphics.pose().popPose();
         RenderSystem.disableBlend();
     }
 
