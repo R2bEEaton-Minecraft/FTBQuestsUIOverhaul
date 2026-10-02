@@ -27,8 +27,8 @@ import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.RewardInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.TaskInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.config.ModClientConfig;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.integration.RecipeViewer;
-import dev.ftb.mods.ftbquestsvisualoverhaul.client.integration.EasyNpcDialogueImmersionBridge;
-import dev.ftb.mods.ftbquestsvisualoverhaul.client.integration.QuestNarrationBridge;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.narration.QuestNarrationPacing;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.narration.QuestNarrationPresenter;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.DescriptionAlignment;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestOpenContext;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestViewState;
@@ -261,7 +261,7 @@ public class OverhaulQuestScreen extends Screen {
     private int maxPages;
     private double chapterScroll;
     private long primaryButtonPressedUntilMs;
-    private final QuestNarrationBridge narrationBridge = EasyNpcDialogueImmersionBridge.create();
+    private final QuestNarrationPresenter narrationPresenter = new QuestNarrationPresenter();
     private long narrationQuestId = Long.MIN_VALUE;
     private String narrationFingerprint = "";
     private String narrationText = "";
@@ -2370,8 +2370,7 @@ public class OverhaulQuestScreen extends Screen {
         narrationStartedAtMs = Util.getMillis();
         previouslyRevealed = 0;
         boolean eligible = !quest.hiddenDetails() && (quest.canStart() || quest.started() || quest.completed());
-        narrationActive = narrationBridge != QuestNarrationBridge.NONE
-                && !text.isEmpty()
+        narrationActive = !text.isEmpty()
                 && QuestDataController.shouldAnimateQuestNarration(quest.id(), fingerprint, eligible);
         if (!narrationActive) previouslyRevealed = text.length();
         // Opening is the one-shot presentation moment, including when the player skips it.
@@ -2380,10 +2379,10 @@ public class OverhaulQuestScreen extends Screen {
 
     private int visibleNarrationCharacters() {
         if (!narrationActive) return narrationText.length();
-        int revealed = Mth.clamp(narrationBridge.revealedCharacterCount(narrationText,
+        int revealed = Mth.clamp(narrationPresenter.revealedCharacterCount(narrationText,
                 Math.max(0L, Util.getMillis() - narrationStartedAtMs)), 0, narrationText.length());
         if (revealed > previouslyRevealed) {
-            narrationBridge.playNewlyRevealed(narrationText.substring(previouslyRevealed, revealed));
+            narrationPresenter.playNewlyRevealed(narrationText.substring(previouslyRevealed, revealed));
             previouslyRevealed = revealed;
         }
         if (revealed >= narrationText.length()) narrationActive = false;
@@ -2446,9 +2445,8 @@ public class OverhaulQuestScreen extends Screen {
         return sink -> {
             final int[] used = {0};
             return source.accept((index, style, codePoint) -> {
-                int width = Character.charCount(codePoint);
-                if (used[0] + width > visibleUtf16Characters) return false;
-                used[0] += width;
+                if (!QuestNarrationPacing.codePointWithinPrefix(used[0], codePoint, visibleUtf16Characters)) return false;
+                used[0] += Character.charCount(codePoint);
                 return sink.accept(index, style, codePoint);
             });
         };
