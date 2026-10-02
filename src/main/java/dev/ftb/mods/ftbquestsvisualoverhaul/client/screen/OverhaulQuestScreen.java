@@ -27,6 +27,8 @@ import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.RewardInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.data.TaskInteractionMode;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.config.ModClientConfig;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.integration.RecipeViewer;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.integration.EasyNpcDialogueImmersionBridge;
+import dev.ftb.mods.ftbquestsvisualoverhaul.client.integration.QuestNarrationBridge;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.DescriptionAlignment;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestOpenContext;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.state.QuestViewState;
@@ -55,6 +57,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 /**
  * Quest screen that replicates the vanilla Minecraft advancements screen
@@ -256,6 +261,13 @@ public class OverhaulQuestScreen extends Screen {
     private int maxPages;
     private double chapterScroll;
     private long primaryButtonPressedUntilMs;
+    private final QuestNarrationBridge narrationBridge = EasyNpcDialogueImmersionBridge.create();
+    private long narrationQuestId = Long.MIN_VALUE;
+    private String narrationFingerprint = "";
+    private String narrationText = "";
+    private long narrationStartedAtMs;
+    private int previouslyRevealed;
+    private boolean narrationActive;
 
     // Scroll bounds tracking (from AdvancementTab)
     private int minNodeX = Integer.MAX_VALUE;
@@ -312,6 +324,11 @@ public class OverhaulQuestScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // Escape deliberately keeps its existing close-modal behavior.
+        if (keyCode != 256 && viewState.getViewedQuestId() != 0L && narrationActive) {
+            revealNarrationImmediately();
+            return true;
+        }
         if (FTBQuestsClient.KEY_QUESTS != null && FTBQuestsClient.KEY_QUESTS.matches(keyCode, scanCode)) {
             if (viewState.getViewedQuestId() != 0L) {
                 closeViewedQuest();
@@ -338,10 +355,14 @@ public class OverhaulQuestScreen extends Screen {
 
         // If a detail modal is open, handle clicks for it first
         if (selectedQuest != null) {
+            DetailLayout layout = buildDetailLayout(selectedQuest);
+            if (button == 0 && narrationActive && layout.bodyRect().contains(mouseX, mouseY)) {
+                revealNarrationImmediately();
+                return true;
+            }
             if (button == 0 && handleClickTargets(mouseX, mouseY)) {
                 return true;
             }
-            DetailLayout layout = buildDetailLayout(selectedQuest);
             if (!modalBounds(layout).contains(mouseX, mouseY)) {
                 closeViewedQuest();
             }
@@ -1763,6 +1784,7 @@ public class OverhaulQuestScreen extends Screen {
         graphics.fill(0, 0, width, height, 0xB015110D);
 
         DetailLayout layout = buildDetailLayout(quest);
+        ensureNarration(quest, layout);
         Rect rect = layout.rect();
         Rect header = layout.headerRect();
         Rect panel = layout.panelRect();
@@ -2291,6 +2313,8 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private int renderDescriptionBlocks(GuiGraphics graphics, DetailLayout layout, Rect bodyRect, int startY) {
+        int visibleCharacters = visibleNarrationCharacters();
+        int characterOffset = 0;
         int y = startY;
         boolean first = true;
         for (DescriptionBlock block : layout.descriptionBlocks()) {
@@ -2302,11 +2326,16 @@ public class OverhaulQuestScreen extends Screen {
             if (block instanceof TextBlock textBlock) {
                 boolean centered = ModClientConfig.DESCRIPTION_ALIGNMENT.get() == DescriptionAlignment.CENTER;
                 for (FormattedCharSequence line : textBlock.lines()) {
+                    String lineText = textOf(line);
+                    int lineVisible = Mth.clamp(visibleCharacters - characterOffset, 0, lineText.length());
+                    FormattedCharSequence visibleLine = takePrefix(line, lineVisible);
                     if (centered) {
-                        drawCenteredScaledString(graphics, line, bodyRect.centerX(), y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
+                        drawCenteredScaledString(graphics, visibleLine, bodyRect.centerX(), y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
                     } else {
-                        drawScaledString(graphics, line, bodyRect.x(), y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
+                        drawScaledString(graphics, visibleLine, bodyRect.x(), y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
                     }
+                    // The separator makes independently wrapped lines and blocks distinct reveal units.
+                    characterOffset += lineText.length() + 1;
                     y += Math.max(7, Math.round(font.lineHeight * MODAL_DESCRIPTION_SCALE));
                 }
             } else if (block instanceof ImageBlock imageBlock) {
@@ -2328,6 +2357,101 @@ public class OverhaulQuestScreen extends Screen {
             }
         }
         return y;
+    }
+
+    private void ensureNarration(QuestDataSnapshot.QuestSnapshot quest, DetailLayout layout) {
+        String text = narrationText(layout.descriptionBlocks());
+        String fingerprint = narrationFingerprint(text, resolveRawDescription(quest));
+        if (narrationQuestId == quest.id() && narrationFingerprint.equals(fingerprint)) return;
+
+        narrationQuestId = quest.id();
+        narrationFingerprint = fingerprint;
+        narrationText = text;
+        narrationStartedAtMs = Util.getMillis();
+        previouslyRevealed = 0;
+        boolean eligible = !quest.hiddenDetails() && (quest.canStart() || quest.started() || quest.completed());
+        narrationActive = narrationBridge != QuestNarrationBridge.NONE
+                && !text.isEmpty()
+                && QuestDataController.shouldAnimateQuestNarration(quest.id(), fingerprint, eligible);
+        if (!narrationActive) previouslyRevealed = text.length();
+        // Opening is the one-shot presentation moment, including when the player skips it.
+        if (narrationActive) QuestDataController.markQuestNarrationSeen(quest.id(), fingerprint);
+    }
+
+    private int visibleNarrationCharacters() {
+        if (!narrationActive) return narrationText.length();
+        int revealed = Mth.clamp(narrationBridge.revealedCharacterCount(narrationText,
+                Math.max(0L, Util.getMillis() - narrationStartedAtMs)), 0, narrationText.length());
+        if (revealed > previouslyRevealed) {
+            narrationBridge.playNewlyRevealed(narrationText.substring(previouslyRevealed, revealed));
+            previouslyRevealed = revealed;
+        }
+        if (revealed >= narrationText.length()) narrationActive = false;
+        return revealed;
+    }
+
+    private void revealNarrationImmediately() {
+        previouslyRevealed = narrationText.length();
+        narrationActive = false;
+    }
+
+    private void resetNarration() {
+        narrationQuestId = Long.MIN_VALUE;
+        narrationFingerprint = "";
+        narrationText = "";
+        previouslyRevealed = 0;
+        narrationActive = false;
+    }
+
+    private String narrationText(List<DescriptionBlock> blocks) {
+        StringBuilder builder = new StringBuilder();
+        for (DescriptionBlock block : blocks) {
+            if (block instanceof TextBlock textBlock) {
+                for (FormattedCharSequence line : textBlock.lines()) {
+                    builder.append(textOf(line)).append('\n');
+                }
+            }
+        }
+        return builder.toString();
+    }
+
+    private String narrationFingerprint(String text, List<String> rawDescription) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            digest.update(text.getBytes(StandardCharsets.UTF_8));
+            digest.update((byte) 0);
+            for (String raw : rawDescription) {
+                digest.update(raw.getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+            }
+            StringBuilder hex = new StringBuilder(64);
+            for (byte value : digest.digest()) hex.append(String.format("%02x", value));
+            return hex.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            return Integer.toHexString((text + rawDescription).hashCode());
+        }
+    }
+
+    private String textOf(FormattedCharSequence text) {
+        StringBuilder builder = new StringBuilder();
+        text.accept((index, style, codePoint) -> {
+            builder.appendCodePoint(codePoint);
+            return true;
+        });
+        return builder.toString();
+    }
+
+    /** Retains the original glyph styles while refusing to split a surrogate pair. */
+    private FormattedCharSequence takePrefix(FormattedCharSequence source, int visibleUtf16Characters) {
+        return sink -> {
+            final int[] used = {0};
+            return source.accept((index, style, codePoint) -> {
+                int width = Character.charCount(codePoint);
+                if (used[0] + width > visibleUtf16Characters) return false;
+                used[0] += width;
+                return sink.accept(index, style, codePoint);
+            });
+        };
     }
 
     private ImageComponent findImageComponent(Component component) {
@@ -2477,7 +2601,7 @@ public class OverhaulQuestScreen extends Screen {
             return;
         }
 
-        viewState.setViewedQuestId(0L);
+        closeViewedQuest();
     }
 
     private QuestDataSnapshot.QuestSnapshot findPreferredQuestToFocus(QuestDataSnapshot snapshot, long chapterId) {
@@ -3087,6 +3211,7 @@ public class OverhaulQuestScreen extends Screen {
     private void closeViewedQuest() {
         viewState.setViewedQuestId(0L);
         viewState.setDetailScroll(0D);
+        resetNarration();
     }
 
     private Reward resolveReward(long id) {

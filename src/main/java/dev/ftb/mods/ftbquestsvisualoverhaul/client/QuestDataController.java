@@ -36,6 +36,10 @@ public class QuestDataController {
             .resolve("ftbquests")
             .resolve("quests")
             .resolve("ftbquestsvisualoverhaul_chapter_groups.properties");
+    private static final Path QUEST_NARRATION_FILE = FMLPaths.CONFIGDIR.get()
+            .resolve("ftbquests")
+            .resolve("quests")
+            .resolve("ftbquestsvisualoverhaul_quest_narration.properties");
     private static final Path LEGACY_TILE_TEXTURES_FILE = FMLPaths.CONFIGDIR.get().resolve("ftbquestsvisualoverhaul_tiles.properties");
 
     private static QuestViewState persistedViewState = new QuestViewState();
@@ -48,11 +52,13 @@ public class QuestDataController {
     private static long lastReadyToClaimQuestId;
     private static ClientQuestFile trackedQuestFile;
     private static UUID trackedPlayerId;
+    private static final Properties questNarrationLedger = new Properties();
 
     static {
         loadPersistentTileTextures();
         loadPersistentFreePanStates();
         loadPersistentChapterGroups();
+        loadQuestNarrationLedger();
     }
 
     private QuestDataController() {
@@ -130,6 +136,23 @@ public class QuestDataController {
     public static void setHiddenAcceptedQuestState(boolean hidden, Set<Long> questIds) {
         persistedViewState.setHideAcceptedQuests(hidden);
         persistedViewState.setHiddenAcceptedQuestIds(questIds);
+    }
+
+    public static boolean shouldAnimateQuestNarration(long questId, String fingerprint, boolean eligible) {
+        return eligible && fingerprint != null && !fingerprint.equals(questNarrationLedger.getProperty(Long.toUnsignedString(questId)));
+    }
+
+    public static void markQuestNarrationSeen(long questId, String fingerprint) {
+        if (fingerprint == null || fingerprint.equals(questNarrationLedger.getProperty(Long.toUnsignedString(questId)))) return;
+        questNarrationLedger.setProperty(Long.toUnsignedString(questId), fingerprint);
+        try {
+            Files.createDirectories(QUEST_NARRATION_FILE.getParent());
+            try (OutputStream stream = Files.newOutputStream(QUEST_NARRATION_FILE)) {
+                questNarrationLedger.store(stream, "FTB Quests UI Overhaul quest narration seen descriptions");
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
     }
 
     private static void refreshClaimableQuestTracker() {
@@ -314,6 +337,15 @@ public class QuestDataController {
         persistedViewState.setChapterTitleTextures(textures);
         if (sourceFile.equals(LEGACY_TILE_TEXTURES_FILE)) {
             savePersistentTileTextures();
+        }
+    }
+
+    private static void loadQuestNarrationLedger() {
+        if (!Files.isRegularFile(QUEST_NARRATION_FILE)) return;
+        try (InputStream stream = Files.newInputStream(QUEST_NARRATION_FILE)) {
+            questNarrationLedger.load(stream);
+        } catch (IOException ex) {
+            ex.printStackTrace();
         }
     }
 

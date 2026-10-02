@@ -108,6 +108,14 @@ dependencies {
     if (file("run/mods-disabled/Placebo-1.20.1-8.6.3.jar").exists()) {
         runtimeOnly fg.deobf("dev.local:Placebo:1.20.1-8.6.3")
     }
+    // Easy NPC uses mixins, so the development runtime must load remapped copies
+    // through ForgeGradle rather than raw production jars from run/mods.
+    if (file("run/mods-disabled/easy_npc-forge-1.20.1-7.12.1.jar").exists()) {
+        runtimeOnly fg.deobf("dev.local:easy_npc-forge-1.20.1:7.12.1")
+        runtimeOnly fg.deobf("dev.local:easy_npc_config_ui-forge-1.20.1:7.12.1")
+        runtimeOnly fg.deobf("dev.local:easy_npc_bundle-forge-1.20.1:7.12.1")
+        runtimeOnly fg.deobf("dev.local:easy-npc-dialogue-immersion-forge-1.20.1:0.3.1")
+    }
 }
 
 tasks.named('processResources', ProcessResources).configure {

@@ -50,3 +50,10 @@ mandatory = true
 versionRange = "[${ftb_quests_version},)"
 ordering = "AFTER"
 side = "BOTH"
+
+[[dependencies.${mod_id}]]
+modId = "easynpcdialogueimmersion"
+mandatory = false
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "CLIENT"
