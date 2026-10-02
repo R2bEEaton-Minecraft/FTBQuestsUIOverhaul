@@ -98,6 +98,9 @@ dependencies {
     // Demo content mod used by the example quest tree under run/config/ftbquests/quests
     runtimeOnly fg.deobf("curse.maven:natures-compass-252848:4712189")
 
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
     // Local dev-only mod kept outside run/mods so ForgeGradle can remap it for userdev.
     if (file("run/mods-disabled/cosmeticarmorreworked-1.20.1-v1a.jar").exists()) {
         runtimeOnly fg.deobf("dev.local:cosmeticarmorreworked:1.20.1-v1a")
@@ -153,4 +156,8 @@ jar {
                 'Implementation-Vendor'  : mod_author
         ])
     }
+}
+
+test {
+    useJUnitPlatform()
 }
