@@ -16,7 +16,7 @@
 - Punctuation pauses: comma 300 ms, period 600 ms, exclamation 500 ms, question mark 600 ms.
 - Preserve existing UTF-16 reveal accounting and code-point-safe styled prefix rendering (do not re-wrap text, do not split surrogate pairs).
 - Play a local `dialogue_blip.ogg` for newly revealed letters/digits only; cap a lagged frame to the newest 8 candidate blips while revealing all visual characters immediately.
-- No new user-facing setting, no network/server behavior.
+- One client-side config toggle, `enable_quest_narration` (default `false`), gates the whole feature; no pack-side control, no speed/sound customization, no network/server behavior.
 - `OverhaulQuestScreen` must not check `ModList` or load any optional-mod class for narration.
 - Remove the optional `easynpcdialogueimmersion` mods.toml declaration and the Easy NPC/ENDI dev-runtime `build.gradle` entries.
 - Restore `forge_version` to `47.2.19` in `gradle.properties`.
@@ -37,7 +37,7 @@
 
 This class has zero Minecraft imports so it runs in the plain `test` source set without the Minecraft/Forge classpath.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```java
 package dev.ftb.mods.ftbquestsvisualoverhaul.client.narration;
@@ -115,12 +115,12 @@ class QuestNarrationPacingTest {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew test --tests "*.QuestNarrationPacingTest"`
 Expected: FAIL (compilation error — `QuestNarrationPacing` does not exist yet).
 
-- [ ] **Step 3: Add JUnit 5 to the build**
+- [x] **Step 3: Add JUnit 5 to the build**
 
 In `build.gradle`, add to the `dependencies { ... }` block (after the existing `runtimeOnly fg.deobf("curse.maven:natures-compass-252848:4712189")` line, before the `run/mods-disabled` conditional blocks):
 
@@ -137,7 +137,7 @@ test {
 }
 ```
 
-- [ ] **Step 4: Write the minimal implementation**
+- [x] **Step 4: Write the minimal implementation**
 
 ```java
 package dev.ftb.mods.ftbquestsvisualoverhaul.client.narration;
@@ -191,12 +191,12 @@ public final class QuestNarrationPacing {
 }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `./gradlew test --tests "*.QuestNarrationPacingTest"`
 Expected: PASS (10 tests).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add build.gradle src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/narration/QuestNarrationPacing.java src/test/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/narration/QuestNarrationPacingTest.java
@@ -221,7 +221,7 @@ git commit -m "Add native stateless quest narration pacing with unit tests"
 
 This task has no unit test: it is thin glue over `Minecraft.getInstance()` and registry wiring, which only a running client can exercise. Verification is the manual client check in Task 4.
 
-- [ ] **Step 1: Copy the sound asset**
+- [x] **Step 1: Copy the sound asset**
 
 ```bash
 mkdir -p "src/main/resources/assets/ftbquestsvisualoverhaul/sounds"
@@ -229,7 +229,7 @@ cp "F:/EasyNPCDialogueImmersion/src/main/resources/assets/easynpcdialogueimmersi
    "src/main/resources/assets/ftbquestsvisualoverhaul/sounds/dialogue_blip.ogg"
 ```
 
-- [ ] **Step 2: Declare the sound**
+- [x] **Step 2: Declare the sound**
 
 Create `src/main/resources/assets/ftbquestsvisualoverhaul/sounds.json`:
 
@@ -243,7 +243,7 @@ Create `src/main/resources/assets/ftbquestsvisualoverhaul/sounds.json`:
 }
 ```
 
-- [ ] **Step 3: Register the SoundEvent**
+- [x] **Step 3: Register the SoundEvent**
 
 ```java
 package dev.ftb.mods.ftbquestsvisualoverhaul.client.narration;
@@ -273,7 +273,7 @@ public final class ModSounds {
 }
 ```
 
-- [ ] **Step 4: Wire registration into mod startup**
+- [x] **Step 4: Wire registration into mod startup**
 
 In `FTBQuestsVisualOverhaul.java`, add an import and call `ModSounds.register(...)` in the constructor:
 
@@ -292,7 +292,7 @@ import dev.ftb.mods.ftbquestsvisualoverhaul.client.narration.ModSounds;
     }
 ```
 
-- [ ] **Step 5: Implement local playback with a minimal overlap guard**
+- [x] **Step 5: Implement local playback with a minimal overlap guard**
 
 ```java
 package dev.ftb.mods.ftbquestsvisualoverhaul.client.narration;
@@ -364,12 +364,12 @@ public final class QuestNarrationSoundPlayer {
 }
 ```
 
-- [ ] **Step 6: Compile to confirm no errors**
+- [x] **Step 6: Compile to confirm no errors**
 
 Run: `./gradlew compileJava`
 Expected: BUILD SUCCESSFUL.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/main/resources/assets/ftbquestsvisualoverhaul/sounds src/main/resources/assets/ftbquestsvisualoverhaul/sounds.json src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/narration/ModSounds.java src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/narration/QuestNarrationSoundPlayer.java src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/FTBQuestsVisualOverhaul.java
@@ -390,7 +390,7 @@ git commit -m "Ship and register a native dialogue_blip sound for quest narratio
 - Consumes: `QuestNarrationPacing.revealedCharacterCount(String, long)` and `QuestNarrationPacing.codePointWithinPrefix(int, int, int)` (Task 1); `new QuestNarrationSoundPlayer().playNewlyRevealed(String)` (Task 2).
 - Produces: `QuestNarrationPresenter.revealedCharacterCount(String text, long elapsedMillis) -> int`, `QuestNarrationPresenter.playNewlyRevealed(String characters) -> void` — the single object `OverhaulQuestScreen` owns for narration.
 
-- [ ] **Step 1: Add the presenter**
+- [x] **Step 1: Add the presenter**
 
 ```java
 package dev.ftb.mods.ftbquestsvisualoverhaul.client.narration;
@@ -409,7 +409,7 @@ public final class QuestNarrationPresenter {
 }
 ```
 
-- [ ] **Step 2: Swap the screen's imports and field**
+- [x] **Step 2: Swap the screen's imports and field**
 
 In `OverhaulQuestScreen.java`, replace (around line 29-31):
 
@@ -439,7 +439,7 @@ with:
     private final QuestNarrationPresenter narrationPresenter = new QuestNarrationPresenter();
 ```
 
-- [ ] **Step 3: Update `ensureNarration` eligibility check**
+- [x] **Step 3: Update `ensureNarration` eligibility check**
 
 Find (around line 2373):
 
@@ -456,7 +456,7 @@ Replace with:
                 && QuestDataController.shouldAnimateQuestNarration(quest.id(), fingerprint, eligible);
 ```
 
-- [ ] **Step 4: Update `visibleNarrationCharacters`**
+- [x] **Step 4: Update `visibleNarrationCharacters`**
 
 Find (around line 2383-2387):
 
@@ -480,7 +480,7 @@ Replace with:
         }
 ```
 
-- [ ] **Step 5: Route `takePrefix` through the pure surrogate-pair-safe helper**
+- [x] **Step 5: Route `takePrefix` through the pure surrogate-pair-safe helper**
 
 Find the existing `takePrefix` method:
 
@@ -515,19 +515,19 @@ Replace with:
     }
 ```
 
-- [ ] **Step 6: Delete the ENDI bridge classes**
+- [x] **Step 6: Delete the ENDI bridge classes**
 
 ```bash
 git rm src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/integration/EasyNpcDialogueImmersionBridge.java
 git rm src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/integration/QuestNarrationBridge.java
 ```
 
-- [ ] **Step 7: Compile and run the full test suite**
+- [x] **Step 7: Compile and run the full test suite**
 
 Run: `./gradlew compileJava test`
 Expected: BUILD SUCCESSFUL, all `QuestNarrationPacingTest` cases still pass (the production code they exercise did not change).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/narration/QuestNarrationPresenter.java src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/screen/OverhaulQuestScreen.java
@@ -547,7 +547,7 @@ git commit -m "Move OverhaulQuestScreen narration onto the native presenter"
 - Consumes: nothing (pure removal/config task); depends on Task 3 being complete so no Java source still references ENDI/Easy NPC classes before this task removes their dev-runtime jars.
 - Produces: nothing consumed by later tasks — this is the last task.
 
-- [ ] **Step 1: Remove the optional mods.toml dependency**
+- [x] **Step 1: Remove the optional mods.toml dependency**
 
 In `src/main/resources/META-INF/mods.toml`, delete the trailing block (currently lines 54-59):
 
@@ -562,7 +562,7 @@ side = "CLIENT"
 
 Leave the file ending after the `ftbquests` dependency block's `side = "BOTH"` line.
 
-- [ ] **Step 2: Remove the Easy NPC/ENDI dev-runtime block from build.gradle**
+- [x] **Step 2: Remove the Easy NPC/ENDI dev-runtime block from build.gradle**
 
 In `build.gradle`, delete:
 
@@ -579,7 +579,7 @@ In `build.gradle`, delete:
 
 leaving the `Placebo` conditional block as the last entry before the closing `}` of `dependencies { ... }`.
 
-- [ ] **Step 3: Restore the Forge baseline**
+- [x] **Step 3: Restore the Forge baseline**
 
 In `gradle.properties`, change:
 
@@ -593,17 +593,17 @@ to:
 forge_version=47.2.19
 ```
 
-- [ ] **Step 4: Confirm no remaining ENDI/Easy NPC references**
+- [x] **Step 4: Confirm no remaining ENDI/Easy NPC references**
 
 Run: `grep -rn "easynpcdialogueimmersion\|easy_npc\|ClientDialogConfig" --include=*.java --include=*.toml --include=*.gradle --include=*.properties . | grep -v "/build/"`
 Expected: no output (the only remaining hits should be the ENDI design doc and handoff doc under `docs/`, which this grep's include filters already exclude).
 
-- [ ] **Step 5: Full clean build**
+- [x] **Step 5: Full clean build**
 
 Run: `./gradlew clean build`
 Expected: BUILD SUCCESSFUL, with no `run/mods-disabled` Easy NPC jars present (confirms the addon's dev classpath no longer needs them).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/resources/META-INF/mods.toml build.gradle gradle.properties
@@ -612,35 +612,125 @@ git commit -m "Drop the optional ENDI dependency and restore the 47.2.19 Forge b
 
 ---
 
-### Task 5: Manual client verification
+### Task 5: Client config toggle, off by default
 
-**Files:** none (manual QA pass; no code changes expected unless a regression is found, in which case fix it in the relevant file from Tasks 1-4 and re-run this task).
+**Files:**
+- Modify: `src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/config/ModClientConfig.java`
+- Modify: `src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/config/ModConfigScreen.java`
+- Modify: `src/main/resources/assets/ftbquestsvisualoverhaul/lang/en_us.json`
+- Modify: `src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/screen/OverhaulQuestScreen.java`
+
+**Interfaces:**
+- Consumes: nothing new.
+- Produces: `ModClientConfig.ENABLE_QUEST_NARRATION` (a `ForgeConfigSpec.BooleanValue`, default `false`), read by `OverhaulQuestScreen.ensureNarration()`.
+
+Follow-up requested after Task 4: the feature needs a simple client-side on/off switch in this addon's own mod config, defaulting to off, with no pack-side control and no other tunables (speed, sound, etc. stay fixed).
+
+- [x] **Step 1: Add the config value**
+
+In `ModClientConfig.java`, add the field declaration next to the other fields:
+
+```java
+    public static final ForgeConfigSpec.BooleanValue ENABLE_QUEST_NARRATION;
+```
+
+and define it in the `"ui"` push block, after `DESCRIPTION_ALIGNMENT`:
+
+```java
+        ENABLE_QUEST_NARRATION = builder
+                .comment("Type out a quest's description the first time you open it, with a typewriter reveal and blip sound.",
+                        "Off by default.")
+                .define("enable_quest_narration", false);
+```
+
+- [x] **Step 2: Add the config screen row**
+
+In `ModConfigScreen.java`, add a row after `show_unknown_type_warning`:
+
+```java
+        addRenderableWidget(booleanOption("enable_quest_narration", x, y,
+                ModClientConfig.ENABLE_QUEST_NARRATION.get(), ModClientConfig.ENABLE_QUEST_NARRATION::set));
+        y += ROW_HEIGHT + 8;
+```
+
+(adjusting the preceding row's trailing `y += ROW_HEIGHT + 8;` back down to `y += ROW_HEIGHT;` so only the last row keeps the extra gap before the Done button).
+
+- [x] **Step 3: Add the translation strings**
+
+In `lang/en_us.json`, add after the `show_unknown_type_warning.tooltip` line:
+
+```json
+  "config.ftbquestsvisualoverhaul.enable_quest_narration": "Quest Narration",
+  "config.ftbquestsvisualoverhaul.enable_quest_narration.tooltip": "Type out a quest's description the first time you open it, with a typewriter reveal and blip sound.",
+```
+
+- [x] **Step 4: Gate narration on the config value**
+
+In `OverhaulQuestScreen.ensureNarration()`, find:
+
+```java
+        narrationActive = !text.isEmpty()
+                && QuestDataController.shouldAnimateQuestNarration(quest.id(), fingerprint, eligible);
+```
+
+Replace with:
+
+```java
+        narrationActive = ModClientConfig.ENABLE_QUEST_NARRATION.get()
+                && !text.isEmpty()
+                && QuestDataController.shouldAnimateQuestNarration(quest.id(), fingerprint, eligible);
+```
+
+Leave the line below it (`if (narrationActive) QuestDataController.markQuestNarrationSeen(...)`) unchanged: the ledger is only marked seen when narration actually played, so turning the toggle on later still gives every quest its one-time animated open, exactly as it did while ENDI was merely absent.
+
+- [x] **Step 5: Compile and run the test suite**
+
+Run: `./gradlew compileJava test`
+Expected: BUILD SUCCESSFUL.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/config/ModClientConfig.java src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/config/ModConfigScreen.java src/main/resources/assets/ftbquestsvisualoverhaul/lang/en_us.json src/main/java/dev/ftb/mods/ftbquestsvisualoverhaul/client/screen/OverhaulQuestScreen.java docs/superpowers/specs/2026-10-02-standalone-quest-narration-design.md docs/superpowers/plans/2026-10-02-standalone-quest-narration.md
+git commit -m "Gate quest narration behind a client config toggle, off by default"
+```
+
+---
+
+### Task 6: Manual client verification
+
+**Files:** none (manual QA pass; no code changes expected unless a regression is found, in which case fix it in the relevant file from Tasks 1-5 and re-run this task).
 
 - [ ] **Step 1: Launch the dev client with no Easy NPC/ENDI jars present**
 
 Run: `./gradlew runClient`
 Expected: client starts with no missing-dependency or classloading errors.
 
-- [ ] **Step 2: Open a fresh eligible quest for the first time**
+- [ ] **Step 2: Confirm the feature is inert by default**
 
-In-game, open a quest that has never been viewed before and has a non-empty description.
+With `enable_quest_narration` left at its default `false`, open a quest that has never been viewed before.
+Expected: the description renders exactly as it did before this feature existed — fully immediate, no typewriter, no blips.
+
+- [ ] **Step 3: Turn the toggle on and open a fresh eligible quest**
+
+In the mod's config screen (Mods list → FTB Quests UI Overhaul → Config), turn on "Quest Narration," then open a quest that has never been viewed before and has a non-empty description.
 Expected: the description types in character-by-character, audibly clicking on letters/digits, pausing longer after `,`/`.`/`!`/`?`.
 
-- [ ] **Step 3: Confirm click/key skip**
+- [ ] **Step 4: Confirm click/key skip**
 
 While the above quest is still typing, click inside the modal body (not on a task/reward/close target) or press a non-Escape key.
 Expected: remaining text reveals instantly; no task/reward is triggered; the modal stays open. Escape still closes the modal as before.
 
-- [ ] **Step 4: Confirm persistence after reopen**
+- [ ] **Step 5: Confirm persistence after reopen**
 
 Close and reopen the same quest (and/or restart the client).
 Expected: the description now renders fully immediately, with no typewriter and no blips.
 
-- [ ] **Step 5: Spot-check images/page-breaks/multi-page descriptions**
+- [ ] **Step 6: Spot-check images/page-breaks/multi-page descriptions**
 
 Open a quest whose description contains an image or page break, and one with a long multi-page description.
 Expected: images/page-breaks keep their layout height from the first frame (no scroll jump); narration still reveals only `TextBlock` content.
 
-- [ ] **Step 6: Record the result**
+- [ ] **Step 7: Record the result**
 
-No commit needed for this task — it is verification only. If a regression is found, fix it as a new commit in the appropriate file from Tasks 1-4, then re-run the affected manual step.
+No commit needed for this task — it is verification only. If a regression is found, fix it as a new commit in the appropriate file from Tasks 1-5, then re-run the affected manual step.

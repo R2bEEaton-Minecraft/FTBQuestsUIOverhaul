@@ -18,6 +18,8 @@
   "config.ftbquestsvisualoverhaul.allow_vanilla_fallback.tooltip": "Allow the mod to temporarily open the default FTB Quests screen for interactions it can't handle itself.",
   "config.ftbquestsvisualoverhaul.show_unknown_type_warning": "Fallback Warning Banner",
   "config.ftbquestsvisualoverhaul.show_unknown_type_warning.tooltip": "Show a warning banner when a task or reward has to be routed to the default UI.",
+  "config.ftbquestsvisualoverhaul.enable_quest_narration": "Quest Narration",
+  "config.ftbquestsvisualoverhaul.enable_quest_narration.tooltip": "Type out a quest's description the first time you open it, with a typewriter reveal and blip sound.",
   "button.ftbquestsvisualoverhaul.clean_ui_mode": "Clean UI Mode",
   "button.ftbquestsvisualoverhaul.editing_mode": "Editing Mode",
   "button.ftbquestsvisualoverhaul.quest_book": "Quest Book",

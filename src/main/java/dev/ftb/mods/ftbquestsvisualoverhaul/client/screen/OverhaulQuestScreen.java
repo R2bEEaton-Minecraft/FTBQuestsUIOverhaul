@@ -2370,7 +2370,8 @@ public class OverhaulQuestScreen extends Screen {
         narrationStartedAtMs = Util.getMillis();
         previouslyRevealed = 0;
         boolean eligible = !quest.hiddenDetails() && (quest.canStart() || quest.started() || quest.completed());
-        narrationActive = !text.isEmpty()
+        narrationActive = ModClientConfig.ENABLE_QUEST_NARRATION.get()
+                && !text.isEmpty()
                 && QuestDataController.shouldAnimateQuestNarration(quest.id(), fingerprint, eligible);
         if (!narrationActive) previouslyRevealed = text.length();
         // Opening is the one-shot presentation moment, including when the player skips it.

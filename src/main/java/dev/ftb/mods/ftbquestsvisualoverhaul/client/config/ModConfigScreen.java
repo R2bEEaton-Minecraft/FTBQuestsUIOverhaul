@@ -31,7 +31,7 @@ public class ModConfigScreen extends Screen {
     @Override
     protected void init() {
         int x = width / 2 - WIDGET_WIDTH / 2;
-        int y = Math.max(40, height / 2 - ROW_HEIGHT * 3);
+        int y = Math.max(40, height / 2 - ROW_HEIGHT * 4);
 
         addRenderableWidget(booleanOption("replace_ftbquests_screen", x, y,
                 ModClientConfig.REPLACE_FTBQUESTS_SCREEN.get(), ModClientConfig.REPLACE_FTBQUESTS_SCREEN::set));
@@ -51,6 +51,10 @@ public class ModConfigScreen extends Screen {
 
         addRenderableWidget(booleanOption("show_unknown_type_warning", x, y,
                 ModClientConfig.SHOW_UNKNOWN_TYPE_WARNING.get(), ModClientConfig.SHOW_UNKNOWN_TYPE_WARNING::set));
+        y += ROW_HEIGHT;
+
+        addRenderableWidget(booleanOption("enable_quest_narration", x, y,
+                ModClientConfig.ENABLE_QUEST_NARRATION.get(), ModClientConfig.ENABLE_QUEST_NARRATION::set));
         y += ROW_HEIGHT + 8;
 
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose())

@@ -12,6 +12,7 @@ public class ModClientConfig {
     public static final ForgeConfigSpec.EnumValue<LayoutMode> DEFAULT_LAYOUT;
     public static final ForgeConfigSpec.BooleanValue SHOW_UNKNOWN_TYPE_WARNING;
     public static final ForgeConfigSpec.EnumValue<DescriptionAlignment> DESCRIPTION_ALIGNMENT;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_QUEST_NARRATION;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -34,6 +35,10 @@ public class ModClientConfig {
                         "CENTER matches the framed UI artwork, LEFT reads more like a book page.",
                         "Images keep whatever alignment the quest author gave them either way.")
                 .defineEnum("description_alignment", DescriptionAlignment.CENTER);
+        ENABLE_QUEST_NARRATION = builder
+                .comment("Type out a quest's description the first time you open it, with a typewriter reveal and blip sound.",
+                        "Off by default.")
+                .define("enable_quest_narration", false);
         builder.pop();
 
         SPEC = builder.build();

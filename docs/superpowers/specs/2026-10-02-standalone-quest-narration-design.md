@@ -15,7 +15,7 @@ The existing first-open ledger, description-only rendering, skip input behavior,
 - Preserve the existing UTF-16 reveal accounting and code-point-safe styled prefix rendering.
 - Play a local copy of ENDI's default `dialogue_blip.ogg` for newly revealed letters and digits only.
 - Cap a lagged frame to the newest eight candidate blips while revealing all visual characters immediately.
-- Do not add a user-facing setting or any network/server behavior.
+- Add one client-side config toggle, `enable_quest_narration` (default `false`), controlled from this addon's own config screen. No pack-side control, no speed/sound customization, and no network/server behavior.
 
 ## Components
 
@@ -34,4 +34,5 @@ The copied sound is stored at `assets/ftbquestsvisualoverhaul/sounds/dialogue_bl
 
 - Unit-test punctuation pacing, including the stock delays and a surrogate-pair-safe visible prefix boundary where practical.
 - Build and run the client with no Easy NPC/ENDI jars present.
-- Manually open a fresh eligible quest and confirm description-only typewriter reveal, punctuation pauses, default blip, click/key skip, and persistence after reopen.
+- Confirm the feature is inert with `enable_quest_narration` at its default `false`: quests render exactly as before, with no typewriter and no blips.
+- With the toggle turned on, manually open a fresh eligible quest and confirm description-only typewriter reveal, punctuation pauses, default blip, click/key skip, and persistence after reopen.
