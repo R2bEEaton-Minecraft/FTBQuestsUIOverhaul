@@ -169,7 +169,7 @@ public class OverhaulQuestScreen extends Screen {
     // proportions instead of being distorted by per-axis normalization.
     private static final double NODE_POSITION_SCALE = 14.0D;
     private static final int NODE_MIN_TILE_GAP = 6;
-    private static final int NODE_LAYOUT_RELAXATION_PASSES = 24;
+    private static final int NODE_LAYOUT_RELAXATION_PASSES = 8;
     private static final int WIDGET_WIDTH = 26;
     private static final int WIDGET_HEIGHT = 26;
     private static final int WIDGET_ICON_X = 8;
@@ -187,9 +187,10 @@ public class OverhaulQuestScreen extends Screen {
     private static final int TREE_FOCUS_PADDING = 12;
     private static final int MAX_FOCUS_TARGETS = 8;
     private static final int TREE_EDGE_SHADOW_SIZE = 6;
-    private static final double TREE_ZOOM_MIN = 0.5D;
+    private static final double TREE_ZOOM_MIN = 0.1D;
     private static final double TREE_ZOOM_MAX = 1.75D;
     private static final double TREE_ZOOM_SCROLL_FACTOR = 1.125D;
+    private static final int MAX_TILE_RENDER_COUNT = 16384;
     private static final int HOVER_OUTGOING_LINE_COLOR = 0xFFF2D34F;
     private static final int HOVER_INCOMING_LINE_COLOR = 0xFF58B9FF;
 
@@ -274,6 +275,10 @@ public class OverhaulQuestScreen extends Screen {
     private int minNodeY = Integer.MAX_VALUE;
     private int maxNodeX = Integer.MIN_VALUE;
     private int maxNodeY = Integer.MIN_VALUE;
+
+    // Node bounds cache — authored positions never change during gameplay,
+    // so bounds only need recomputing when the active chapter switches.
+    private long cachedNodeBoundsChapterId = Long.MIN_VALUE;
 
     public OverhaulQuestScreen(QuestOpenContext openContext) {
         super(Component.translatable(SCREEN_KEY + "screen_title"));
@@ -576,7 +581,12 @@ public class OverhaulQuestScreen extends Screen {
         List<QuestDataSnapshot.QuestSnapshot> quests = chapter.quests();
 
         // Compute node bounds and auto-center (matching AdvancementTab logic)
-        computeNodeBounds(quests);
+        // Authored quest positions never change during gameplay, so bounds only
+        // need recomputing when the active chapter switches.
+        if (focusedChapterId != chapter.id()) {
+            computeNodeBounds(quests);
+            cachedNodeBoundsChapterId = chapter.id();
+        }
         if (!centered && !quests.isEmpty()) {
             // Center the zoomed world bounds inside the viewport.
             viewState.setTreePanX((TREE_WIDTH / 2.0D) - ((maxNodeX + minNodeX) * viewState.getTreeZoom()) / 2.0D);
@@ -597,9 +607,19 @@ public class OverhaulQuestScreen extends Screen {
         }
         graphics.pose().pushPose();
         graphics.pose().translate((float) viewState.getTreePanX(), (float) viewState.getTreePanY(), 0.0F);
-        graphics.pose().scale((float) viewState.getTreeZoom(), (float) viewState.getTreeZoom(), 1.0F);
 
         double zoom = viewState.getTreeZoom();
+
+        // Clamp zoom dynamically so tile count stays under the cap.
+        // This preserves edge-to-edge tiling while preventing tile explosion.
+        double effectiveMinZoom = computeEffectiveMinZoom(TREE_WIDTH, TREE_HEIGHT);
+        if (zoom < effectiveMinZoom) {
+            viewState.setTreeZoom(effectiveMinZoom);
+            zoom = effectiveMinZoom;
+        }
+
+        graphics.pose().scale((float) zoom, (float) zoom, 1.0F);
+
         int firstTileX = Mth.floor((-viewState.getTreePanX() / zoom) / 16.0D) - 1;
         int lastTileX = Mth.ceil((TREE_WIDTH - viewState.getTreePanX()) / zoom / 16.0D) + 1;
         int firstTileY = Mth.floor((-viewState.getTreePanY() / zoom) / 16.0D) - 1;
@@ -1284,6 +1304,18 @@ public class OverhaulQuestScreen extends Screen {
             return 1;
         }
         return ((firstIndex + secondIndex) & 1) == 0 ? 1 : -1;
+    }
+
+    private double computeEffectiveMinZoom(int viewportWidth, int viewportHeight) {
+        double tilesWide = (double) viewportWidth / 16.0D;
+        double tilesTall = (double) viewportHeight / 16.0D;
+        double tiles = tilesWide * tilesTall;
+        if (tiles <= MAX_TILE_RENDER_COUNT) {
+            return TREE_ZOOM_MIN;
+        }
+        // Tile count scales as 1/zoom². Minimum zoom to stay under cap = sqrt(tiles / MAX).
+        double minZoom = Math.sqrt(tiles / MAX_TILE_RENDER_COUNT);
+        return Math.max(minZoom, TREE_ZOOM_MIN);
     }
 
     private void clampTreePanToQuestBounds() {
