@@ -183,7 +183,7 @@ public class OverhaulQuestScreen extends Screen {
     private static final int STATUS_NOTIFICATION_ICON_WIDTH = 9;
     private static final int STATUS_NOTIFICATION_ICON_HEIGHT = 9;
     private static final int STATUS_OVERLAY_RIGHT_INSET = -1;
-    private static final int TREE_PAN_BOUND_PADDING = 12;
+    private static final int TREE_PAN_BOUND_PADDING = 48;
     private static final int TREE_FOCUS_PADDING = 12;
     private static final int MAX_FOCUS_TARGETS = 8;
     private static final int TREE_EDGE_SHADOW_SIZE = 6;
@@ -279,6 +279,7 @@ public class OverhaulQuestScreen extends Screen {
     // Node bounds cache — authored positions never change during gameplay,
     // so bounds only need recomputing when the active chapter switches.
     private long cachedNodeBoundsChapterId = Long.MIN_VALUE;
+    private int cachedNodeBoundsQuestCount = -1;
 
     public OverhaulQuestScreen(QuestOpenContext openContext) {
         super(Component.translatable(SCREEN_KEY + "screen_title"));
@@ -487,7 +488,7 @@ public class OverhaulQuestScreen extends Screen {
         viewState.setTreePanX(relMouseX - contentX * newZoom);
         viewState.setTreePanY(relMouseY - contentY * newZoom);
 
-        computeNodeBounds(chapter.quests());
+        ensureNodeBounds(chapter);
         clampTreePanToQuestBounds();
 
         return true;
@@ -583,10 +584,7 @@ public class OverhaulQuestScreen extends Screen {
         // Compute node bounds and auto-center (matching AdvancementTab logic)
         // Authored quest positions never change during gameplay, so bounds only
         // need recomputing when the active chapter switches.
-        if (focusedChapterId != chapter.id()) {
-            computeNodeBounds(quests);
-            cachedNodeBoundsChapterId = chapter.id();
-        }
+        ensureNodeBounds(chapter);
         if (!centered && !quests.isEmpty()) {
             // Center the zoomed world bounds inside the viewport.
             viewState.setTreePanX((TREE_WIDTH / 2.0D) - ((maxNodeX + minNodeX) * viewState.getTreeZoom()) / 2.0D);
@@ -1160,6 +1158,17 @@ public class OverhaulQuestScreen extends Screen {
         return new Rect(x, y, maxX - x, maxY - y);
     }
 
+    /** Recomputes the bounds only when the chapter, or the set of quests shown in it, changed. */
+    private void ensureNodeBounds(QuestDataSnapshot.ChapterSnapshot chapter) {
+        List<QuestDataSnapshot.QuestSnapshot> quests = chapter.quests();
+        if (cachedNodeBoundsChapterId == chapter.id() && cachedNodeBoundsQuestCount == quests.size()) {
+            return;
+        }
+        computeNodeBounds(quests);
+        cachedNodeBoundsChapterId = chapter.id();
+        cachedNodeBoundsQuestCount = quests.size();
+    }
+
     /**
      * Compute min/max node bounds (matching AdvancementTab.addWidget bounds tracking)
      * from the authored quest positions after mapping them into widget space.
@@ -1329,9 +1338,9 @@ public class OverhaulQuestScreen extends Screen {
         }
 
         double zoom = viewState.getTreeZoom();
-        int padding = TREE_PAN_BOUND_PADDING;
-        double minContent = (minNode - padding) * zoom;
-        double maxContent = (maxNode + padding) * zoom;
+        // Padding is in screen pixels so the margin stays the same when zoomed far out.
+        double minContent = minNode * zoom - TREE_PAN_BOUND_PADDING;
+        double maxContent = maxNode * zoom + TREE_PAN_BOUND_PADDING;
         double contentSize = maxContent - minContent;
         if (contentSize <= viewportSize) {
             return (viewportSize - contentSize) / 2.0D - minContent;
@@ -2754,7 +2763,7 @@ public class OverhaulQuestScreen extends Screen {
             return;
         }
 
-        computeNodeBounds(chapter.quests());
+        ensureNodeBounds(chapter);
         List<Rect> rects = limitFocusRects(targets.stream().map(this::getNodeWorldRect).toList());
 
         int minX = Integer.MAX_VALUE;

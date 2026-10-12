@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.10
+
+### Navigation
+- Fixed the quest view sometimes opening off-centre after switching chapters, caused by the previous chapter's bounds being reused
+- With Free Pan off, the edge of the view now keeps a fixed margin around the nearest quest instead of shrinking as you zoom out, so a fully zoomed-out chapter no longer feels cramped
+
 ## 1.0.3
 
 ### Navigation
