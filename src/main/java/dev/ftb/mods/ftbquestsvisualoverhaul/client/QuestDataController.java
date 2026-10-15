@@ -68,6 +68,12 @@ public class QuestDataController {
         dirty = true;
     }
 
+    /** Marks the snapshot dirty and drops cached quest data; for when the quest file itself changed. */
+    public static void invalidate() {
+        SNAPSHOT_BUILDER.clearCaches();
+        dirty = true;
+    }
+
     public static QuestDataSnapshot getSnapshot() {
         if (dirty && ClientQuestFile.exists()) {
             snapshot = SNAPSHOT_BUILDER.build(ClientQuestFile.INSTANCE.selfTeamData);

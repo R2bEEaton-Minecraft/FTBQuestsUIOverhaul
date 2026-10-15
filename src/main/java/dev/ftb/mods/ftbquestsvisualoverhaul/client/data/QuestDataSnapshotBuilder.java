@@ -25,12 +25,27 @@ import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 public class QuestDataSnapshotBuilder {
     private static final String DATA_KEY = "data.ftbquestsvisualoverhaul.";
+
+    // Quest titles only change when the quest file or language reloads, so the lowercase sort
+    // key is computed once per quest rather than on every comparison of every rebuild.
+    private final Map<Long, String> titleSortKeys = new HashMap<>();
+
+    /** Drops cached per-quest data; call whenever FTB Quests clears its own caches. */
+    public void clearCaches() {
+        titleSortKeys.clear();
+    }
+
+    private String titleSortKey(Quest quest) {
+        return titleSortKeys.computeIfAbsent(quest.getId(), id -> quest.getTitle().getString().toLowerCase(Locale.ROOT));
+    }
 
     public QuestDataSnapshot build(TeamData teamData) {
         List<QuestDataSnapshot.ChapterSnapshot> chapters = new ArrayList<>();
@@ -52,7 +67,7 @@ public class QuestDataSnapshotBuilder {
 
             chapter.getQuests().stream()
                     .filter(quest -> quest.isVisible(teamData))
-                    .sorted(Comparator.comparing(quest -> quest.getTitle().getString().toLowerCase(Locale.ROOT)))
+                    .sorted(Comparator.comparing(this::titleSortKey))
                     .forEach(quest -> {
                         List<QuestDataSnapshot.TaskSnapshot> tasks = new ArrayList<>();
                         List<QuestDataSnapshot.RewardSnapshot> rewards = new ArrayList<>();

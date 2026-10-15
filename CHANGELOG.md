@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.11
+
+### Performance
+- Large quest chapters no longer lag. The quest data was being rebuilt for every chapter 20 times a second while the book was open; it now refreshes a few times a second (faster while a quest is open, so inventory-based task progress stays current)
+- The tiled background is drawn as a single repeating quad instead of thousands of separate tiles, which was the main cost when zoomed far out
+- Quest widgets and connection lines outside the visible area are skipped, and their state is computed once per refresh instead of every frame
+
+### Fixes
+- Fixed a crash when opening a quest with dialogue narration enabled while connected to a server that does not have this mod installed (the dialogue blip sound was being stripped from the client's registry)
+
 ## 1.0.10
 
 ### Navigation

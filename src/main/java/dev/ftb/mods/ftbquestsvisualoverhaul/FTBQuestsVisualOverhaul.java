@@ -3,7 +3,6 @@ package dev.ftb.mods.ftbquestsvisualoverhaul;
 import com.mojang.logging.LogUtils;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.OverhaulClient;
 import dev.ftb.mods.ftbquestsvisualoverhaul.client.config.ModClientConfig;
-import dev.ftb.mods.ftbquestsvisualoverhaul.client.narration.ModSounds;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.PathPackResources;
@@ -31,7 +30,6 @@ public class FTBQuestsVisualOverhaul {
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, ModClientConfig.SPEC);
         MinecraftForge.EVENT_BUS.register(this);
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::addPackFinders);
-        ModSounds.register(FMLJavaModLoadingContext.get().getModEventBus());
 
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> OverhaulClient::init);
     }

@@ -27,6 +27,6 @@ public class OverhaulClient {
         MinecraftForge.EVENT_BUS.register(QuestLauncherButtonInjector.class);
         MinecraftForge.EVENT_BUS.register(CleanUiModeOverlay.class);
         MinecraftForge.EVENT_BUS.register(QuestHotkeys.class);
-        ClearFileCacheEvent.EVENT.register(file -> QuestDataController.markDirty());
+        ClearFileCacheEvent.EVENT.register(file -> QuestDataController.invalidate());
     }
 }

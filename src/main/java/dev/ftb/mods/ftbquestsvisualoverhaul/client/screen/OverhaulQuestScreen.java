@@ -191,6 +191,9 @@ public class OverhaulQuestScreen extends Screen {
     private static final double TREE_ZOOM_MAX = 1.75D;
     private static final double TREE_ZOOM_SCROLL_FACTOR = 1.125D;
     private static final int MAX_TILE_RENDER_COUNT = 16384;
+    private static final int SNAPSHOT_REFRESH_TICKS_TREE = 10;
+    private static final int SNAPSHOT_REFRESH_TICKS_DETAIL = 4;
+    private static final int CULL_MARGIN = 16;
     private static final int HOVER_OUTGOING_LINE_COLOR = 0xFFF2D34F;
     private static final int HOVER_INCOMING_LINE_COLOR = 0xFF58B9FF;
 
@@ -280,6 +283,16 @@ public class OverhaulQuestScreen extends Screen {
     // so bounds only need recomputing when the active chapter switches.
     private long cachedNodeBoundsChapterId = Long.MIN_VALUE;
     private int cachedNodeBoundsQuestCount = -1;
+    private int nodeBoundsVersion;
+
+    // Per-chapter draw data (node state, connection geometry). Derived from the snapshot and the
+    // node layout only, so it is rebuilt when either changes instead of every frame.
+    private int ticksSinceSnapshotRefresh;
+    private QuestDataSnapshot.ChapterSnapshot drawCacheChapter;
+    private int drawCacheBoundsVersion = -1;
+    private final List<QuestDraw> drawCacheQuests = new ArrayList<>();
+    private final List<ConnectionDraw> drawCacheConnections = new ArrayList<>();
+    private final Map<Long, QuestDataSnapshot.QuestSnapshot> drawCacheQuestsById = new HashMap<>();
 
     public OverhaulQuestScreen(QuestOpenContext openContext) {
         super(Component.translatable(SCREEN_KEY + "screen_title"));
@@ -310,7 +323,13 @@ public class OverhaulQuestScreen extends Screen {
         // FTB Quests pushes client progress updates into TeamData, but it only refreshes
         // the vanilla QuestScreen widgets. Rebuild our cached snapshot while this screen
         // is open so inventory-detected task completion and reward claimability stay in sync.
-        QuestDataController.markDirty();
+        // Rebuilding walks every quest in every chapter, so it is throttled: quickly while a
+        // quest is open (inventory-based task progress is shown there), slowly on the tree.
+        int refreshInterval = viewState.getViewedQuestId() != 0L ? SNAPSHOT_REFRESH_TICKS_DETAIL : SNAPSHOT_REFRESH_TICKS_TREE;
+        if (++ticksSinceSnapshotRefresh >= refreshInterval) {
+            ticksSinceSnapshotRefresh = 0;
+            QuestDataController.markDirty();
+        }
     }
 
     @Override
@@ -622,25 +641,34 @@ public class OverhaulQuestScreen extends Screen {
         int lastTileX = Mth.ceil((TREE_WIDTH - viewState.getTreePanX()) / zoom / 16.0D) + 1;
         int firstTileY = Mth.floor((-viewState.getTreePanY() / zoom) / 16.0D) - 1;
         int lastTileY = Mth.ceil((TREE_HEIGHT - viewState.getTreePanY()) / zoom / 16.0D) + 1;
-        for (int tx = firstTileX; tx <= lastTileX; ++tx) {
-            for (int ty = firstTileY; ty <= lastTileY; ++ty) {
-                graphics.blit(tileTexture, tx * 16, ty * 16, 0.0F, 0.0F, 16, 16, 16, 16);
-            }
-        }
+        // One quad whose UVs repeat the 16x16 tile, rather than a blit per tile: a zoomed-out
+        // view otherwise submits thousands of quads every frame.
+        int tilesWide = lastTileX - firstTileX + 1;
+        int tilesTall = lastTileY - firstTileY + 1;
+        graphics.blit(tileTexture, firstTileX * 16, firstTileY * 16, tilesWide * 16, tilesTall * 16,
+                0.0F, 0.0F, tilesWide * 16, tilesTall * 16, 16, 16);
+
+        ensureDrawCache(chapter);
 
         hoveredQuest = findHoveredQuest(quests, mouseX - treeLeft, mouseY - treeTop);
 
+        // World-space rectangle currently visible in the viewport, used to skip off-screen work.
+        double visibleMinX = (-viewState.getTreePanX() / zoom) - CULL_MARGIN;
+        double visibleMaxX = ((TREE_WIDTH - viewState.getTreePanX()) / zoom) + CULL_MARGIN;
+        double visibleMinY = (-viewState.getTreePanY() / zoom) - CULL_MARGIN;
+        double visibleMaxY = ((TREE_HEIGHT - viewState.getTreePanY()) / zoom) + CULL_MARGIN;
+
         // Draw connections (matching AdvancementWidget.drawConnectivity)
         // First pass: black outline, second pass: white center
-        drawAllConnections(graphics, quests, true);
-        drawAllConnections(graphics, quests, false);
+        drawAllConnections(graphics, true, visibleMinX, visibleMinY, visibleMaxX, visibleMaxY);
+        drawAllConnections(graphics, false, visibleMinX, visibleMinY, visibleMaxX, visibleMaxY);
         if (hoveredQuest != null) {
             drawHoveredQuestConnections(graphics, quests, hoveredQuest, true);
             drawHoveredQuestConnections(graphics, quests, hoveredQuest, false);
         }
 
         // Draw widgets (matching AdvancementWidget.draw)
-        drawAllWidgets(graphics, quests, mouseX - treeLeft, mouseY - treeTop);
+        drawAllWidgets(graphics, mouseX - treeLeft, mouseY - treeTop, visibleMinX, visibleMinY, visibleMaxX, visibleMaxY);
 
         graphics.pose().popPose();
         graphics.pose().popPose();
@@ -1146,7 +1174,8 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private Rect getNodeWorldRect(QuestDataSnapshot.QuestSnapshot quest) {
-        return adjustedNodeWorldRects.getOrDefault(quest.id(), getAuthoredNodeWorldRect(quest));
+        Rect adjusted = adjustedNodeWorldRects.get(quest.id());
+        return adjusted != null ? adjusted : getAuthoredNodeWorldRect(quest);
     }
 
     private Rect getNodeScreenRect(QuestDataSnapshot.QuestSnapshot quest) {
@@ -1165,6 +1194,7 @@ public class OverhaulQuestScreen extends Screen {
             return;
         }
         computeNodeBounds(quests);
+        nodeBoundsVersion++;
         cachedNodeBoundsChapterId = chapter.id();
         cachedNodeBoundsQuestCount = quests.size();
     }
@@ -1351,47 +1381,71 @@ public class OverhaulQuestScreen extends Screen {
         return Mth.clamp(pan, minPan, maxPan);
     }
 
+    /**
+     * Rebuilds the per-chapter draw data when the snapshot or the node layout changed.
+     * Quest state (obtained/locked/status) and connection geometry only depend on those two,
+     * so computing them once per snapshot keeps the per-frame cost to drawing alone.
+     */
+    private void ensureDrawCache(QuestDataSnapshot.ChapterSnapshot chapter) {
+        if (drawCacheChapter == chapter && drawCacheBoundsVersion == nodeBoundsVersion) {
+            return;
+        }
+
+        drawCacheQuests.clear();
+        drawCacheConnections.clear();
+        drawCacheQuestsById.clear();
+        for (QuestDataSnapshot.QuestSnapshot quest : chapter.quests()) {
+            drawCacheQuestsById.put(quest.id(), quest);
+        }
+
+        for (QuestDataSnapshot.QuestSnapshot quest : chapter.quests()) {
+            Rect worldRect = getNodeWorldRect(quest);
+            boolean obtained = isQuestObtained(quest);
+            boolean available = isQuestAvailable(quest);
+            drawCacheQuests.add(new QuestDraw(quest, worldRect, obtained, !obtained && !available,
+                    resolvePrimaryActionButtonState(quest).type()));
+
+            Rect childFrameRect = getWidgetFrameWorldRect(worldRect);
+            for (Long depId : quest.dependencyQuestIds()) {
+                QuestDataSnapshot.QuestSnapshot parent = drawCacheQuestsById.get(depId);
+                if (parent == null) continue;
+
+                Rect parentFrameRect = getWidgetFrameWorldRect(getNodeWorldRect(parent));
+                int startX = parentFrameRect.centerX();
+                int startY = parentFrameRect.centerY();
+                int endX = childFrameRect.centerX();
+                int endY = childFrameRect.centerY();
+                drawCacheConnections.add(new ConnectionDraw(startX, (startX + endX) / 2, startY, endX, endY,
+                        isQuestVisuallyCompleted(parent) && available));
+            }
+        }
+
+        drawCacheChapter = chapter;
+        drawCacheBoundsVersion = nodeBoundsVersion;
+    }
+
     // ---- Connection line drawing ----
 
     /**
      * Draws stable advancement-style elbow connections between quest nodes.
      */
-    private void drawAllConnections(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests, boolean outline) {
-        Map<Long, QuestDataSnapshot.QuestSnapshot> questMap = new HashMap<>();
-        for (QuestDataSnapshot.QuestSnapshot q : quests) {
-            questMap.put(q.id(), q);
-        }
-
-        for (QuestDataSnapshot.QuestSnapshot quest : quests) {
-            for (Long depId : quest.dependencyQuestIds()) {
-                QuestDataSnapshot.QuestSnapshot parent = questMap.get(depId);
-                if (parent == null) continue;
-
-                Rect parentRect = getNodeWorldRect(parent);
-                Rect childRect = getNodeWorldRect(quest);
-                Rect parentFrameRect = getWidgetFrameWorldRect(parentRect);
-                Rect childFrameRect = getWidgetFrameWorldRect(childRect);
-
-                int lineColor = outline ? 0xFF000000 : isQuestVisuallyCompleted(parent) && isQuestAvailable(quest) ? 0xFF35E041 : 0xFFFFFFFF;
-
-                int startX = parentFrameRect.centerX();
-                int startY = parentFrameRect.centerY();
-                int endX = childFrameRect.centerX();
-                int endY = childFrameRect.centerY();
-                int bendX = (startX + endX) / 2;
-                int thickness = outline ? 3 : 1;
-
-                drawElbowLine(graphics, startX, bendX, startY, endX, endY, thickness, lineColor);
+    private void drawAllConnections(GuiGraphics graphics, boolean outline,
+                                    double visibleMinX, double visibleMinY, double visibleMaxX, double visibleMaxY) {
+        int thickness = outline ? 3 : 1;
+        for (ConnectionDraw connection : drawCacheConnections) {
+            if (connection.maxX() < visibleMinX || connection.minX() > visibleMaxX
+                    || connection.maxY() < visibleMinY || connection.minY() > visibleMaxY) {
+                continue;
             }
+            int lineColor = outline ? 0xFF000000 : connection.active() ? 0xFF35E041 : 0xFFFFFFFF;
+            drawElbowLine(graphics, connection.startX(), connection.bendX(), connection.startY(),
+                    connection.endX(), connection.endY(), thickness, lineColor);
         }
     }
 
     private void drawHoveredQuestConnections(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests,
                                              QuestDataSnapshot.QuestSnapshot hovered, boolean outline) {
-        Map<Long, QuestDataSnapshot.QuestSnapshot> questMap = new HashMap<>();
-        for (QuestDataSnapshot.QuestSnapshot quest : quests) {
-            questMap.put(quest.id(), quest);
-        }
+        Map<Long, QuestDataSnapshot.QuestSnapshot> questMap = drawCacheQuestsById;
 
         int thickness = outline ? 5 : 3;
         for (Long depId : hovered.dependencyQuestIds()) {
@@ -1475,15 +1529,23 @@ public class OverhaulQuestScreen extends Screen {
      * - V = 128 + widgetType * 26 (128=obtained, 154=unobtained)
      * - Then render item icon at (scrollX + x + 8, scrollY + y + 5)
      */
-    private void drawAllWidgets(GuiGraphics graphics, List<QuestDataSnapshot.QuestSnapshot> quests, int relMouseX, int relMouseY) {
+    private void drawAllWidgets(GuiGraphics graphics, int relMouseX, int relMouseY,
+                                double visibleMinX, double visibleMinY, double visibleMaxX, double visibleMaxY) {
         Rect viewportRect = localTreeViewportRect();
-        for (QuestDataSnapshot.QuestSnapshot quest : quests) {
-            Rect worldRect = getNodeWorldRect(quest);
+        Rect frame = frameRect();
+        boolean clickable = viewState.getViewedQuestId() == 0L;
+        for (QuestDraw draw : drawCacheQuests) {
+            Rect worldRect = draw.worldRect();
+            if (worldRect.maxX() < visibleMinX || worldRect.x() > visibleMaxX
+                    || worldRect.maxY() < visibleMinY || worldRect.y() > visibleMaxY) {
+                continue;
+            }
+            QuestDataSnapshot.QuestSnapshot quest = draw.quest();
             Rect screenRect = getNodeScreenRect(quest);
             int nodeX = worldRect.x();
             int nodeY = worldRect.y();
 
-            boolean obtained = isQuestObtained(quest);
+            boolean obtained = draw.obtained();
             int widgetTypeIndex = obtained ? 0 : 1;
 
             // Frame texture U: 0=TASK, 26=CHALLENGE, 52=GOAL
@@ -1499,21 +1561,21 @@ public class OverhaulQuestScreen extends Screen {
             // Matching vanilla: render icon at (scrollX + x + 8, scrollY + y + 5)
             quest.icon().draw(graphics, nodeX + WIDGET_ICON_X, nodeY + WIDGET_ICON_Y, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE);
 
-            if (!obtained && !isQuestAvailable(quest)) {
+            if (draw.locked()) {
                 renderLockOverlay(graphics, worldRect);
             }
-            renderQuestStatusOverlayOnWidget(graphics, worldRect, quest);
+            renderQuestStatusOverlay(graphics, draw.status(),
+                    widgetStatusRect(worldRect, STATUS_NOTIFICATION_ICON_WIDTH, STATUS_NOTIFICATION_ICON_HEIGHT, -1));
 
             // Hit detection for click targets (in screen coordinates)
             Rect visibleScreenRect = clipRect(screenRect, viewportRect);
             if (visibleScreenRect != null) {
-                Rect frame = frameRect();
                 Rect absoluteRect = new Rect(
                         visibleScreenRect.x() + frame.x() + TREE_X,
                         visibleScreenRect.y() + frame.y() + TREE_Y,
                         visibleScreenRect.width(),
                         visibleScreenRect.height());
-                if (viewState.getViewedQuestId() == 0L) {
+                if (clickable) {
                     clickTargets.add(new ClickTarget(absoluteRect, () -> {
                         viewState.setViewedQuestId(quest.id());
                         viewState.setDetailScroll(0D);
@@ -1540,7 +1602,11 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private void renderQuestStatusOverlay(GuiGraphics graphics, QuestDataSnapshot.QuestSnapshot quest, Rect overlayRect) {
-        switch (resolvePrimaryActionButtonState(quest).type()) {
+        renderQuestStatusOverlay(graphics, resolvePrimaryActionButtonState(quest).type(), overlayRect);
+    }
+
+    private void renderQuestStatusOverlay(GuiGraphics graphics, PrimaryActionType type, Rect overlayRect) {
+        switch (type) {
             case IN_PROGRESS -> renderInProgressSpinner(graphics, overlayRect.x(), overlayRect.y());
             case COMPLETE -> renderStatusTexture(graphics, OVERHAUL_NOTIFICATION_TEXTURE, overlayRect);
             case COMPLETED -> renderCheckTexture(graphics, overlayRect.x(), overlayRect.y());
@@ -3865,6 +3931,28 @@ public class OverhaulQuestScreen extends Screen {
     }
 
     private record TooltipTarget(Rect rect, List<Component> lines) {
+    }
+
+    private record QuestDraw(QuestDataSnapshot.QuestSnapshot quest, Rect worldRect, boolean obtained, boolean locked,
+                             PrimaryActionType status) {
+    }
+
+    private record ConnectionDraw(int startX, int bendX, int startY, int endX, int endY, boolean active) {
+        int minX() {
+            return Math.min(startX, endX);
+        }
+
+        int maxX() {
+            return Math.max(startX, endX);
+        }
+
+        int minY() {
+            return Math.min(startY, endY);
+        }
+
+        int maxY() {
+            return Math.max(startY, endY);
+        }
     }
 
     private record NodeLayout(QuestDataSnapshot.QuestSnapshot quest, Rect rect) {

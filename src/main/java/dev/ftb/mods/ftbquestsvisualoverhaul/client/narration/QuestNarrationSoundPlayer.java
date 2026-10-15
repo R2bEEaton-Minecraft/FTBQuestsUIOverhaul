@@ -52,7 +52,7 @@ public final class QuestNarrationSoundPlayer {
         private WeighedSoundEvents resolvedEvents;
 
         ResolvedBlipSoundInstance(float pitch, float volume) {
-            super(ModSounds.DIALOGUE_BLIP.get().getLocation(), SoundSource.MASTER, volume, pitch,
+            super(ModSounds.DIALOGUE_BLIP, SoundSource.MASTER, volume, pitch,
                     SoundInstance.createUnseededRandom(), false, 0, SoundInstance.Attenuation.NONE, 0, 0, 0, true);
         }
 
