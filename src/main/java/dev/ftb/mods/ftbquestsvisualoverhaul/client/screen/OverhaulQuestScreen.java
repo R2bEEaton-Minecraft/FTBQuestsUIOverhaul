@@ -2437,7 +2437,10 @@ public class OverhaulQuestScreen extends Screen {
                     int lineVisible = Mth.clamp(visibleCharacters - characterOffset, 0, lineText.length());
                     FormattedCharSequence visibleLine = takePrefix(line, lineVisible);
                     if (centered) {
-                        drawCenteredScaledString(graphics, visibleLine, bodyRect.centerX(), y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
+                        // Anchor on the full line's width, not the revealed prefix, so letters appear in place
+                        // instead of the line re-centering (and sliding) as it grows.
+                        int fullWidth = Math.round(font.width(line) * MODAL_DESCRIPTION_SCALE);
+                        drawScaledString(graphics, visibleLine, bodyRect.centerX() - fullWidth / 2, y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
                     } else {
                         drawScaledString(graphics, visibleLine, bodyRect.x(), y, UiColors.get(UiColors.MODAL_DESCRIPTION_TEXT), MODAL_DESCRIPTION_SCALE);
                     }
